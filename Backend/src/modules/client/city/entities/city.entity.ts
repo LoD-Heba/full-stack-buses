@@ -1,0 +1,42 @@
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  Generated,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { Route } from '../../route/entities/route.entity';
+
+@Entity('cities')
+export class City {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ length: 100 })
+  name: string;
+
+  @Column({ length: 100 })
+  department: string;
+
+  @Column({type:'text', nullable: true})
+  description: string
+
+  @Column({ default: true, name: 'is_active' })
+  is_active: boolean;
+
+  // Unas rutas tienen esta ciudad como ORIGEN
+  @OneToMany(() => Route, (route) => route.originCity)
+  originRoutes: Route[];
+
+  // Unas rutas tienen esta ciudad como DESTINO
+  @OneToMany(() => Route, (route) => route.destinationCity)
+  destinationRoutes: Route[];
+
+  @CreateDateColumn({ name: 'created_at' })
+  created_at: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updated_at: Date;
+}
