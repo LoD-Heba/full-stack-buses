@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Bus, DollarSign, ShoppingCart, TrendingUp, TrendingDown } from 'lucide-react';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 export default function DashboardPage() {
   const stats = [
@@ -43,6 +44,7 @@ export default function DashboardPage() {
   ];
 
   return (
+    <ProtectedRoute requireRole="admin">
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Panel Principal</h1>
@@ -140,5 +142,6 @@ export default function DashboardPage() {
         </Card>
       </div>
     </div>
+     </ProtectedRoute>
   );
 }

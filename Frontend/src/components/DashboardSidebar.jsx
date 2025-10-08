@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import UserMenu from "@/components/UserMenu"
 import {
   Users, Shield, Key, UserCog, Map, Building2, DollarSign,
   ShoppingCart, Bus, Layers, Armchair, Clock, FileText, Newspaper, LayoutDashboard
@@ -29,6 +30,7 @@ export default function DashboardSidebar() {
 
   return (
     <aside className="w-52 bg-black min-h-screen">
+      
       <div className="p-6">
         <h2 className="text-xl font-bold mb-2">Dashboard</h2>
         <p className="text-xs text-gray-400">Panel de Administración</p>
@@ -44,8 +46,8 @@ export default function DashboardSidebar() {
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${
                 isActive
-                  ? 'bg-orange-500 text-white'
-                  : 'text-gray-300 hover:bg-slate-800'
+                  ? 'bg-orange-500'
+                  : ' hover:bg-slate-800'
               }`}
             >
               <Icon className="w-5 h-5" />
