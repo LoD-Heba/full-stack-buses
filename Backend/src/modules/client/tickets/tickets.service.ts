@@ -71,7 +71,7 @@ export class TicketService {
       where: { 
         trip: { id: tripId }, 
         seat: { id: seatId },
-        status: 'CONFIRMED',
+        status: 'CONFIRMADO',
         is_active: true
       }
     });
@@ -87,7 +87,7 @@ export class TicketService {
       where: { 
         trip: { id: tripId }, 
         user: { id: userId },
-        status: 'CONFIRMED',
+        status: 'CONFIRMADO',
         is_active: true
       }
     });
@@ -256,12 +256,12 @@ export class TicketService {
 
     return {
       upcoming: tickets.filter(t => 
-        t.status === 'CONFIRMED' && new Date(t.trip.departure_time) > now
+        t.status === 'CONFIRMADO' && new Date(t.trip.departure_time) > now
       ),
       past: tickets.filter(t => 
-        t.status === 'CONFIRMED' && new Date(t.trip.departure_time) <= now
+        t.status === 'CONFIRMADO' && new Date(t.trip.departure_time) <= now
       ),
-      cancelled: tickets.filter(t => t.status === 'CANCELLED')
+      cancelled: tickets.filter(t => t.status === 'CANCELADO')
     };
   }
 
@@ -298,7 +298,7 @@ export class TicketService {
     const ticket = await this.findOne(id);
 
     // Solo permitir cancelar tickets pendientes
-    if (ticket.status === 'CONFIRMED') {
+    if (ticket.status === 'CONFIRMADO') {
       throw new BadRequestException(
         'No se puede eliminar un ticket confirmado. Use la función de cancelación.'
       );
@@ -313,7 +313,7 @@ export class TicketService {
   async cancelTicket(id: string): Promise<Ticket> {
     const ticket = await this.findOne(id);
 
-    if (ticket.status === 'CANCELLED') {
+    if (ticket.status === 'CANCELADO') {
       throw new BadRequestException('El ticket ya está cancelado');
     }
 
@@ -334,11 +334,11 @@ export class TicketService {
   async confirmTicket(id: string): Promise<Ticket> {
     const ticket = await this.findOne(id);
 
-    if (ticket.status === 'CONFIRMED') {
+    if (ticket.status === 'CONFIRMADO') {
       throw new BadRequestException('El ticket ya está confirmado');
     }
 
-    if (ticket.status === 'CANCELLED') {
+    if (ticket.status === 'CANCELADO') {
       throw new BadRequestException('No se puede confirmar un ticket cancelado');
     }
 
