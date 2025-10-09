@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss';
+import plugin from 'tailwindcss/plugin';
 
 const config: Config = {
   darkMode: ['class'],
@@ -83,8 +84,26 @@ const config: Config = {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
       },
+      textShadow: {
+        sm: '0 1px 2px rgb(0 0 0 / 0.5)',
+        DEFAULT: '0 2px 4px rgb(0 0 0 / 0.5)',
+        lg: '0 8px 16px rgb(0 0 0 / 0.5)',
+        
+      },
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [
+    require('tailwindcss-animate'),
+    plugin(function ({ matchUtilities, theme }) {
+      matchUtilities(
+        {
+          'text-shadow': (value: string) => ({
+            textShadow: value,
+          }),
+        },
+        { values: theme('textShadow') as Record<string, string> }
+      );
+    }),
+  ],
 };
 export default config;

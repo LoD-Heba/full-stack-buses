@@ -6,6 +6,7 @@ import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import Navbar from "@/src/components/Navbar";
 import Footer from "@/src/components/Footer";
+import { clsx } from 'clsx'
 import { usePathname } from "next/navigation";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -23,12 +24,10 @@ export default function RootLayout({
     <html lang="es">
       <head>
         <title>Trans Sacaba - Transporte Interdepartamental Bolivia</title>
-        <meta
-          name="description"
-          content="Viajamos por los 9 departamentos de Bolivia con seguridad y comodidad"
-        />
+        <link rel="icon" href="/favicon.ico" />
+       
       </head>
-      <body className={inter.className}>
+     <body className={clsx(inter.className, 'bg-gray-100 w-[1200px] h-[800px] mx-auto')}>
         <div className="flex flex-col min-h-screen">
           {/* {!isDashboard && !isLogin && <Navbar />} */}
           <Navbar></Navbar>

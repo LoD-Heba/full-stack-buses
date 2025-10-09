@@ -27,7 +27,7 @@ export default function Navbar() {
   const isActive = (path) => pathname === path;
 
   return (
-    <nav className="bg-gradient-to-r from-slate-800 to-slate-900 text-white shadow-lg sticky top-0 z-50">
+    <nav className="bg-black shadow-lg sticky top-0 z-50 ">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <Link
@@ -36,7 +36,7 @@ export default function Navbar() {
           >
             <Bus className="w-8 h-8 text-orange-400" />
             <div className="flex flex-col">
-              <span className="font-bold text-xl">Trans Sacaba</span>
+              <span className="font-bold text-xl ">Trans Sacaba</span>
               <span className="text-xs text-orange-400">
                 Viajamos por Bolivia
               </span>
@@ -85,7 +85,7 @@ export default function Navbar() {
         </div>
 
         {isMenuOpen && (
-          <div className="md:hidden py-4 border-t border-slate-700">
+          <div className="md:hidden py-4 border-t border-slate-100">
             <div className="flex flex-col space-y-2">
               {navLinks.map((link) => (
                 <Link
