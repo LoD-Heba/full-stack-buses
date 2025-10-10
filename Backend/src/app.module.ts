@@ -18,6 +18,7 @@ import { PaymentModule } from './modules/client/payment/payment.module';
 import { ReportModule } from './modules/client/report/report.module';
 import { NewsModule } from './modules/client/news/news.module';
 import { SeatStacksModule } from './modules/client/seat-stacks/seat-stacks.module';
+import { UploadModule } from './common/upload/upload.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { SeatStacksModule } from './modules/client/seat-stacks/seat-stacks.modul
     }),
     CommonModule,
     UserModule,
+    UploadModule,
     RoleModule,
     TicketsModule,
     AuthModule,

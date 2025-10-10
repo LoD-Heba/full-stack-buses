@@ -12,6 +12,7 @@ import { Seat } from './entities/seat.entity';
 import { SeatStack } from '../seat-stacks/entities/seat-stack.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
+import { Bus } from '../bus/entities/bus.entity';
 
 @Injectable()
 export class SeatService {
@@ -20,6 +21,8 @@ export class SeatService {
     private readonly seatRepository: Repository<Seat>,
     @InjectRepository(SeatStack)
     private readonly seatStackRepository: Repository<SeatStack>,
+    @InjectRepository(Bus)
+    private readonly busRepository: Repository<Bus>,
   ) {}
 
   async create(createSeatDto: CreateSeatDto): Promise<Seat> {
@@ -73,7 +76,9 @@ export class SeatService {
     return this.findOne(savedSeat.id);
   }
 
-  async findAll(paginationDto: PaginationDto): Promise<PaginatedResponse<Seat>> {
+  async findAll(
+    paginationDto: PaginationDto,
+  ): Promise<PaginatedResponse<Seat>> {
     const { page = 1, limit = 10 } = paginationDto;
 
     const take = Math.min(Math.max(limit, 1), 100);
@@ -91,9 +96,9 @@ export class SeatService {
       where: { is_active: true },
       relations: {
         stacks: {
-          bus: true
+          bus: true,
         },
-        tickets: true
+        tickets: true,
       },
       order: { seat_number: 'ASC' },
       skip,
@@ -118,7 +123,7 @@ export class SeatService {
       where: { id, is_active: true },
       relations: {
         stacks: {
-          bus: true
+          bus: true,
         },
         tickets: {
           trip: true,
@@ -160,10 +165,9 @@ export class SeatService {
     }
 
     if (searchTerm) {
-      queryBuilder.andWhere(
-        'seat.seat_code ILIKE :searchTerm',
-        { searchTerm: `%${searchTerm}%` }
-      );
+      queryBuilder.andWhere('seat.seat_code ILIKE :searchTerm', {
+        searchTerm: `%${searchTerm}%`,
+      });
     }
 
     const total = await queryBuilder.getCount();
@@ -197,9 +201,9 @@ export class SeatService {
         stacks: { id: stackId },
         is_active: true,
       },
-      relations: { 
+      relations: {
         stacks: true,
-        tickets: true 
+        tickets: true,
       },
       order: { seat_number: 'ASC' },
     });
@@ -216,7 +220,7 @@ export class SeatService {
       .andWhere('stacks.id = :stackId', { stackId })
       .andWhere(
         '(tickets.id IS NULL OR (tickets.status != :confirmed OR trip.departure_time < :now))',
-        { confirmed: 'CONFIRMED', now: new Date() }
+        { confirmed: 'CONFIRMED', now: new Date() },
       )
       .orderBy('seat.seat_number', 'ASC')
       .getMany();
@@ -224,16 +228,16 @@ export class SeatService {
 
   async findByType(type: SeatType): Promise<Seat[]> {
     return this.seatRepository.find({
-      where: { 
-        type, 
-        is_active: true 
+      where: {
+        type,
+        is_active: true,
       },
-      relations: { 
+      relations: {
         stacks: {
-          bus: true
-        }
+          bus: true,
+        },
       },
-      order: { seat_number: 'ASC' }
+      order: { seat_number: 'ASC' },
     });
   }
 
@@ -244,20 +248,20 @@ export class SeatService {
     const existingSeat = await this.findOne(id);
 
     // Verificar si el asiento tiene tickets confirmados
-    const confirmedTickets = existingSeat.tickets?.filter(
-      ticket => ticket.status === 'CONFIRMED'
-    ) || [];
+    const confirmedTickets =
+      existingSeat.tickets?.filter((ticket) => ticket.status === 'CONFIRMED') ||
+      [];
 
     if (confirmedTickets.length > 0) {
       // No permitir cambios críticos si tiene tickets confirmados
       const criticalChanges = ['seat_number', 'seat_code', 'type'];
-      const hasCriticalChanges = criticalChanges.some(field => 
-        seatData[field] !== undefined
+      const hasCriticalChanges = criticalChanges.some(
+        (field) => seatData[field] !== undefined,
       );
 
       if (hasCriticalChanges) {
         throw new BadRequestException(
-          'No se pueden modificar datos críticos de un asiento con tickets confirmados'
+          'No se pueden modificar datos críticos de un asiento con tickets confirmados',
         );
       }
     }
@@ -276,14 +280,17 @@ export class SeatService {
     }
 
     // Verificar unicidad del código de asiento si se está actualizando
-    if (updateData.seat_code && updateData.seat_code !== existingSeat.seat_code) {
+    if (
+      updateData.seat_code &&
+      updateData.seat_code !== existingSeat.seat_code
+    ) {
       const targetStackId = stackId || existingSeat.stacks.id;
       const existingCode = await this.seatRepository.findOne({
         where: {
           seat_code: updateData.seat_code,
           stacks: { id: targetStackId },
           is_active: true,
-          id: Not(id)
+          id: Not(id),
         },
       });
 
@@ -295,14 +302,17 @@ export class SeatService {
     }
 
     // Verificar unicidad del número de asiento si se está actualizando
-    if (seatData.seat_number && seatData.seat_number !== existingSeat.seat_number) {
+    if (
+      seatData.seat_number &&
+      seatData.seat_number !== existingSeat.seat_number
+    ) {
       const targetStackId = stackId || existingSeat.stacks.id;
       const existingNumber = await this.seatRepository.findOne({
         where: {
           seat_number: seatData.seat_number,
           stacks: { id: targetStackId },
           is_active: true,
-          id: Not(id)
+          id: Not(id),
         },
       });
 
@@ -330,7 +340,7 @@ export class SeatService {
     if (hasStackToUpdate) {
       await this.seatRepository.save({
         id,
-        stacks: stack
+        stacks: stack,
       });
 
       // Actualizar capacidad de ambos buses si se cambió de stack
@@ -345,13 +355,12 @@ export class SeatService {
     const seat = await this.findOne(id);
 
     // Verificar si tiene tickets confirmados
-    const confirmedTickets = seat.tickets?.filter(
-      ticket => ticket.status === 'CONFIRMED'
-    ) || [];
+    const confirmedTickets =
+      seat.tickets?.filter((ticket) => ticket.status === 'CONFIRMED') || [];
 
     if (confirmedTickets.length > 0) {
       throw new BadRequestException(
-        'No se puede eliminar un asiento que tiene tickets confirmados'
+        'No se puede eliminar un asiento que tiene tickets confirmados',
       );
     }
 
@@ -366,9 +375,15 @@ export class SeatService {
     return { ...seat, is_active: false };
   }
 
-  async bulkCreateSeats(stackId: string, count: number, type: SeatType = SeatType.NORMAL): Promise<Seat[]> {
+  async bulkCreateSeats(
+    stackId: string,
+    count: number,
+    type: SeatType = SeatType.NORMAL,
+  ): Promise<Seat[]> {
     if (count <= 0 || count > 50) {
-      throw new BadRequestException('El número de asientos debe estar entre 1 y 50');
+      throw new BadRequestException(
+        'El número de asientos debe estar entre 1 y 50',
+      );
     }
 
     // Verificar que el stack existe
@@ -377,7 +392,7 @@ export class SeatService {
     // Obtener el número más alto existente en el stack
     const lastSeat = await this.seatRepository.findOne({
       where: { stacks: { id: stackId } },
-      order: { seat_number: 'DESC' }
+      order: { seat_number: 'DESC' },
     });
 
     const startNumber = (lastSeat?.seat_number || 0) + 1;
@@ -391,7 +406,7 @@ export class SeatService {
         seat_code: seatCode,
         seat_number: seatNumber,
         type,
-        stacks: stack
+        stacks: stack,
       });
 
       seats.push(seat);
@@ -413,10 +428,10 @@ export class SeatService {
       .leftJoin('seat.tickets', 'tickets')
       .select([
         'COUNT(tickets.ticket_id) as total_tickets',
-        'COUNT(CASE WHEN tickets.status = \'CONFIRMED\' THEN 1 END) as confirmed_tickets',
-        'COUNT(CASE WHEN tickets.status = \'PENDING\' THEN 1 END) as pending_tickets',
-        'COUNT(CASE WHEN tickets.status = \'CANCELLED\' THEN 1 END) as cancelled_tickets',
-        'SUM(CASE WHEN tickets.status = \'CONFIRMED\' THEN tickets.price ELSE 0 END) as total_revenue'
+        "COUNT(CASE WHEN tickets.status = 'CONFIRMED' THEN 1 END) as confirmed_tickets",
+        "COUNT(CASE WHEN tickets.status = 'PENDING' THEN 1 END) as pending_tickets",
+        "COUNT(CASE WHEN tickets.status = 'CANCELLED' THEN 1 END) as cancelled_tickets",
+        "SUM(CASE WHEN tickets.status = 'CONFIRMED' THEN tickets.price ELSE 0 END) as total_revenue",
       ])
       .where('seat.id = :id', { id })
       .getRawOne();
@@ -429,10 +444,15 @@ export class SeatService {
         pendingTickets: parseInt(stats.pending_tickets) || 0,
         cancelledTickets: parseInt(stats.cancelled_tickets) || 0,
         totalRevenue: parseFloat(stats.total_revenue) || 0,
-        utilizationRate: stats.total_tickets > 0 
-          ? ((parseInt(stats.confirmed_tickets) || 0) / parseInt(stats.total_tickets) * 100).toFixed(2)
-          : '0'
-      }
+        utilizationRate:
+          stats.total_tickets > 0
+            ? (
+                ((parseInt(stats.confirmed_tickets) || 0) /
+                  parseInt(stats.total_tickets)) *
+                100
+              ).toFixed(2)
+            : '0',
+      },
     };
   }
 
@@ -440,37 +460,36 @@ export class SeatService {
   private async findSeatStack(stackId: string): Promise<SeatStack> {
     const seatStack = await this.seatStackRepository.findOne({
       where: { id: stackId },
-      relations: { bus: true }
+      relations: { bus: true },
     });
-    
+
     if (!seatStack) {
       throw new NotFoundException(`El stack de asientos ${stackId} no existe`);
     }
-    
+
     return seatStack;
   }
 
   private async updateBusCapacity(stackId: string): Promise<void> {
     // Contar asientos activos en el stack
     const activeSeatsCount = await this.seatRepository.count({
-      where: { 
-        stacks: { id: stackId }, 
-        is_active: true 
-      }
+      where: {
+        stacks: { id: stackId },
+        is_active: true,
+      },
     });
 
     // Obtener el stack con su bus
     const stack = await this.seatStackRepository.findOne({
       where: { id: stackId },
-      relations: { bus: true }
+      relations: { bus: true },
     });
 
     if (stack?.bus) {
       // Actualizar la capacidad del bus
-      await this.seatStackRepository.query(
-        'UPDATE buses SET capacity = $1 WHERE id = $2',
-        [activeSeatsCount, stack.bus.id]
-      );
+      await this.busRepository.update(stack.bus.id, {
+        capacity: activeSeatsCount,
+      });
     }
   }
 }

@@ -236,7 +236,7 @@ export class BusService {
   }
 
   async update(id: string, updateBusDto: UpdateBusDto): Promise<Bus> {
-    const { userId, stackId,capacity, ...busData } = updateBusDto;
+    const { userId, stackId, ...busData } = updateBusDto;
 
     // Verificar que el bus existe
     const existingBus = await this.findOne(id);

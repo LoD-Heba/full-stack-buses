@@ -58,7 +58,7 @@ export class RouteService {
 
     if (existingRoute) {
       throw new BadRequestException(
-        `Ya existe una ruta de ${originCity.name} a ${destinationCity.name}`
+        `Ya existe una ruta de ${originCity.city} a ${destinationCity.city}`
       );
     }
 
@@ -69,7 +69,7 @@ export class RouteService {
     }
 
     // Generar nombre automático si no se proporciona
-    const routeName = name || `${originCity.name} - ${destinationCity.name}`;
+    const routeName = name || `${originCity.city} - ${destinationCity.city}`;
 
     // Crear la ruta
     const route = this.routeRepository.create({
@@ -302,7 +302,7 @@ export class RouteService {
         ? await this.findCity(destinationCityId) 
         : existingRoute.destinationCity;
       
-      updateData.name = updateRouteDto.name || `${origin.name} - ${destination.name}`;
+      updateData.name = updateRouteDto.name || `${origin.city} - ${destination.city}`;
     }
 
     // Verificar que hay algo para actualizar

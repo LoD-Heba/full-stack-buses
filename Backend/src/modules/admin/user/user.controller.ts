@@ -8,6 +8,8 @@ import {
   Delete,
   Query,
   ParseUUIDPipe,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -15,6 +17,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { SearchUserDto } from './dto/search-user.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { RegisterDto } from 'src/modules/auth/dto/register.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('users')
 export class UserController {
@@ -73,11 +76,27 @@ export class UserController {
   toggleActive(@Param('id', ParseUUIDPipe) id: string) {
     return this.userService.toggleActive(id);
   }
- // Cambiar estado activo/inactivo
+  // Cambiar estado activo/inactivo
   @Patch(':id/deactive')
   toggleDeactive(@Param('id', ParseUUIDPipe) id: string) {
     return this.userService.toggleDeactive(id);
   }
+  //------------------------------CLOUDINARYA---------------------------------
+  @Patch(':id/image')
+  @UseInterceptors(FileInterceptor('image')) // 'image' es el nombre del campo en FormData
+  async uploadImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.userService.updateImage(id, file);
+  }
+
+  // ✅ Eliminar imagen de perfil
+  @Patch(':id/remove-image')
+  async removeImage(@Param('id', ParseUUIDPipe) id: string) {
+    return this.userService.removeImage(id);
+  }
+  //------------------------------------------------------------------
   // Verificar email
   @Patch(':id/verify-email')
   verifyEmail(@Param('id', ParseUUIDPipe) id: string) {
@@ -103,11 +122,11 @@ export class UserController {
     );
   }
 
-// Crear perfil para usuario
+  // Crear perfil para usuario
   @Post(':id/profile')
   createProfile(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() profileData: any
+    @Body() profileData: any,
   ) {
     return this.userService.createProfile(id, profileData);
   }
@@ -116,7 +135,7 @@ export class UserController {
   @Patch(':id/profile')
   updateProfile(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() profileData: any
+    @Body() profileData: any,
   ) {
     return this.userService.updateProfile(id, profileData);
   }

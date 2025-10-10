@@ -16,6 +16,7 @@ import { User } from './entities/user.entity';
 import { Role } from '../role/entities/role.entity';
 import { UserProfile } from '../user-profile/entities/user-profile.entity';
 import { RegisterDto } from 'src/modules/auth/dto/register.dto';
+import { UploadService } from 'src/common/upload/upload.service';
 
 @Injectable()
 export class UserService {
@@ -28,6 +29,8 @@ export class UserService {
 
     @InjectRepository(UserProfile)
     private readonly userProfileRepository: Repository<UserProfile>,
+
+    private readonly uploadService: UploadService,
   ) {}
 
   /********************************* Crear usuario (Admin) ************************************** */
@@ -36,7 +39,9 @@ export class UserService {
 
     // Validar que se proporciona al menos email o phone
     if (!email && !phone) {
-      throw new BadRequestException('Debe proporcionar al menos email o teléfono');
+      throw new BadRequestException(
+        'Debe proporcionar al menos email o teléfono',
+      );
     }
 
     // Verificar que el rol existe
@@ -75,7 +80,9 @@ export class UserService {
 
     // Validar que se proporciona al menos email o phone
     if (!email && !phone) {
-      throw new BadRequestException('Debe proporcionar al menos email o teléfono');
+      throw new BadRequestException(
+        'Debe proporcionar al menos email o teléfono',
+      );
     }
 
     // Verificar que email sea único si se proporciona
@@ -90,11 +97,13 @@ export class UserService {
 
     // Obtener rol por defecto (ej: "user" o "client")
     const defaultRole = await this.roleRepository.findOne({
-      where: { name: 'user', isActive: true } // O el nombre de tu rol por defecto
+      where: { name: 'user', isActive: true }, // O el nombre de tu rol por defecto
     });
 
     if (!defaultRole) {
-      throw new BadRequestException('Rol por defecto no configurado en el sistema');
+      throw new BadRequestException(
+        'Rol por defecto no configurado en el sistema',
+      );
     }
 
     // Hash de la contraseña
@@ -115,7 +124,9 @@ export class UserService {
   }
 
   /**************************** Buscar todos los usuarios ************************************* */
-  async findAll(paginationDto: PaginationDto): Promise<PaginatedResponse<User>> {
+  async findAll(
+    paginationDto: PaginationDto,
+  ): Promise<PaginatedResponse<User>> {
     const { page = 1, limit = 10 } = paginationDto;
 
     const take = Math.min(Math.max(limit, 1), 100);
@@ -130,12 +141,11 @@ export class UserService {
     const hasPrevPage = page > 1;
 
     const data = await this.userRepository.find({
-     
-      relations: { 
-        roles: true, 
+      relations: {
+        roles: true,
         profile: true,
         buses: true,
-        tickets: true
+        tickets: true,
       },
       order: { createdAt: 'DESC' },
       skip,
@@ -158,7 +168,8 @@ export class UserService {
   /***************************** Buscar usuarios con filtros ************************************ */
   async search(searchDto: SearchUserDto, paginationDto: PaginationDto) {
     const { page = 1, limit = 10 } = paginationDto;
-    const { searchTerm, roleId, isActive, isEmailVerified, hasProfile } = searchDto;
+    const { searchTerm, roleId, isActive, isEmailVerified, hasProfile } =
+      searchDto;
 
     const take = Math.min(Math.max(limit, 1), 100);
     const skip = (page - 1) * take;
@@ -172,7 +183,7 @@ export class UserService {
     if (searchTerm) {
       queryBuilder.where(
         '(user.name ILIKE :searchTerm OR user.email ILIKE :searchTerm OR user.phone ILIKE :searchTerm)',
-        { searchTerm: `%${searchTerm}%` }
+        { searchTerm: `%${searchTerm}%` },
       );
     }
 
@@ -188,7 +199,9 @@ export class UserService {
 
     // Filtro por email verificado
     if (typeof isEmailVerified === 'boolean') {
-      queryBuilder.andWhere('user.isEmailVerified = :isEmailVerified', { isEmailVerified });
+      queryBuilder.andWhere('user.isEmailVerified = :isEmailVerified', {
+        isEmailVerified,
+      });
     }
 
     // Filtro por tener perfil
@@ -228,19 +241,10 @@ export class UserService {
   /***************************** Buscar un usuario por ID ************************************ */
   async findOne(id: string): Promise<User> {
     const user = await this.userRepository.findOne({
-      where: { id},
-      relations: { 
-        roles: true, 
+      where: { id },
+      relations: {
+        roles: true,
         profile: true,
-        buses: true,
-        tickets: {
-          trip: {
-            route: {
-              originCity: true,
-              destinationCity: true
-            }
-          }
-        }
       },
     });
 
@@ -256,19 +260,19 @@ export class UserService {
   /***************************** Buscar un usuario por ID ************************************ */
   async findOneDeactive(id: string): Promise<User> {
     const user = await this.userRepository.findOne({
-      where: { id, isActive: false},
-      relations: { 
-        roles: true, 
+      where: { id, isActive: false },
+      relations: {
+        roles: true,
         profile: true,
         buses: true,
         tickets: {
           trip: {
             route: {
               originCity: true,
-              destinationCity: true
-            }
-          }
-        }
+              destinationCity: true,
+            },
+          },
+        },
       },
     });
 
@@ -279,18 +283,6 @@ export class UserService {
     }
 
     return user;
-  }
-
-  /***************************** Buscar por email o teléfono ************************************ */
-  async findByEmailOrPhone(emailOrPhone: string): Promise<User | null> {
-    return this.userRepository.findOne({
-      where: [
-        { email: emailOrPhone, isActive: true },
-        { phone: emailOrPhone, isActive: true }
-      ],
-      relations: { roles: true, profile: true },
-      select: ['id', 'name', 'email', 'phone', 'password', 'isActive', 'isEmailVerified', 'isPhoneVerified']
-    });
   }
 
   /******************************* Actualizar un usuario *********************************** */
@@ -322,22 +314,24 @@ export class UserService {
 
     // Actualizar rol si se proporciona
     if (roleId) {
-  if (this.isUUID(roleId)) {
-    // Si lo que recibo es un UUID
-    updateData.roles = await this.findRoleOrThrow(roleId);
-  } else {
-    // Si lo que recibo es un nombre de rol
-    const role = await this.roleRepository.findOne({ where: { name: roleId } });
-    if (!role) {
-      throw new NotFoundException(`El rol '${roleId}' no existe`);
+      if (this.isUUID(roleId)) {
+        // Si lo que recibo es un UUID
+        updateData.roles = await this.findRoleOrThrow(roleId);
+      } else {
+        // Si lo que recibo es un nombre de rol
+        const role = await this.roleRepository.findOne({
+          where: { name: roleId },
+        });
+        if (!role) {
+          throw new NotFoundException(`El rol '${roleId}' no existe`);
+        }
+        updateData.roles = role;
+      }
     }
-    updateData.roles = role;
-  }
-}
 
     await this.userRepository.save({
       id,
-      ...updateData
+      ...updateData,
     });
 
     return this.findOne(id);
@@ -346,23 +340,22 @@ export class UserService {
   /************************ Cambiar estado activo ***************************/
   async toggleActive(id: string): Promise<User> {
     const user = await this.findOneDeactive(id);
-    console.log(id)
-    const active = await this.userRepository.update(id, { 
-      isActive: !user.isActive 
+    const active = await this.userRepository.update(id, {
+      isActive: !user.isActive,
     });
-    if(!active){
-      throw new NotFoundException ('La Id no existe o el usuario ya está activado')
-    } else{
-     "usuario activado"
+    if (!active) {
+      throw new NotFoundException(
+        'La Id no existe o el usuario ya está activado',
+      );
     }
     return this.findOne(id);
   }
 
-    async toggleDeactive(id: string): Promise<User> {
+  async toggleDeactive(id: string): Promise<User> {
     const user = await this.findOne(id);
-    
-    await this.userRepository.update(id, { 
-      isActive: false
+
+    await this.userRepository.update(id, {
+      isActive: false,
     });
 
     return this.findOne(id);
@@ -372,8 +365,8 @@ export class UserService {
   async verifyEmail(id: string): Promise<User> {
     await this.findOne(id);
 
-    await this.userRepository.update(id, { 
-      isEmailVerified: true 
+    await this.userRepository.update(id, {
+      isEmailVerified: true,
     });
 
     return this.findOne(id);
@@ -383,15 +376,18 @@ export class UserService {
   async verifyPhone(id: string): Promise<User> {
     await this.findOne(id);
 
-    await this.userRepository.update(id, { 
-      isPhoneVerified: true 
+    await this.userRepository.update(id, {
+      isPhoneVerified: true,
     });
 
     return this.findOne(id);
   }
 
   /******************************* Crear perfil para un usuario *********************************** */
-  async createProfile(userId: string, profileData: Partial<UserProfile>): Promise<User> {
+  async createProfile(
+    userId: string,
+    profileData: Partial<UserProfile>,
+  ): Promise<User> {
     const user = await this.findOne(userId);
 
     if (user.profile) {
@@ -401,15 +397,18 @@ export class UserService {
     const profile = this.userProfileRepository.create(profileData);
     const savedProfile = await this.userProfileRepository.save(profile);
 
-    await this.userRepository.update(userId, { 
-      profile: savedProfile 
+    await this.userRepository.update(userId, {
+      profile: savedProfile,
     });
 
     return this.findOne(userId);
   }
 
   /*********************  Actualizar perfil de un usuario ************************************ */
-  async updateProfile(userId: string, profileData: Partial<UserProfile>): Promise<User> {
+  async updateProfile(
+    userId: string,
+    profileData: Partial<UserProfile>,
+  ): Promise<User> {
     const user = await this.findOne(userId);
 
     if (!user.profile) {
@@ -441,11 +440,15 @@ export class UserService {
   }
 
   /****************************** Cambiar contraseña ************************************ */
-  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ message: string }> {
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
     // Obtener usuario con contraseña
     const user = await this.userRepository.findOne({
       where: { id: userId, isActive: true },
-      select: ['id', 'password']
+      select: ['id', 'password'],
     });
 
     if (!user) {
@@ -453,7 +456,10 @@ export class UserService {
     }
 
     // Verificar contraseña actual
-    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    const isCurrentPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.password,
+    );
     if (!isCurrentPasswordValid) {
       throw new BadRequestException('La contraseña actual es incorrecta');
     }
@@ -462,8 +468,8 @@ export class UserService {
     const hashedNewPassword = await bcrypt.hash(newPassword, 12);
 
     // Actualizar contraseña
-    await this.userRepository.update(userId, { 
-      password: hashedNewPassword 
+    await this.userRepository.update(userId, {
+      password: hashedNewPassword,
     });
 
     return { message: 'Contraseña cambiada exitosamente' };
@@ -479,9 +485,9 @@ export class UserService {
       .leftJoin('user.buses', 'buses')
       .select([
         'COUNT(DISTINCT tickets.ticket_id) as total_tickets',
-        'COUNT(DISTINCT CASE WHEN tickets.status = \'CONFIRMED\' THEN tickets.ticket_id END) as confirmed_tickets',
+        "COUNT(DISTINCT CASE WHEN tickets.status = 'CONFIRMED' THEN tickets.ticket_id END) as confirmed_tickets",
         'COUNT(DISTINCT buses.id) as total_buses',
-        'SUM(CASE WHEN tickets.status = \'CONFIRMED\' THEN tickets.price ELSE 0 END) as total_spent'
+        "SUM(CASE WHEN tickets.status = 'CONFIRMED' THEN tickets.price ELSE 0 END) as total_spent",
       ])
       .where('user.id = :userId', { userId })
       .getRawOne();
@@ -495,8 +501,8 @@ export class UserService {
         totalSpent: parseFloat(stats.total_spent) || 0,
         hasProfile: !!user.profile,
         isEmailVerified: user.isEmailVerified,
-        isPhoneVerified: user.isPhoneVerified
-      }
+        isPhoneVerified: user.isPhoneVerified,
+      },
     };
   }
 
@@ -505,29 +511,91 @@ export class UserService {
     const user = await this.findOne(id);
 
     // Verificar si tiene tickets confirmados o buses activos
-    const activeTickets = user.tickets?.filter(
-      ticket => ticket.status === 'CONFIRMED'
-    ) || [];
+    const activeTickets =
+      user.tickets?.filter((ticket) => ticket.status === 'CONFIRMED') || [];
 
-    const activeBuses = user.buses?.filter(
-      bus => bus.is_active
-    ) || [];
+    const activeBuses = user.buses?.filter((bus) => bus.is_active) || [];
 
     if (activeTickets.length > 0 || activeBuses.length > 0) {
       throw new BadRequestException(
-        'No se puede eliminar un usuario que tiene tickets confirmados o buses activos'
+        'No se puede eliminar un usuario que tiene tickets confirmados o buses activos',
       );
     }
 
     await this.userRepository.delete(id);
 
     return { ...user, isActive: false };
+
+    ///////////////////////////////////////////////////////////////
+  }
+  async updateImage(userId: string, file: Express.Multer.File): Promise<User> {
+    if (!file) {
+      throw new BadRequestException('No se proporcionó ninguna imagen');
+    }
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException(`Usuario con ID ${userId} no encontrado`);
+    }
+
+    // Eliminar imagen anterior si existe
+    if (user.image_url) {
+      await this.uploadService.deleteImage(user.image_url);
+    }
+
+    // Subir nueva imagen
+    const imageUrl = await this.uploadService.uploadImage(file, {
+      folder: 'users',
+      width: 500,
+      height: 500,
+      crop: 'fill',
+    });
+
+    // Actualizar en base de datos
+    const image = await this.userRepository.update(userId, {
+      image_url: imageUrl,
+    });
+
+    return image;
   }
 
+  async removeImage(userId: string): Promise<User> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException(`Usuario con ID ${userId} no encontrado`);
+    }
+
+    if (!user.image_url) {
+      throw new BadRequestException('El usuario no tiene imagen');
+    }
+
+    // Eliminar de Cloudinary
+    await this.uploadService.deleteImage(user.image_url);
+
+    // Actualizar en base de datos
+    await this.userRepository.update(userId, { image_url: null });
+
+    return this.userRepository.findOne({ where: { id: userId } });
+  }
+
+  async remove(id: string): Promise<User> {
+    const user = await this.findOne(id);
+
+    // Eliminar imagen si existe
+    if (user.image_url) {
+      await this.uploadService.deleteImage(user.image_url);
+    }
+
+    await this.userRepository.delete(id);
+    return { ...user, isActive: false };
+  }
+  //////////////////////////////////////////////////////////////////
   // Métodos privados auxiliares
   private async findRoleOrThrow(roleId: string): Promise<Role> {
     const role = await this.roleRepository.findOne({
-      where: { id: roleId, isActive: true }
+      where: { id: roleId, isActive: true },
     });
 
     if (!role) {
@@ -541,7 +609,7 @@ export class UserService {
 
   private async checkEmailUnique(email: string): Promise<void> {
     const existingUser = await this.userRepository.findOne({
-      where: { email }
+      where: { email },
     });
 
     if (existingUser) {
@@ -551,17 +619,16 @@ export class UserService {
 
   private async checkPhoneUnique(phone: string): Promise<void> {
     const existingUser = await this.userRepository.findOne({
-      where: { phone }
+      where: { phone },
     });
 
-    if (existingUser) { 
+    if (existingUser) {
       throw new ConflictException('El teléfono ya está en uso');
     }
   }
   private isUUID(value: string): boolean {
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(value);
-}
-
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(value);
+  }
 }

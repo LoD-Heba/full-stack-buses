@@ -4,7 +4,7 @@ export class CreateCityDto {
   @IsString({ message: 'El nombre de la ciudad debe ser texto válido.' })
   @IsNotEmpty({ message: 'El nombre de la ciudad es requerido.' })
   @MaxLength(100, { message: 'El nombre no debe superar los 100 caracteres.' })
-  name: string;
+  city: string;
 
   @IsString({ message: 'El departamento debe ser texto válido.' })
   @IsNotEmpty({ message: 'El departamento es requerido.' })

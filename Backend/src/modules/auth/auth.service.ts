@@ -9,7 +9,11 @@ import { UserService } from '../admin/user/user.service';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { JwtPayload, LoginResponse, UserProfile } from './interfaces/auth.interfaces';
+import {
+  JwtPayload,
+  LoginResponse,
+  UserProfile,
+} from './interfaces/auth.interfaces';
 
 @Injectable()
 export class AuthService {
@@ -96,12 +100,19 @@ export class AuthService {
 
   /********************************************************************** */
   // Método para obtener el usuario actual desde el token JWT
-  async getCurrentUser(userId: string): Promise<User> {
+  async getCurrentUser(userId: string): Promise<Partial<User>> {
     const user = await this.userRepository.findOne({
       where: { id: userId, isActive: true },
-      relations: { 
-        roles: true, 
-        profile: true 
+      relations: { roles: true, profile: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        isEmailVerified: true,
+        isPhoneVerified: true,
+        isActive: true,
+        createdAt: true,
       },
     });
 
@@ -115,7 +126,27 @@ export class AuthService {
   /********************************************************************** */
   // Método para refrescar el token
   async refreshToken(userId: string): Promise<LoginResponse> {
-    const user = await this.getCurrentUser(userId);
+    const user = await this.userRepository.findOne({
+      where: { id: userId, isActive: true },
+      relations: { roles: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        password: true,
+        isActive: true,
+        isEmailVerified: true,
+        isPhoneVerified: true,
+        roles: {
+          id: true,
+          name: true,
+        },
+      },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
     return this.generateAuthResponse(user);
   }
 
@@ -130,12 +161,12 @@ export class AuthService {
   /********************************************************************** */
   // Validar credenciales para cambio de contraseña
   async validateCredentialsForPasswordChange(
-    userId: string, 
-    currentPassword: string
+    userId: string,
+    currentPassword: string,
   ): Promise<boolean> {
     const user = await this.userRepository.findOne({
       where: { id: userId, isActive: true },
-      select: ['id', 'password']
+      select: ['id', 'password'],
     });
 
     if (!user) {
@@ -149,7 +180,7 @@ export class AuthService {
   // Método privado para generar tiempo de expiración en segundos
   private getTokenExpirationInSeconds(): number {
     const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '1d');
-    
+
     if (expiresIn.endsWith('h')) {
       return parseInt(expiresIn) * 3600;
     }
@@ -168,8 +199,8 @@ export class AuthService {
   private async findUserForAuth(identifier: string): Promise<User | null> {
     // Detectar si el identificador es email o teléfono
     const isEmail = identifier.includes('@');
-    
-    const whereCondition = isEmail 
+
+    const whereCondition = isEmail
       ? { email: identifier, isActive: true }
       : { phone: identifier, isActive: true };
 
@@ -185,9 +216,9 @@ export class AuthService {
         isActive: true,
         isEmailVerified: true,
         isPhoneVerified: true,
-        roles: { 
-          id: true, 
-          name: true 
+        roles: {
+          id: true,
+          name: true,
         },
       },
     });

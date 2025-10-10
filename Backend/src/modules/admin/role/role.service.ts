@@ -149,9 +149,6 @@ export class RoleService {
         await this.userRepository.save(user);
       }
     }
-    if(roleToDelete){
-
-    }
 
     // Eliminar rol definitivamente
     await this.roleRepository.remove(roleToDelete);

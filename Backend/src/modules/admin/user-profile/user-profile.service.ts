@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserProfile } from './entities/user-profile.entity';
@@ -17,12 +17,23 @@ export class UserProfileService {
     private readonly tickedRepository : Repository <Ticket>
   ) {}
 
-  async create(
-    createUserProfileDto: CreateUserProfileDto,
-  ): Promise<UserProfile> {
-    const userProfile = this.userProfileRepository.create(createUserProfileDto);
-    return this.userProfileRepository.save(userProfile);
+  async create(createUserProfileDto: CreateUserProfileDto): Promise<UserProfile> {
+  // Validar documentNumber único
+  if (createUserProfileDto.documentNumber) {
+    const exists = await this.userProfileRepository.findOne({
+      where: { documentNumber: createUserProfileDto.documentNumber }
+    });
+    
+    if (exists) {
+      throw new ConflictException(
+        `Ya existe un perfil con el C.I. ${createUserProfileDto.documentNumber}`
+      );
+    }
   }
+  
+  const userProfile = this.userProfileRepository.create(createUserProfileDto);
+  return this.userProfileRepository.save(userProfile);
+}
 
   async findAll(paginationDto: PaginationDto) {
     // Desestructurar y establecer valores predeterminados para paginación

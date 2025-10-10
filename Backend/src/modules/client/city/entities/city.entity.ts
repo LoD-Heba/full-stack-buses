@@ -2,7 +2,6 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  Generated,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -15,7 +14,7 @@ export class City {
   id: string;
 
   @Column({ length: 100 })
-  name: string;
+  city: string;
 
   @Column({ length: 100 })
   department: string;
