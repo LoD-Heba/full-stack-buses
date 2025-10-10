@@ -82,20 +82,7 @@ export class UserController {
     return this.userService.toggleDeactive(id);
   }
   //------------------------------CLOUDINARYA---------------------------------
-  @Patch(':id/image')
-  @UseInterceptors(FileInterceptor('image')) // 'image' es el nombre del campo en FormData
-  async uploadImage(
-    @Param('id', ParseUUIDPipe) id: string,
-    @UploadedFile() file: Express.Multer.File,
-  ) {
-    return this.userService.updateImage(id, file);
-  }
 
-  // ✅ Eliminar imagen de perfil
-  @Patch(':id/remove-image')
-  async removeImage(@Param('id', ParseUUIDPipe) id: string) {
-    return this.userService.removeImage(id);
-  }
   //------------------------------------------------------------------
   // Verificar email
   @Patch(':id/verify-email')

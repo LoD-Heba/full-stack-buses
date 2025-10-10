@@ -16,7 +16,6 @@ import { User } from './entities/user.entity';
 import { Role } from '../role/entities/role.entity';
 import { UserProfile } from '../user-profile/entities/user-profile.entity';
 import { RegisterDto } from 'src/modules/auth/dto/register.dto';
-import { UploadService } from 'src/common/upload/upload.service';
 
 @Injectable()
 export class UserService {
@@ -30,7 +29,6 @@ export class UserService {
     @InjectRepository(UserProfile)
     private readonly userProfileRepository: Repository<UserProfile>,
 
-    private readonly uploadService: UploadService,
   ) {}
 
   /********************************* Crear usuario (Admin) ************************************** */
@@ -528,70 +526,6 @@ export class UserService {
 
     ///////////////////////////////////////////////////////////////
   }
-  async updateImage(userId: string, file: Express.Multer.File): Promise<User> {
-    if (!file) {
-      throw new BadRequestException('No se proporcionó ninguna imagen');
-    }
-
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-
-    if (!user) {
-      throw new NotFoundException(`Usuario con ID ${userId} no encontrado`);
-    }
-
-    // Eliminar imagen anterior si existe
-    if (user.image_url) {
-      await this.uploadService.deleteImage(user.image_url);
-    }
-
-    // Subir nueva imagen
-    const imageUrl = await this.uploadService.uploadImage(file, {
-      folder: 'users',
-      width: 500,
-      height: 500,
-      crop: 'fill',
-    });
-
-    // Actualizar en base de datos
-    const image = await this.userRepository.update(userId, {
-      image_url: imageUrl,
-    });
-
-    return image;
-  }
-
-  async removeImage(userId: string): Promise<User> {
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-
-    if (!user) {
-      throw new NotFoundException(`Usuario con ID ${userId} no encontrado`);
-    }
-
-    if (!user.image_url) {
-      throw new BadRequestException('El usuario no tiene imagen');
-    }
-
-    // Eliminar de Cloudinary
-    await this.uploadService.deleteImage(user.image_url);
-
-    // Actualizar en base de datos
-    await this.userRepository.update(userId, { image_url: null });
-
-    return this.userRepository.findOne({ where: { id: userId } });
-  }
-
-  async remove(id: string): Promise<User> {
-    const user = await this.findOne(id);
-
-    // Eliminar imagen si existe
-    if (user.image_url) {
-      await this.uploadService.deleteImage(user.image_url);
-    }
-
-    await this.userRepository.delete(id);
-    return { ...user, isActive: false };
-  }
-  //////////////////////////////////////////////////////////////////
   // Métodos privados auxiliares
   private async findRoleOrThrow(roleId: string): Promise<Role> {
     const role = await this.roleRepository.findOne({

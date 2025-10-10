@@ -5,6 +5,8 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUrl,
+  isURL,
   IsUUID,
   Length,
   Matches,
@@ -25,16 +27,21 @@ export class CreateUserDto {
   @Transform(({ value }) => value?.toString().toLowerCase().trim())
   email?: string;
 
+   @IsOptional()
+  @IsString()
+  @IsUrl({}, { message: 'La imagen debe ser una URL válida' })
+  image_url?: string;
+
   // Phone es opcional, pero requerido si no hay email
   @ValidateIf((o) => !o.email)
   @IsNotEmpty({ message: 'El teléfono es obligatorio si no proporciona email' })
   @IsString({ message: 'El teléfono debe ser una cadena de texto' })
-  @Matches(/^[+]?[0-9\s\-\(\)]{7,15}$/, { 
-    message: 'El teléfono debe tener un formato válido' 
+  @Matches(/^[+]?[0-9\s\-\(\)]{7,15}$/, {
+    message: 'El teléfono debe tener un formato válido',
   })
   @Transform(({ value }) => value?.toString().trim())
   phone?: string;
-  
+
   @IsString({ message: 'La contraseña debe ser una cadena de texto' })
   @IsNotEmpty({ message: 'La contraseña es obligatoria' })
   @Transform(({ value }) => value?.toString().trim())
