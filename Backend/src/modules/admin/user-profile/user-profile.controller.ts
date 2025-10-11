@@ -19,7 +19,7 @@ import { PermissionsGuard } from 'src/common/guard/permission.guard';
 import { RolesGuard } from 'src/common/guard/role.guard';
 import { Permissions } from 'src/common/decorators/permission.decorator';
 
-@Controller('userProfile')
+@Controller('clients')
 export class UserProfileController {
   constructor(private readonly userProfileService: UserProfileService) {}
 
@@ -34,15 +34,21 @@ export class UserProfileController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
-  @Permissions('ver_perfiles')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.userProfileService.findOne(id);
   }
 
+  @Get(':id/with-tickets')
+  findOneWithTickets(@Param('id', ParseUUIDPipe) id: string) {
+    return this.userProfileService.findOneWithTickets(id);
+  }
+
+  @Get(':id/can-purchase')
+  canPurchaseTickets(@Param('id', ParseUUIDPipe) id: string) {
+    return this.userProfileService.canPurchaseTickets(id);
+  }
+
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
-  @Permissions('editar_perfiles')
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserProfileDto: UpdateUserProfileDto,
@@ -50,9 +56,12 @@ export class UserProfileController {
     return this.userProfileService.update(id, updateUserProfileDto);
   }
 
+  @Patch(':id/toggle-active')
+  toggleActive(@Param('id', ParseUUIDPipe) id: string) {
+    return this.userProfileService.toggleActive(id);
+  }
+
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, PermissionsGuard, RolesGuard)
-  @Permissions('eliminar_perfiles')
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.userProfileService.remove(id);
   }
