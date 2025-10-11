@@ -1,3 +1,4 @@
+// Backend/src/modules/client/bus/dto/create-bus.dto.ts
 import {
   IsBoolean,
   IsEnum,
@@ -6,6 +7,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  IsUrl,
   Length,
   Matches,
   MaxLength,
@@ -74,8 +76,13 @@ export class CreateBusDto {
   amenities?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(1000, { message: 'La URL de la imagen no puede exceder los 1000 caracteres' })
+  image_url?: string;
+
+  @IsOptional()
   @IsEnum(BusStatus, {
-    message: 'El status debe ser: DISPONIBLE, EN_USO, MANTENIMIENTO O FUERA_DE_SERVICIO'
+    message: 'El status debe ser: disponible, en_uso, mantenimiento o fuera_de_servicio'
   })
   status?: BusStatus;
 

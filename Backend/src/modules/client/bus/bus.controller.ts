@@ -1,3 +1,4 @@
+// Backend/src/modules/client/bus/bus.controller.ts
 import {
   Controller,
   Get,
@@ -9,7 +10,13 @@ import {
   Query,
   ParseUUIDPipe,
   ParseEnumPipe,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { BusService } from './bus.service';
 import { CreateBusDto, BusStatus } from './dto/create-bus.dto';
 import { UpdateBusDto } from './dto/update-bus.dto';
@@ -23,6 +30,45 @@ export class BusController {
   @Post()
   create(@Body() createBusDto: CreateBusDto) {
     return this.busService.create(createBusDto);
+  }
+
+  @Post(':id/upload-image')
+  @UseInterceptors(
+    FileInterceptor('image', {
+      storage: diskStorage({
+        destination: './uploads/buses',
+        filename: (req, file, cb) => {
+          const randomName = Array(32)
+            .fill(null)
+            .map(() => Math.round(Math.random() * 16).toString(16))
+            .join('');
+          cb(null, `${randomName}${extname(file.originalname)}`);
+        },
+      }),
+      fileFilter: (req, file, cb) => {
+        if (!file.originalname.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
+          return cb(
+            new BadRequestException('Solo se permiten imágenes (jpg, jpeg, png, gif, webp)'),
+            false,
+          );
+        }
+        cb(null, true);
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+    }),
+  )
+  async uploadImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No se proporcionó ninguna imagen');
+    }
+
+    const imageUrl = `/uploads/buses/${file.filename}`;
+    return this.busService.updateImageUrl(id, imageUrl);
   }
 
   @Get()

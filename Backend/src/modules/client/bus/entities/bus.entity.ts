@@ -1,3 +1,4 @@
+// Backend/src/modules/client/bus/entities/bus.entity.ts
 import {
   Column,
   CreateDateColumn,
@@ -30,7 +31,7 @@ export class Bus {
   year: number;
 
   @Column({ nullable: true })
-  capacity: number; // Cantidad aproximada de asientos
+  capacity: number;
 
   @Column({
     type: 'enum',
@@ -50,6 +51,10 @@ export class Bus {
   })
   status: string;
 
+  // Nuevo campo para la imagen
+  @Column({ type: 'text', nullable: true, name: 'image_url' })
+  image_url: string;
+
   @Column({ default: true, name: 'is_active' })
   is_active: boolean;
 
@@ -59,7 +64,6 @@ export class Bus {
   @UpdateDateColumn({ name: 'updated_at' })
   updated_at: Date;
 
-  // Un bus tiene un stack (1:1)
   @OneToOne(() => SeatStack, (stacks) => stacks.bus, { 
     cascade: true,
     nullable: true 
@@ -67,18 +71,15 @@ export class Bus {
   @JoinColumn({ name: 'seat_stack_id' })
   stacks: SeatStack;
 
-  // Un bus tiene muchos viajes (1:N)
   @OneToMany(() => Trip, (trip) => trip.bus)
   trips: Trip[];
 
-  // Un bus puede tener muchas rutas y una ruta puede tener muchos buses (N:M)
   @ManyToMany(() => Route, (route) => route.buses)
   routes: Route[];
 
-  // Muchos buses pueden ser gestionados por un usuario (N:1)
   @ManyToOne(() => User, (user) => user.buses, {
     nullable: false,
-    onDelete: 'CASCADE', // Si el usuario se elimina, el bus también
+    onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'user_id' })
   user: User;

@@ -355,7 +355,7 @@ export class BusService {
         );
       }
     }
- 
+
     if (status === BusStatus.DISPONIBLE && bus.status === BusStatus.EN_USO) {
       // Verificar que no tenga viajes en progreso
       const activeTrips =
@@ -384,7 +384,7 @@ export class BusService {
         'COUNT(DISTINCT trips.id) as total_trips',
         "COUNT(DISTINCT CASE WHEN trips.status = 'COMPLETED' THEN trips.id END) as completed_trips",
         'COUNT(tickets.ticket_id) as total_tickets',
-        "SUM(CASE WHEN tickets.status = 'CONFIRMED' THEN tickets.price ELSE 0 END) as total_revenue",
+        "SUM(CASE WHEN tickets.status = 'CONFIRMADO' THEN tickets.price ELSE 0 END) as total_revenue",
       ])
       .where('bus.id = :id', { id })
       .getRawOne();
@@ -451,5 +451,13 @@ export class BusService {
         bus.stacks.seats?.filter((seat) => seat.is_active).length || 0;
       await this.busRepository.update(busId, { capacity: activeSeats });
     }
+  }
+
+  async updateImageUrl(id: string, imageUrl: string): Promise<Bus> {
+    const bus = await this.findOne(id);
+
+    await this.busRepository.update(id, { image_url: imageUrl });
+
+    return this.findOne(id);
   }
 }
