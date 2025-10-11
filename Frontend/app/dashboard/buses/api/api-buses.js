@@ -1,13 +1,10 @@
+// Frontend/app/dashboard/buses/api/api-buses.js
 const BASE_URL = "http://localhost:3001/api/v1/buses";
 
-/**
- * Manejo centralizado de errores de API
- */
 async function handleApiResponse(response) {
   const data = await response.json();
   
   if (!response.ok) {
-    // Extraer mensaje de error del backend
     const errorMessage = data.message || 
                         data.error || 
                         `Error ${response.status}: ${response.statusText}`;
@@ -17,12 +14,9 @@ async function handleApiResponse(response) {
   return data;
 }
 
-/**
- * Crear un nuevo bus
- */
 export async function createBus(busData) {
   try {
-    const res = await fetch(`${BASE_URL}`, {
+    const res = await fetch(`http://localhost:3001/api/v1/buses`, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
@@ -37,9 +31,27 @@ export async function createBus(busData) {
   }
 }
 
-/**
- * Obtener todos los buses con paginación
- */
+export async function uploadBusImage(busId, imageFile) {
+  try {
+    if (!busId || !imageFile) {
+      throw new Error("ID de bus y archivo de imagen son requeridos");
+    }
+
+    const formData = new FormData();
+    formData.append('image', imageFile);
+
+    const res = await fetch(`${BASE_URL}/${busId}/upload-image`, {
+      method: "POST",
+      body: formData,
+    });
+
+    return await handleApiResponse(res);
+  } catch (error) {
+    console.error(`Error al subir imagen del bus ${busId}:`, error);
+    throw error;
+  }
+}
+
 export async function getBuses(page = 1, limit = 10) {
   try {
     const res = await fetch(`${BASE_URL}?page=${page}&limit=${limit}`, {
@@ -56,12 +68,8 @@ export async function getBuses(page = 1, limit = 10) {
   }
 }
 
-/**
- * Buscar buses con filtros
- */
 export async function searchBuses(filters = {}, page = 1, limit = 10) {
   try {
-    // Limpiar filtros vacíos
     const cleanFilters = Object.entries(filters).reduce((acc, [key, value]) => {
       if (value !== null && value !== undefined && value !== "") {
         acc[key] = value;
@@ -89,16 +97,13 @@ export async function searchBuses(filters = {}, page = 1, limit = 10) {
   }
 }
 
-/**
- * Obtener un bus por ID
- */
 export async function getBus(id) {
   try {
     if (!id || id === "undefined") {
       throw new Error("ID de bus inválido");
     }
 
-    const res = await fetch(`${BASE_URL}/${id}`, { 
+    const res = await fetch(`http://localhost:3001/api/v1/buses/${id}`, { 
       cache: "no-store",
       headers: {
         "Content-Type": "application/json",
@@ -112,9 +117,6 @@ export async function getBus(id) {
   }
 }
 
-/**
- * Obtener buses por usuario
- */
 export async function getBusesByUser(userId) {
   try {
     if (!userId) {
@@ -135,9 +137,6 @@ export async function getBusesByUser(userId) {
   }
 }
 
-/**
- * Obtener buses disponibles
- */
 export async function getAvailableBuses() {
   try {
     const res = await fetch(`${BASE_URL}/available`, { 
@@ -154,9 +153,6 @@ export async function getAvailableBuses() {
   }
 }
 
-/**
- * Obtener estadísticas de un bus
- */
 export async function getBusStatistics(id) {
   try {
     if (!id) {
@@ -177,9 +173,6 @@ export async function getBusStatistics(id) {
   }
 }
 
-/**
- * Actualizar un bus
- */
 export async function updateBus(id, busData) {
   try {
     if (!id) {
@@ -201,9 +194,6 @@ export async function updateBus(id, busData) {
   }
 }
 
-/**
- * Cambiar estado de un bus
- */
 export async function changeBusStatus(id, status) {
   try {
     if (!id) {
@@ -214,7 +204,7 @@ export async function changeBusStatus(id, status) {
       throw new Error("Estado requerido");
     }
 
-    const validStatuses = ["AVAILABLE", "IN_USE", "MAINTENANCE", "OUT_OF_SERVICE"];
+    const validStatuses = ["disponible", "en_uso", "mantenimiento", "fuera_de_servicio"];
     if (!validStatuses.includes(status)) {
       throw new Error(`Estado inválido. Debe ser: ${validStatuses.join(", ")}`);
     }
@@ -234,9 +224,6 @@ export async function changeBusStatus(id, status) {
   }
 }
 
-/**
- * Eliminar un bus (soft delete)
- */
 export async function deleteBus(id) {
   try {
     if (!id) {

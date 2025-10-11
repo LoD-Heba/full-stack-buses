@@ -104,11 +104,11 @@ export default function BusesPage() {
 
   const handleToggleActive = async (bus) => {
     try {
-      const newStatus = bus.status === "AVAILABLE" ? "OUT_OF_SERVICE" : "AVAILABLE";
+      const newStatus = bus.status === "disponible" ? "fuera_de_servicio" : "disponible";
       await changeBusStatus(bus.id, newStatus);
       toast({
         title: "Éxito",
-        description: `Bus ${newStatus === "AVAILABLE" ? "activado" : "desactivado"} correctamente`,
+        description: `Bus ${newStatus === "disponible" ? "activado" : "desactivado"} correctamente`,
       });
       loadBuses();
     } catch (error) {
