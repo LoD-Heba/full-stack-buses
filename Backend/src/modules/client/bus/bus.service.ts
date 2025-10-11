@@ -329,7 +329,7 @@ export class BusService {
     // Verificar si tiene viajes programados o en progreso
     const activeTrips =
       bus.trips?.filter(
-        (trip) => trip.status === 'SCHEDULED' || trip.status === 'IN_PROGRESS',
+        (trip) => trip.status === 'SCHEDULED' || trip.status === 'IN_PROGRESS', ///////////////
       ) || [];
 
     if (activeTrips.length > 0) {
