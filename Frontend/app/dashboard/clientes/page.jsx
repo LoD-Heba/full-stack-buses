@@ -131,23 +131,7 @@ export default function ClientesPage() {
         </div>
       </div>
 
-      {/* Búsqueda */}
-      <div className="mb-4 flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Buscar por nombre, apellido o documento..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            className="pl-10"
-          />
-        </div>
-        <Button onClick={handleSearch} className="bg-blue-600 hover:bg-blue-700">
-          Buscar
-        </Button>
-      </div>
-
+   
       <DataTable
         title="Gestión de Clientes"
         columns={[

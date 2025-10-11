@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { 
   User, 
-  Mail, 
   Phone, 
   Calendar, 
   MapPin,
@@ -19,10 +18,10 @@ import {
   Plus,
   Eye,
   FileText,
+  IdCard,
 } from "lucide-react";
 import { toast } from "sonner";
-import { EditProfileModal } from "../../../usuarios/components/EditProfileModal";
-import { getUserTicketHistory } from "../../../tickets/api/api-tickets";
+import { getClientWithTickets } from "../../api/api-clients";
 import { TicketPreviewModal } from "../../../tickets/components/ticket-preview-modal";
 import { exportSingleTicketToPDF } from "../../../tickets/utils/export-pdf";
 
@@ -32,78 +31,52 @@ const STATUS_COLORS = {
   CANCELADO: "bg-red-500 text-white",
 };
 
-async function getClientProfile(id) {
-  try {
-    const res = await fetch(`http://localhost:3001/api/v1/users/${id}`, {
-      cache: "no-store",
-    });
-    
-    if (!res.ok) {
-      throw new Error("Failed to fetch client profile");
-    }
-    
-    return res.json();
-  } catch (error) {
-    console.error("Error fetching client profile:", error);
-    return null;
-  }
-}
-
 export default function ClientProfilePage() {
   const params = useParams();
   const router = useRouter();
   const [client, setClient] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [ticketHistory, setTicketHistory] = useState({
-    upcoming: [],
-    past: [],
-    cancelled: [],
-  });
-  const [loadingTickets, setLoadingTickets] = useState(false);
   const [previewTicket, setPreviewTicket] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
 
   const loadProfile = async () => {
     setLoading(true);
-    const clientData = await getClientProfile(params.id);
-    setClient(clientData);
-    setLoading(false);
-  };
-
-  const loadTicketHistory = async () => {
-    if (!params.id) return;
-    
-    setLoadingTickets(true);
     try {
-      const history = await getUserTicketHistory(params.id);
-      setTicketHistory(history);
+      const clientData = await getClientWithTickets(params.id);
+      
+      // Categorizar tickets
+      const now = new Date();
+      const upcoming = [];
+      const past = [];
+      const cancelled = [];
+
+      (clientData.tickets || []).forEach((ticket) => {
+        if (ticket.status === "CANCELADO") {
+          cancelled.push(ticket);
+        } else if (new Date(ticket.trip?.departure_time) > now) {
+          upcoming.push(ticket);
+        } else {
+          past.push(ticket);
+        }
+      });
+
+      setClient({
+        ...clientData,
+        ticketHistory: { upcoming, past, cancelled },
+      });
     } catch (error) {
-      console.error("Error al cargar tickets:", error);
-      toast.error("Error al cargar el historial de tickets");
+      console.error("Error al cargar perfil:", error);
+      toast.error("Error al cargar el perfil del cliente");
     } finally {
-      setLoadingTickets(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     loadProfile();
-    loadTicketHistory();
   }, [params.id]);
 
-  const handleProfileUpdated = (updatedProfile) => {
-    setClient({ ...client, profile: updatedProfile });
-    loadProfile();
-  };
-
   const handleAddTicket = () => {
-    if (!client.profile || !client.profile.firstName || !client.profile.lastName || !client.profile.documentNumber) {
-      toast.error("El cliente debe completar su perfil antes de comprar tickets", {
-        description: "Nombre, apellido y documento son requeridos",
-      });
-      setIsEditModalOpen(true);
-      return;
-    }
     router.push(`/dashboard/tickets/nuevo?clientId=${params.id}`);
   };
 
@@ -111,8 +84,8 @@ export default function ClientProfilePage() {
     const formattedTicket = {
       code: ticket.code,
       status: ticket.status,
-      passenger: `${client.profile?.firstName || ""} ${client.profile?.lastName || ""}`.trim() || client.name,
-      document: client.profile?.documentNumber || "Sin documento",
+      passenger: `${client.firstName} ${client.lastName}`,
+      document: client.documentNumber,
       trip_route: `${ticket.trip?.route?.originCity?.name || "?"} → ${ticket.trip?.route?.destinationCity?.name || "?"}`,
       departure_time: new Date(ticket.trip?.departure_time).toLocaleString("es-ES"),
       bus_plate: ticket.trip?.bus?.plate || "—",
@@ -129,8 +102,8 @@ export default function ClientProfilePage() {
     const formattedTicket = {
       code: ticket.code,
       status: ticket.status,
-      passenger: `${client.profile?.firstName || ""} ${client.profile?.lastName || ""}`.trim() || client.name,
-      document: client.profile?.documentNumber || "Sin documento",
+      passenger: `${client.firstName} ${client.lastName}`,
+      document: client.documentNumber,
       trip_route: `${ticket.trip?.route?.originCity?.name || "?"} → ${ticket.trip?.route?.destinationCity?.name || "?"}`,
       departure_time: new Date(ticket.trip?.departure_time).toLocaleString("es-ES"),
       bus_plate: ticket.trip?.bus?.plate || "—",
@@ -167,13 +140,8 @@ export default function ClientProfilePage() {
     );
   }
 
-  const getInitials = (name) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+  const getInitials = (firstName, lastName) => {
+    return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
   };
 
   const formatDate = (date) => {
@@ -184,8 +152,8 @@ export default function ClientProfilePage() {
     });
   };
 
-  const totalTickets = ticketHistory.upcoming.length + ticketHistory.past.length + ticketHistory.cancelled.length;
-  const hasCompleteProfile = client.profile && client.profile.firstName && client.profile.lastName && client.profile.documentNumber;
+  const { upcoming = [], past = [], cancelled = [] } = client.ticketHistory || {};
+  const totalTickets = upcoming.length + past.length + cancelled.length;
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
@@ -205,43 +173,33 @@ export default function ClientProfilePage() {
             <div className="flex items-center gap-6">
               <Avatar className="h-24 w-24">
                 <AvatarFallback className="text-2xl bg-blue-500 text-white">
-                  {getInitials(client.name)}
+                  {getInitials(client.firstName, client.lastName)}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="text-3xl font-bold mb-2">{client.name}</h1>
+                <h1 className="text-3xl font-bold mb-2">
+                  {client.firstName} {client.lastName}
+                </h1>
                 <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
-                  {client.email && (
-                    <div className="flex items-center gap-1">
-                      <Mail className="h-4 w-4" />
-                      {client.email}
-                    </div>
-                  )}
-                  {client.phone && (
-                    <div className="flex items-center gap-1">
-                      <Phone className="h-4 w-4" />
-                      {client.phone}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1">
+                    <IdCard className="h-4 w-4" />
+                    C.I.: {client.documentNumber}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Phone className="h-4 w-4" />
+                    {client.phone}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <Badge className={client.isActive ? "bg-green-500" : "bg-gray-500"}>
-                    {client.isActive ? "Activo" : "Inactivo"}
-                  </Badge>
-                  {hasCompleteProfile ? (
-                    <Badge className="bg-green-500">
-                      ✓ Perfil Completo
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                      ⚠ Perfil Incompleto
-                    </Badge>
-                  )}
-                </div>
+                <Badge className={client.isActive ? "bg-green-500" : "bg-gray-500"}>
+                  {client.isActive ? "Activo" : "Inactivo"}
+                </Badge>
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setIsEditModalOpen(true)}>
+              <Button 
+                variant="outline" 
+                onClick={() => router.push(`/dashboard/clientes/${params.id}/editar`)}
+              >
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
               </Button>
@@ -267,52 +225,37 @@ export default function ClientProfilePage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {client.profile ? (
-              <>
-                <div>
-                  <p className="text-sm text-gray-500">Nombre Completo</p>
-                  <p className="font-medium">
-                    {client.profile.firstName} {client.profile.lastName}
-                  </p>
-                </div>
-                <Separator />
-                <div>
-                  <p className="text-sm text-gray-500">Documento</p>
-                  <p className="font-medium">{client.profile.documentNumber || "No especificado"}</p>
-                </div>
-                <Separator />
-                <div>
-                  <p className="text-sm text-gray-500">Teléfono</p>
-                  <p className="font-medium">{client.profile.phone || "No especificado"}</p>
-                </div>
-                <Separator />
-                <div>
-                  <p className="text-sm text-gray-500 flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    Dirección
-                  </p>
-                  <p className="font-medium">{client.profile.address || "No especificado"}</p>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-500 mb-4">
-                  No hay información de perfil disponible
-                </p>
-                <Button onClick={() => setIsEditModalOpen(true)}>
-                  Crear Perfil
-                </Button>
-              </div>
-            )}
+            <div>
+              <p className="text-sm text-gray-500">Nombre Completo</p>
+              <p className="font-medium">{client.firstName} {client.lastName}</p>
+            </div>
+            <Separator />
+            <div>
+              <p className="text-sm text-gray-500">Documento de Identidad</p>
+              <p className="font-medium">{client.documentNumber}</p>
+            </div>
+            <Separator />
+            <div>
+              <p className="text-sm text-gray-500">Teléfono</p>
+              <p className="font-medium">{client.phone}</p>
+            </div>
+            <Separator />
+            <div>
+              <p className="text-sm text-gray-500 flex items-center gap-1">
+                <MapPin className="h-4 w-4" />
+                Dirección
+              </p>
+              <p className="font-medium">{client.address || "No especificado"}</p>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Información de Cuenta */}
+        {/* Información de Registro */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Información de Cuenta
+              Información de Registro
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -332,8 +275,8 @@ export default function ClientProfilePage() {
             </div>
             <Separator />
             <div>
-              <p className="text-sm text-gray-500">Tipo de Usuario</p>
-              <Badge variant="outline">Cliente</Badge>
+              <p className="text-sm text-gray-500">Tipo</p>
+              <Badge variant="outline">Cliente sin cuenta</Badge>
             </div>
           </CardContent>
         </Card>
@@ -343,7 +286,7 @@ export default function ClientProfilePage() {
           <CardHeader>
             <CardTitle>Resumen de Tickets</CardTitle>
             <CardDescription>
-              Estadísticas del historial de viajes
+              Historial completo de compras de boletos
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -355,17 +298,17 @@ export default function ClientProfilePage() {
               </div>
               <div className="flex flex-col items-center p-4 bg-green-50 rounded-lg">
                 <Ticket className="h-8 w-8 text-green-600 mb-2" />
-                <p className="text-2xl font-bold">{ticketHistory.upcoming.length}</p>
+                <p className="text-2xl font-bold">{upcoming.length}</p>
                 <p className="text-sm text-gray-600">Próximos</p>
               </div>
               <div className="flex flex-col items-center p-4 bg-gray-50 rounded-lg">
                 <Ticket className="h-8 w-8 text-gray-600 mb-2" />
-                <p className="text-2xl font-bold">{ticketHistory.past.length}</p>
+                <p className="text-2xl font-bold">{past.length}</p>
                 <p className="text-sm text-gray-600">Completados</p>
               </div>
               <div className="flex flex-col items-center p-4 bg-red-50 rounded-lg">
                 <Ticket className="h-8 w-8 text-red-600 mb-2" />
-                <p className="text-2xl font-bold">{ticketHistory.cancelled.length}</p>
+                <p className="text-2xl font-bold">{cancelled.length}</p>
                 <p className="text-sm text-gray-600">Cancelados</p>
               </div>
             </div>
@@ -373,18 +316,18 @@ export default function ClientProfilePage() {
         </Card>
 
         {/* Tickets Próximos */}
-        {ticketHistory.upcoming.length > 0 && (
+        {upcoming.length > 0 && (
           <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Ticket className="h-5 w-5 text-green-600" />
-                Próximos Viajes ({ticketHistory.upcoming.length})
+                Próximos Viajes ({upcoming.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {ticketHistory.upcoming.map((ticket) => (
-                  <Card key={ticket.ticket_id} className="bg-green-50 border-green-200">
+                {upcoming.map((ticket) => (
+                  <Card key={ticket.id} className="bg-green-50 border-green-200">
                     <CardContent className="pt-4">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -436,7 +379,7 @@ export default function ClientProfilePage() {
         )}
 
         {/* Historial de Viajes */}
-        {(ticketHistory.past.length > 0 || ticketHistory.cancelled.length > 0) && (
+        {(past.length > 0 || cancelled.length > 0) && (
           <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -446,12 +389,12 @@ export default function ClientProfilePage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {[...ticketHistory.past, ...ticketHistory.cancelled]
+                {[...past, ...cancelled]
                   .sort((a, b) => new Date(b.booking_date) - new Date(a.booking_date))
                   .slice(0, 10)
                   .map((ticket) => (
                     <div
-                      key={ticket.ticket_id}
+                      key={ticket.id}
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border"
                     >
                       <div className="flex-1">
@@ -502,41 +445,17 @@ export default function ClientProfilePage() {
               <p className="text-gray-500 mb-6">
                 Este cliente aún no ha comprado ningún ticket de viaje
               </p>
-              {hasCompleteProfile ? (
-                <Button
-                  onClick={handleAddTicket}
-                  className="bg-orange-600 hover:bg-orange-700"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Crear Primer Ticket
-                </Button>
-              ) : (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-md mx-auto">
-                  <p className="text-sm text-yellow-800 mb-3">
-                    El cliente debe completar su perfil antes de comprar tickets
-                  </p>
-                  <Button
-                    onClick={() => setIsEditModalOpen(true)}
-                    variant="outline"
-                    className="border-yellow-300 text-yellow-700 hover:bg-yellow-100"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Completar Perfil
-                  </Button>
-                </div>
-              )}
+              <Button
+                onClick={handleAddTicket}
+                className="bg-orange-600 hover:bg-orange-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Crear Primer Ticket
+              </Button>
             </CardContent>
           </Card>
         )}
       </div>
-
-      {/* Modal de Edición de Perfil */}
-      <EditProfileModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        user={client}
-        onSuccess={handleProfileUpdated}
-      />
 
       {/* Modal de Vista Previa del Ticket */}
       <TicketPreviewModal

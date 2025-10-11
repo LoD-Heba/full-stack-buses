@@ -57,17 +57,6 @@ export default function DataTable({
         )}
       </div>
 
-      {/* Barra de búsqueda */}
-      <div className="relative">
-        <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-        <Input
-          placeholder="Buscar..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
-      </div>
-
       {/* Tabla */}
       <div className="border rounded-lg overflow-hidden bg-white">
         <Table>

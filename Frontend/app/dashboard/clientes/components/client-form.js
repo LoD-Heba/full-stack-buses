@@ -75,12 +75,7 @@ export function ClientForm({ client }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Alert className="mb-6 bg-blue-50 border-blue-200">
-            <AlertCircle className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800">
-              <strong>Importante:</strong> Este formulario registra clientes que pueden comprar tickets sin necesidad de crear una cuenta de usuario.
-            </AlertDescription>
-          </Alert>
+         
 
           <form onSubmit={onSubmit} className="space-y-6">
             <div className="space-y-4">
@@ -93,7 +88,7 @@ export function ClientForm({ client }) {
                 <div>
                   <Label className="flex items-center gap-2">
                     <User className="h-4 w-4" />
-                    Nombres *
+                    Nombres 
                   </Label>
                   <Input
                     {...register("firstName", {
@@ -112,7 +107,7 @@ export function ClientForm({ client }) {
                 <div>
                   <Label className="flex items-center gap-2">
                     <User className="h-4 w-4" />
-                    Apellidos *
+                    Apellidos 
                   </Label>
                   <Input
                     {...register("lastName", {
@@ -120,7 +115,7 @@ export function ClientForm({ client }) {
                       minLength: { value: 3, message: "Mínimo 3 caracteres" },
                       maxLength: { value: 100, message: "Máximo 100 caracteres" },
                     })}
-                    placeholder="Pérez López"
+                    placeholder="Perez Lopez"
                     className="mt-1"
                   />
                   {errors.lastName && (
@@ -131,31 +126,29 @@ export function ClientForm({ client }) {
                 <div>
                   <Label className="flex items-center gap-2">
                     <IdCard className="h-4 w-4" />
-                    Número de Documento (C.I.) *
+                    Número de Documento 
                   </Label>
                   <Input
                     {...register("documentNumber", {
                       required: "El C.I. es obligatorio",
                       pattern: {
                         value: /^\d{7,10}(-[0-9A-Za-z]{1,3})?$/,
-                        message: "Formato inválido. Ejemplos: 8502732, 1234567890 o 8502732-1B",
+                        message: "Ejemplos: 8502732",
                       },
                     })}
-                    placeholder="12345678 o 12345678-1A"
+                    placeholder="12345678"
                     className="mt-1"
                   />
                   {errors.documentNumber && (
                     <p className="text-red-500 text-sm mt-1">{errors.documentNumber.message}</p>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">
-                    Formato: 7-10 dígitos, opcional: guión y 1-3 caracteres
-                  </p>
+                
                 </div>
 
                 <div>
                   <Label className="flex items-center gap-2">
                     <Phone className="h-4 w-4" />
-                    Teléfono *
+                    Teléfono 
                   </Label>
                   <Input
                     type="tel"
@@ -183,7 +176,7 @@ export function ClientForm({ client }) {
                     {...register("address", {
                       maxLength: { value: 200, message: "Máximo 200 caracteres" },
                     })}
-                    placeholder="Av. Principal #123, Zona Centro"
+                  
                     className="mt-1"
                   />
                   {errors.address && (

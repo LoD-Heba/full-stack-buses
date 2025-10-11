@@ -127,10 +127,12 @@ export default function BusDetailPage() {
   }
 
   const statusConfig = STATUS_CONFIG[bus.status] || STATUS_CONFIG.disponible;
-  
+
   // Procesar URL de imagen
-  const imageUrl = bus.image_url 
-    ? (bus.image_url.startsWith('http') ? bus.image_url : `http://localhost:3001${bus.image_url}`)
+  const imageUrl = bus.image_url
+    ? bus.image_url.startsWith("http")
+      ? bus.image_url
+      : `http://localhost:3001${bus.image_url}`
     : null;
 
   return (
@@ -213,7 +215,9 @@ export default function BusDetailPage() {
             <CardContent>
               <div className="space-y-2">
                 <p className="text-sm text-gray-600">Usuario</p>
-                <p className="font-medium">{bus.user?.email || bus.user?.username || "N/A"}</p>
+                <p className="font-medium">
+                  {bus.user?.email || bus.user?.username || "N/A"}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -287,7 +291,9 @@ export default function BusDetailPage() {
                       <RouteIcon className="h-5 w-5" />
                       <p className="text-sm font-medium">Viajes</p>
                     </div>
-                    <p className="text-2xl font-bold">{statistics.totalTrips}</p>
+                    <p className="text-2xl font-bold">
+                      {statistics.totalTrips}
+                    </p>
                     <p className="text-xs text-gray-600 mt-1">
                       {statistics.completedTrips} completados
                     </p>
@@ -298,27 +304,10 @@ export default function BusDetailPage() {
                       <Users className="h-5 w-5" />
                       <p className="text-sm font-medium">Tickets</p>
                     </div>
-                    <p className="text-2xl font-bold">{statistics.totalTickets}</p>
-                    <p className="text-xs text-gray-600 mt-1">vendidos</p>
-                  </div>
-
-                  <div className="bg-purple-50 p-4 rounded-lg">
-                    <div className="flex items-center gap-2 text-purple-600 mb-2">
-                      <DollarSign className="h-5 w-5" />
-                      <p className="text-sm font-medium">Ingresos</p>
-                    </div>
                     <p className="text-2xl font-bold">
-                      ${statistics.totalRevenue.toFixed(2)}
+                      {statistics.totalTickets}
                     </p>
-                  </div>
-
-                  <div className="bg-orange-50 p-4 rounded-lg">
-                    <div className="flex items-center gap-2 text-orange-600 mb-2">
-                      <TrendingUp className="h-5 w-5" />
-                      <p className="text-sm font-medium">Utilización</p>
-                    </div>
-                    <p className="text-2xl font-bold">{statistics.utilizationRate}%</p>
-                    <p className="text-xs text-gray-600 mt-1">promedio</p>
+                    <p className="text-xs text-gray-600 mt-1">vendidos</p>
                   </div>
                 </div>
               </CardContent>
@@ -341,7 +330,9 @@ export default function BusDetailPage() {
                       <div className="flex items-center gap-3">
                         <MapPin className="h-5 w-5 text-orange-500" />
                         <div>
-                          <p className="font-medium">{route.origin} → {route.destination}</p>
+                          <p className="font-medium">
+                            {route.name}
+                          </p>
                           <p className="text-sm text-gray-600">
                             Distancia: {route.distance_km} km
                           </p>
@@ -395,7 +386,8 @@ export default function BusDetailPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar este bus?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta acción eliminará permanentemente el bus <strong>{bus.plate}</strong>.
+              Esta acción eliminará permanentemente el bus{" "}
+              <strong>{bus.plate}</strong>.
               {bus.trips && bus.trips.length > 0 && (
                 <span className="block mt-2 text-yellow-600">
                   ⚠️ Este bus tiene {bus.trips.length} viajes registrados.

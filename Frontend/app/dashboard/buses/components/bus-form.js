@@ -48,7 +48,6 @@ export function BusForm({ bus }) {
   const [imageFile, setImageFile] = useState(null);
   const router = useRouter();
 
-  // ✅ Detección simple: si hay bus, es edición
   const isEditing = !!bus;
 
   const currentYear = new Date().getFullYear();
@@ -94,7 +93,7 @@ export function BusForm({ bus }) {
       if (bus.image_url) {
         const imageUrl = bus.image_url.startsWith("http")
           ? bus.image_url
-          : `http://localhost:3001${bus.image_url}`;
+          : `http://localhost:3001/api/v1/${bus.image_url}`;
         setImagePreview(imageUrl);
       }
     }
@@ -162,7 +161,6 @@ export function BusForm({ bus }) {
       setIsSubmitting(true);
       setBackendError(null);
 
-      // Validaciones
       if (
         data.year &&
         (Number(data.year) < 1950 || Number(data.year) > currentYear + 2)
@@ -172,7 +170,6 @@ export function BusForm({ bus }) {
         return;
       }
 
-      // Formatear datos
       const formattedData = {
         plate: data.plate.toUpperCase().trim(),
         model: data.model.trim(),
@@ -297,9 +294,6 @@ export function BusForm({ bus }) {
                   onChange={handleImageChange}
                   className="hidden"
                 />
-                <p className="text-xs text-gray-500 mt-2">
-                  Formato: JPG, PNG, GIF, WebP. Máximo 5MB
-                </p>
               </div>
             </CardContent>
           </Card>
@@ -307,14 +301,12 @@ export function BusForm({ bus }) {
           {/* Información Básica */}
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Información Básica</CardTitle>
+              <CardTitle>Información Basica</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="plate">
-                    Placa <span className="text-red-500">*</span>
-                  </Label>
+                  <Label htmlFor="plate">Placa</Label>
                   <Input
                     id="plate"
                     {...register("plate", {
@@ -326,7 +318,7 @@ export function BusForm({ bus }) {
                         message: "Solo letras, números y guiones",
                       },
                     })}
-                    placeholder="ABC-1234"
+                    placeholder="1234 ABC"
                     className={errors.plate ? "border-red-500" : ""}
                     disabled={isEditing && bus?.status === BUS_STATUSES.EN_USO}
                   />
@@ -338,9 +330,7 @@ export function BusForm({ bus }) {
                 </div>
 
                 <div>
-                  <Label htmlFor="model">
-                    Modelo <span className="text-red-500">*</span>
-                  </Label>
+                  <Label htmlFor="model">Modelo</Label>
                   <Input
                     id="model"
                     {...register("model", {
@@ -387,9 +377,7 @@ export function BusForm({ bus }) {
                 </div>
 
                 <div>
-                  <Label htmlFor="service_type">
-                    Tipo de servicio <span className="text-red-500">*</span>
-                  </Label>
+                  <Label htmlFor="service_type">Tipo de servicio</Label>
                   <Select
                     value={selectedServiceType}
                     onValueChange={(val) => setValue("service_type", val)}
@@ -469,10 +457,10 @@ export function BusForm({ bus }) {
                   pattern: {
                     value:
                       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-                    message: "UUID inválido",
+                    message: "ARREGLAR",
                   },
                 })}
-                placeholder="UUID del usuario"
+                placeholder="ARRHLAR"
                 className={errors.userId ? "border-red-500" : ""}
               />
               {errors.userId && (
@@ -493,7 +481,7 @@ export function BusForm({ bus }) {
                     message: "UUID inválido",
                   },
                 })}
-                placeholder="UUID del stack"
+                placeholder="ARREGLAR"
                 className={errors.stackId ? "border-red-500" : ""}
               />
               {errors.stackId && (
@@ -510,8 +498,7 @@ export function BusForm({ bus }) {
           <Card className="border-yellow-200 bg-yellow-50">
             <CardContent className="pt-6">
               <p className="text-sm text-yellow-800">
-                ⚠️ El bus está en uso. No se pueden modificar datos básicos
-                (placa, modelo, tipo de servicio).
+                 El bus está en uso. No se pueden modificar datos básicos
               </p>
             </CardContent>
           </Card>
@@ -522,8 +509,7 @@ export function BusForm({ bus }) {
           <Card className="border-yellow-200 bg-yellow-50">
             <CardContent className="pt-6">
               <p className="text-sm text-yellow-800">
-                ⚠️ El bus está en uso. No se pueden modificar datos básicos
-                (placa, modelo, tipo de servicio).
+                El bus está en uso. No se pueden modificar datos básicos
               </p>
             </CardContent>
           </Card>

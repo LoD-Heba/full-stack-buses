@@ -27,7 +27,7 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" />
        
       </head>
-     <body className={clsx(inter.className, 'bg-gray-100 w-[1200px] h-[800px] mx-auto')}>
+     <body className={clsx(inter.className, 'bg-gray-100 w-[90%] h-[800px] mx-auto')}>
         <div className="flex flex-col min-h-screen">
           {/* {!isDashboard && !isLogin && <Navbar />} */}
           <Navbar></Navbar>

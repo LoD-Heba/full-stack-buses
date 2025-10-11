@@ -21,7 +21,8 @@ export function TicketPreviewModal({ ticket, open, onClose }) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      
+      <DialogContent className="">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Vista Previa del Ticket</span>

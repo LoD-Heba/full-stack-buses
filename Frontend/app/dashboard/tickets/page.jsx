@@ -124,13 +124,13 @@ export default function TicketsPage() {
     router.push(`/dashboard/tickets/${item.id}`);
   };
 
-  // 🎫 Vista previa del ticket
+  // Vista previa del ticket
   const handlePreview = (ticket) => {
     setPreviewTicket(ticket);
     setShowPreview(true);
   };
 
-  // 📄 Exportar ticket individual a PDF
+  //  Exportar ticket individual a PDF
   const handleExportSingle = (ticket) => {
     try {
       exportSingleTicketToPDF(ticket);
@@ -141,20 +141,6 @@ export default function TicketsPage() {
     }
   };
 
-  // 📊 Exportar todos los tickets a PDF
-  const handleExportAll = () => {
-    try {
-      if (tickets.length === 0) {
-        toast.warning("No hay tickets para exportar");
-        return;
-      }
-      exportTicketsToPDF(tickets);
-      toast.success("Reporte de tickets exportado exitosamente");
-    } catch (error) {
-      console.error(error);
-      toast.error("Error al exportar el reporte");
-    }
-  };
 
   const handleDeleteClick = (ticket) => {
     setActionDialog({ open: true, type: "delete", ticket });
@@ -247,17 +233,7 @@ export default function TicketsPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Botón de exportación */}
-      <div className="flex justify-end">
-        <Button
-          onClick={handleExportAll}
-          variant="outline"
-          className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
-        >
-          <Download className="w-4 h-4 mr-2" />
-          Exportar Todos a PDF
-        </Button>
-      </div>
+    
 
       {/* Acciones rápidas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

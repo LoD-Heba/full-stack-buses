@@ -350,7 +350,7 @@ export default function TripsManagement() {
                   <SelectContent>
                     {routes.map((route) => (
                       <SelectItem key={route.id} value={route.id}>
-                        {route.origin} → {route.destination}
+                        {route.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -470,14 +470,11 @@ export default function TripsManagement() {
                   <div>
                     <Label className="text-gray-500">Ruta</Label>
                     <div className="flex items-center gap-2 mt-1">
-                      <MapPin className="w-5 h-5 text-orange-500" />
                       <div>
                         <div className="font-semibold">
-                          {selectedTrip.route?.origin}
+                          {routes.name}
                         </div>
-                        <div className="text-sm text-gray-600">
-                          → {selectedTrip.route?.destination}
-                        </div>
+                       
                       </div>
                     </div>
                   </div>

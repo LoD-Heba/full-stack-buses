@@ -117,7 +117,7 @@ export default function TripListView() {
                 <option value="">Todas las rutas</option>
                 {routes.map(route => (
                   <option key={route.id} value={route.id}>
-                    {route.origin} → {route.destination}
+                    {route.name}
                   </option>
                 ))}
               </select>
@@ -175,7 +175,7 @@ export default function TripListView() {
                   <Bus className="h-24 w-24 text-white opacity-90" />
                   <div className="absolute top-4 right-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getBusTypeColor(trip.bus.stacks?.seats?.[0]?.type || 'normal')}`}>
-                      {getBusTypeLabel(trip.bus.stacks?.seats?.[0]?.type || 'normal')}
+                      {getBusTypeLabel(trip.bus.stacks)}
                     </span>
                   </div>
                   <div className="absolute bottom-4 left-4 bg-white/20 backdrop-blur-sm px-3 py-1 rounded-lg">
