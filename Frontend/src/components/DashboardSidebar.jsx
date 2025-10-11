@@ -4,10 +4,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import UserMenu from "@/components/UserMenu"
 import {
-  Users, Shield, Key, UserCog, Map, Building2, DollarSign,
+  Users, Shield, UserCog, Map, Building2,
   ShoppingCart, Bus, Layers, Armchair, Clock, FileText, Newspaper, LayoutDashboard,
-  ShoppingBagIcon,
-  ShoppingBasketIcon
+  ShoppingBasketIcon,
+  SquareArrowLeft,
+  TriangleAlertIcon
 } from 'lucide-react';
 
 const menuItems = [
@@ -17,7 +18,6 @@ const menuItems = [
   { href: '/dashboard/empleados', label: 'Empleados', icon: UserCog },
   { href: '/dashboard/rutas', label: 'Rutas', icon: Map },
   { href: '/dashboard/ciudades', label: 'Ciudades', icon: Building2 },
-  { href: '/dashboard/pagos', label: 'Pagos', icon: DollarSign },
   { href: '/dashboard/tickets', label: 'Tickeds', icon: ShoppingCart },
   { href: '/dashboard/buses', label: 'Buses', icon: Bus },
   { href: '/dashboard/stack-asientos', label: 'Stack Asientos', icon: Layers },
@@ -26,6 +26,7 @@ const menuItems = [
   { href: '/dashboard/reportes', label: 'Reportes', icon: FileText },
   { href: '/dashboard/noticias', label: 'Noticias', icon: Newspaper },
   { href: '/dashboard/clientes', label: 'Clientes', icon: ShoppingBasketIcon },
+  { href: '/dashboard/viajes', label: 'Viajes', icon: TriangleAlertIcon },
 ];
 
 export default function DashboardSidebar() {
@@ -37,7 +38,9 @@ export default function DashboardSidebar() {
       <div className="p-6">
         <h2 className="text-xl font-bold mb-2">Dashboard</h2>
         <p className="text-xs text-gray-400">Panel de Administración</p>
+        <h1 className='bg-red-700'>Hola</h1>
       </div>
+    
       <nav className="px-3 bg-black ">
         {menuItems.map((item) => {
           const Icon = item.icon;

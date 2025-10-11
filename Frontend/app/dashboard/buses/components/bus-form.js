@@ -2,18 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createBus, updateBus } from "../api/api-buses";
@@ -22,33 +22,34 @@ import { toast } from "sonner";
 import Image from "next/image";
 
 const SERVICE_TYPES = {
-  NORMAL: 'normal',
-  SEMI_CAMA: 'semi_cama',
-  CAMA: 'cama'
+  NORMAL: "normal",
+  SEMI_CAMA: "semi_cama",
+  CAMA: "cama",
 };
 
 const BUS_STATUSES = {
-  DISPONIBLE: 'disponible',
-  EN_USO: 'en_uso',
-  MANTENIMIENTO: 'mantenimiento',
-  FUERA_DE_SERVICIO: 'fuera_de_servicio'
+  DISPONIBLE: "disponible",
+  EN_USO: "en_uso",
+  MANTENIMIENTO: "mantenimiento",
+  FUERA_DE_SERVICIO: "fuera_de_servicio",
 };
 
 const STATUS_LABELS = {
-  disponible: 'Disponible',
-  en_uso: 'En uso',
-  mantenimiento: 'Mantenimiento',
-  fuera_de_servicio: 'Fuera de servicio'
+  disponible: "Disponible",
+  en_uso: "En uso",
+  mantenimiento: "Mantenimiento",
+  fuera_de_servicio: "Fuera de servicio",
 };
 
 export function BusForm({ bus }) {
   const [backendError, setBackendError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [imagePreview, setImagePreview] = useState(bus?.image_url || null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const router = useRouter();
-  const params = useParams();
-  const isEditing = params?.id && params.id !== "undefined" && params.id !== "new";
+
+  // ✅ Detección simple: si hay bus, es edición
+  const isEditing = !!bus;
 
   const currentYear = new Date().getFullYear();
 
@@ -75,6 +76,7 @@ export function BusForm({ bus }) {
   const selectedServiceType = watch("service_type");
   const selectedStatus = watch("status");
 
+  // Cargar datos del bus en modo edición
   useEffect(() => {
     if (bus) {
       reset({
@@ -87,22 +89,29 @@ export function BusForm({ bus }) {
         userId: bus.user?.id || bus.userId || "",
         stackId: bus.stacks?.id || bus.stackId || "",
       });
-      setImagePreview(bus.image_url);
+
+      // Cargar imagen existente
+      if (bus.image_url) {
+        const imageUrl = bus.image_url.startsWith("http")
+          ? bus.image_url
+          : `http://localhost:3001${bus.image_url}`;
+        setImagePreview(imageUrl);
+      }
     }
   }, [bus, reset]);
 
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!file.type.startsWith('image/')) {
-        toast.error('Por favor selecciona una imagen válida');
+      if (!file.type.startsWith("image/")) {
+        toast.error("Por favor selecciona una imagen válida");
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        toast.error('La imagen no debe superar los 5MB');
+        toast.error("La imagen no debe superar los 5MB");
         return;
       }
-      
+
       setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -115,27 +124,35 @@ export function BusForm({ bus }) {
   const removeImage = () => {
     setImageFile(null);
     setImagePreview(null);
+    const fileInput = document.getElementById("image");
+    if (fileInput) {
+      fileInput.value = "";
+    }
   };
 
   const uploadImage = async (busId) => {
-    if (!imageFile) return;
+    if (!imageFile) return null;
 
     const formData = new FormData();
-    formData.append('image', imageFile);
+    formData.append("image", imageFile);
 
     try {
-      const response = await fetch(`http://localhost:3001/api/v1/buses/${busId}/upload-image`, {
-        method: 'POST',
-        body: formData,
-      });
+      const response = await fetch(
+        `http://localhost:3001/api/v1/buses/${busId}/upload-image`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
       if (!response.ok) {
-        throw new Error('Error al subir la imagen');
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error al subir la imagen");
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Error uploading image:', error);
+      console.error("Error uploading image:", error);
       throw error;
     }
   };
@@ -145,11 +162,17 @@ export function BusForm({ bus }) {
       setIsSubmitting(true);
       setBackendError(null);
 
-      if (data.year && (Number(data.year) < 1950 || Number(data.year) > currentYear + 2)) {
+      // Validaciones
+      if (
+        data.year &&
+        (Number(data.year) < 1950 || Number(data.year) > currentYear + 2)
+      ) {
         setBackendError(`El año debe estar entre 1950 y ${currentYear + 2}`);
+        setIsSubmitting(false);
         return;
       }
 
+      // Formatear datos
       const formattedData = {
         plate: data.plate.toUpperCase().trim(),
         model: data.model.trim(),
@@ -161,39 +184,53 @@ export function BusForm({ bus }) {
         stackId: data.stackId?.trim() || undefined,
       };
 
-      Object.keys(formattedData).forEach(key => 
-        formattedData[key] === undefined && delete formattedData[key]
+      // Remover undefined
+      Object.keys(formattedData).forEach(
+        (key) => formattedData[key] === undefined && delete formattedData[key]
       );
 
       let res;
       if (isEditing) {
-        res = await updateBus(params.id, formattedData);
+        res = await updateBus(bus.id, formattedData);
       } else {
         res = await createBus(formattedData);
       }
 
       // Subir imagen si existe
       if (imageFile && res?.id) {
-        await uploadImage(res.id);
+        try {
+          await uploadImage(res.id);
+        } catch (imgError) {
+          console.error("Error al subir imagen:", imgError);
+          toast.warning("Bus guardado pero no se pudo subir la imagen");
+        }
       }
 
-      toast.success(isEditing ? 'Bus actualizado exitosamente' : 'Bus creado exitosamente');
+      toast.success(
+        isEditing ? "Bus actualizado exitosamente" : "Bus creado exitosamente"
+      );
       router.push("/dashboard/buses");
       router.refresh();
     } catch (err) {
       console.error("Error en onSubmit:", err);
-      
+
+      let errorMessage = "Error al procesar el bus. Intente nuevamente.";
+
       if (err.message.includes("placa")) {
-        setBackendError("La placa ya está registrada en el sistema");
+        errorMessage = "La placa ya está registrada en el sistema";
       } else if (err.message.includes("stack")) {
-        setBackendError("El stack de asientos ya está asignado a otro bus");
-      } else if (err.message.includes("usuario")) {
-        setBackendError("El usuario no existe o no está activo");
-      } else {
-        setBackendError(err.message || "Error al procesar el bus. Intente nuevamente.");
+        errorMessage = "El stack de asientos ya está asignado a otro bus";
+      } else if (
+        err.message.includes("usuario") ||
+        err.message.includes("user")
+      ) {
+        errorMessage = "El usuario no existe o no está activo";
+      } else if (err.message) {
+        errorMessage = err.message;
       }
-      
-      toast.error(backendError || "Error al procesar el formulario");
+
+      setBackendError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -224,12 +261,13 @@ export function BusForm({ bus }) {
                       alt="Preview"
                       fill
                       className="object-cover"
+                      unoptimized
                     />
                     <Button
                       type="button"
                       variant="destructive"
                       size="icon"
-                      className="absolute top-2 right-2"
+                      className="absolute top-2 right-2 z-10"
                       onClick={removeImage}
                     >
                       <X className="h-4 w-4" />
@@ -237,11 +275,14 @@ export function BusForm({ bus }) {
                   </>
                 ) : (
                   <div className="flex items-center justify-center h-full">
-                    <Upload className="h-12 w-12 text-gray-400" />
+                    <div className="text-center">
+                      <Upload className="h-12 w-12 text-gray-400 mx-auto" />
+                      <p className="text-sm text-gray-500 mt-2">Sin imagen</p>
+                    </div>
                   </div>
                 )}
               </div>
-              
+
               <div>
                 <Label htmlFor="image" className="cursor-pointer">
                   <div className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-orange-500 transition-colors">
@@ -276,21 +317,23 @@ export function BusForm({ bus }) {
                   </Label>
                   <Input
                     id="plate"
-                    {...register("plate", { 
+                    {...register("plate", {
                       required: "La placa es obligatoria",
                       minLength: { value: 3, message: "Mínimo 3 caracteres" },
                       maxLength: { value: 20, message: "Máximo 20 caracteres" },
                       pattern: {
                         value: /^[A-Z0-9\-]+$/i,
-                        message: "Solo letras, números y guiones"
-                      }
+                        message: "Solo letras, números y guiones",
+                      },
                     })}
                     placeholder="ABC-1234"
                     className={errors.plate ? "border-red-500" : ""}
                     disabled={isEditing && bus?.status === BUS_STATUSES.EN_USO}
                   />
                   {errors.plate && (
-                    <p className="text-red-500 text-sm mt-1">{errors.plate.message}</p>
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.plate.message}
+                    </p>
                   )}
                 </div>
 
@@ -300,17 +343,22 @@ export function BusForm({ bus }) {
                   </Label>
                   <Input
                     id="model"
-                    {...register("model", { 
+                    {...register("model", {
                       required: "El modelo es obligatorio",
                       minLength: { value: 2, message: "Mínimo 2 caracteres" },
-                      maxLength: { value: 100, message: "Máximo 100 caracteres" }
+                      maxLength: {
+                        value: 100,
+                        message: "Máximo 100 caracteres",
+                      },
                     })}
                     placeholder="Volvo 9700"
                     className={errors.model ? "border-red-500" : ""}
                     disabled={isEditing && bus?.status === BUS_STATUSES.EN_USO}
                   />
                   {errors.model && (
-                    <p className="text-red-500 text-sm mt-1">{errors.model.message}</p>
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.model.message}
+                    </p>
                   )}
                 </div>
               </div>
@@ -318,18 +366,23 @@ export function BusForm({ bus }) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="year">Año</Label>
-                  <Input 
+                  <Input
                     id="year"
-                    type="number" 
+                    type="number"
                     {...register("year", {
                       min: { value: 1950, message: "Año mínimo: 1950" },
-                      max: { value: currentYear + 2, message: `Año máximo: ${currentYear + 2}` }
-                    })} 
+                      max: {
+                        value: currentYear + 2,
+                        message: `Año máximo: ${currentYear + 2}`,
+                      },
+                    })}
                     placeholder={currentYear.toString()}
                     className={errors.year ? "border-red-500" : ""}
                   />
                   {errors.year && (
-                    <p className="text-red-500 text-sm mt-1">{errors.year.message}</p>
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.year.message}
+                    </p>
                   )}
                 </div>
 
@@ -343,11 +396,15 @@ export function BusForm({ bus }) {
                     disabled={isEditing && bus?.status === BUS_STATUSES.EN_USO}
                   >
                     <SelectTrigger id="service_type">
-                      <SelectValue />
+                      <SelectValue placeholder="Selecciona un tipo" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={SERVICE_TYPES.NORMAL}>Normal</SelectItem>
-                      <SelectItem value={SERVICE_TYPES.SEMI_CAMA}>Semi Cama</SelectItem>
+                      <SelectItem value={SERVICE_TYPES.NORMAL}>
+                        Normal
+                      </SelectItem>
+                      <SelectItem value={SERVICE_TYPES.SEMI_CAMA}>
+                        Semi Cama
+                      </SelectItem>
                       <SelectItem value={SERVICE_TYPES.CAMA}>Cama</SelectItem>
                     </SelectContent>
                   </Select>
@@ -356,18 +413,20 @@ export function BusForm({ bus }) {
 
               <div>
                 <Label htmlFor="amenities">Amenidades</Label>
-                <Textarea 
+                <Textarea
                   id="amenities"
                   {...register("amenities", {
                     minLength: { value: 2, message: "Mínimo 2 caracteres" },
-                    maxLength: { value: 500, message: "Máximo 500 caracteres" }
-                  })} 
+                    maxLength: { value: 500, message: "Máximo 500 caracteres" },
+                  })}
                   placeholder="Wi-Fi, TV, Aire acondicionado, Asientos reclinables..."
                   className={errors.amenities ? "border-red-500" : ""}
                   rows={3}
                 />
                 {errors.amenities && (
-                  <p className="text-red-500 text-sm mt-1">{errors.amenities.message}</p>
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.amenities.message}
+                  </p>
                 )}
               </div>
 
@@ -378,7 +437,7 @@ export function BusForm({ bus }) {
                   onValueChange={(val) => setValue("status", val)}
                 >
                   <SelectTrigger id="status">
-                    <SelectValue />
+                    <SelectValue placeholder="Selecciona el estado" />
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(BUS_STATUSES).map(([key, value]) => (
@@ -403,38 +462,44 @@ export function BusForm({ bus }) {
               <Label htmlFor="userId">
                 ID del Usuario <span className="text-red-500">*</span>
               </Label>
-              <Input 
+              <Input
                 id="userId"
-                {...register("userId", { 
+                {...register("userId", {
                   required: "El usuario es obligatorio",
                   pattern: {
-                    value: /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-                    message: "UUID inválido"
-                  }
-                })} 
+                    value:
+                      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+                    message: "UUID inválido",
+                  },
+                })}
                 placeholder="UUID del usuario"
                 className={errors.userId ? "border-red-500" : ""}
               />
               {errors.userId && (
-                <p className="text-red-500 text-sm mt-1">{errors.userId.message}</p>
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.userId.message}
+                </p>
               )}
             </div>
 
             <div>
               <Label htmlFor="stackId">ID del Stack (opcional)</Label>
-              <Input 
+              <Input
                 id="stackId"
                 {...register("stackId", {
                   pattern: {
-                    value: /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-                    message: "UUID inválido"
-                  }
-                })} 
+                    value:
+                      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+                    message: "UUID inválido",
+                  },
+                })}
                 placeholder="UUID del stack"
                 className={errors.stackId ? "border-red-500" : ""}
               />
               {errors.stackId && (
-                <p className="text-red-500 text-sm mt-1">{errors.stackId.message}</p>
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.stackId.message}
+                </p>
               )}
             </div>
           </CardContent>
@@ -445,7 +510,20 @@ export function BusForm({ bus }) {
           <Card className="border-yellow-200 bg-yellow-50">
             <CardContent className="pt-6">
               <p className="text-sm text-yellow-800">
-                ⚠️ El bus está en uso. No se pueden modificar datos básicos (placa, modelo, tipo de servicio).
+                ⚠️ El bus está en uso. No se pueden modificar datos básicos
+                (placa, modelo, tipo de servicio).
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Advertencias */}
+        {isEditing && bus?.status === BUS_STATUSES.EN_USO && (
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardContent className="pt-6">
+              <p className="text-sm text-yellow-800">
+                ⚠️ El bus está en uso. No se pueden modificar datos básicos
+                (placa, modelo, tipo de servicio).
               </p>
             </CardContent>
           </Card>
@@ -454,7 +532,7 @@ export function BusForm({ bus }) {
         {backendError && (
           <Card className="border-red-200 bg-red-50">
             <CardContent className="pt-6">
-              <p className="text-red-600 text-sm">{backendError}</p>
+              <p className="text-red-600 text-sm font-medium">{backendError}</p>
             </CardContent>
           </Card>
         )}
@@ -472,8 +550,10 @@ export function BusForm({ bus }) {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Procesando...
               </>
+            ) : isEditing ? (
+              "Actualizar Bus"
             ) : (
-              isEditing ? "Actualizar Bus" : "Registrar Bus"
+              "Registrar Bus"
             )}
           </Button>
         </div>

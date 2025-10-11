@@ -15,7 +15,6 @@ import {
   Bus as BusIcon,
   Calendar,
   Users,
-  Settings,
   MapPin,
   TrendingUp,
   DollarSign,
@@ -73,7 +72,9 @@ export default function BusDetailPage() {
   const params = useParams();
 
   useEffect(() => {
-    loadBusData();
+    if (params.id) {
+      loadBusData();
+    }
   }, [params.id]);
 
   const loadBusData = async () => {
@@ -126,6 +127,11 @@ export default function BusDetailPage() {
   }
 
   const statusConfig = STATUS_CONFIG[bus.status] || STATUS_CONFIG.disponible;
+  
+  // Procesar URL de imagen
+  const imageUrl = bus.image_url 
+    ? (bus.image_url.startsWith('http') ? bus.image_url : `http://localhost:3001${bus.image_url}`)
+    : null;
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -167,12 +173,13 @@ export default function BusDetailPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                {bus.image_url ? (
+                {imageUrl ? (
                   <Image
-                    src={bus.image_url}
+                    src={imageUrl}
                     alt={bus.plate}
                     fill
                     className="object-cover"
+                    unoptimized
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full">
