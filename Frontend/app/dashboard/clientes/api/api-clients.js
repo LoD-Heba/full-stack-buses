@@ -50,7 +50,7 @@ export async function getClient(id) {
 }
 
 export async function updateClient(id, clientData) {
-  const res = await fetch(`http://localhost:3001/api/v1/users/${id}`, {
+  const res = await fetch(`http://localhost:3001/api/v1/users/${id}/profile`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -82,5 +82,31 @@ export async function getClientProfile(id) {
   } catch (error) {
     console.error("Error fetching client profile:", error);
     return null;
+  }
+}
+
+/**
+ * Actualizar el perfil de un cliente
+ */
+export async function updateClientProfile(userId, profileData) {
+  try {
+    const res = await fetch(`http://localhost:3001/api/v1/user-profiles/${userId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(profileData),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || "Error al actualizar el perfil");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    throw error;
   }
 }

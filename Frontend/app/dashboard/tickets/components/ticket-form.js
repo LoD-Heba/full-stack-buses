@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { createTicket } from "../api/api-tickets";
+import { ArrowLeft, User, Ticket as TicketIcon, Bus, MapPin, Calendar, DollarSign } from "lucide-react";
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -14,289 +19,433 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { createTicket, updateTicket } from "../api/api-tickets";
-import { Loader2, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const TICKET_STATUS = {
-  PENDIENTE: "PENDIENTE",
-  CONFIRMADO: "CONFIRMADO",
-  CANCELADO: "CANCELADO",
-};
-
-const STATUS_LABELS = {
-  PENDIENTE: "Pendiente",
-  CONFIRMADO: "Confirmado",
-  CANCELADO: "Cancelado",
-};
-
-export function TicketForm({ ticket }) {
-  const [backendError, setBackendError] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [trips, setTrips] = useState([]);
-  const [seats, setSeats] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [payments, setPayments] = useState([]);
-
+function NewTicketForm() {
   const router = useRouter();
-  const params = useParams();
-  const isEditing = params?.id && params.id !== "undefined";
+  const searchParams = useSearchParams();
+  const clientId = searchParams.get("clientId");
+  
+  const [loading, setLoading] = useState(true);
+  const [clientInfo, setClientInfo] = useState(null);
+  const [trips, setTrips] = useState([]);
+  const [selectedTrip, setSelectedTrip] = useState(null);
+  const [availableSeats, setAvailableSeats] = useState([]);
+  const [backendError, setBackendError] = useState(null);
 
   const {
     register,
     handleSubmit,
     setValue,
     watch,
-    reset,
     formState: { errors },
   } = useForm({
     defaultValues: {
-      price: "",
-      status: TICKET_STATUS.PENDIENTE,
+      userId: clientId || "",
       tripId: "",
       seatId: "",
-      userId: "",
-      paymentId: "",
+      price: "",
     },
   });
 
-  const selectedStatus = watch("status");
+  const watchTripId = watch("tripId");
 
-  // 🧠 Cargar datos iniciales
+  // Cargar información del cliente
   useEffect(() => {
-    if (ticket) {
-      reset({
-        price: ticket.price?.toString() || "",
-        status: ticket.status || TICKET_STATUS.PENDIENTE,
-        tripId: ticket.trip?.id || "",
-        seatId: ticket.seat?.id || "",
-        userId: ticket.user?.id || "",
-        paymentId: ticket.payment?.id || "",
-      });
-    }
-  }, [ticket, reset]);
-
-  // 🚀 Cargar listas de relaciones desde el backend
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [tripsRes, seatsRes, usersRes, paymentsRes] = await Promise.all([
-          fetch("/api/trips").then((r) => r.json()),
-          fetch("/api/seats").then((r) => r.json()),
-          fetch("/api/users").then((r) => r.json()),
-          fetch("/api/payments").then((r) => r.json()),
-        ]);
-        setTrips(tripsRes);
-        setSeats(seatsRes);
-        setUsers(usersRes);
-        setPayments(paymentsRes);
-      } catch (err) {
-        console.error("Error al cargar datos:", err);
-      }
-    };
-    fetchData();
-  }, []);
-
-  // 🧾 Enviar datos al backend
-  const onSubmit = handleSubmit(async (data) => {
-    try {
-      setIsSubmitting(true);
-      setBackendError(null);
-
-      if (!data.price || parseFloat(data.price) <= 0) {
-        setBackendError("El precio debe ser mayor a 0");
+    const fetchClientInfo = async () => {
+      if (!clientId) {
+        setLoading(false);
         return;
       }
 
-      const formattedData = {
-        price: parseFloat(data.price),
-        status: data.status,
-        tripId: data.tripId,
-        seatId: data.seatId,
-        userId: data.userId,
-        paymentId: data.paymentId || undefined,
-      };
+      try {
+        const res = await fetch(`http://localhost:3001/api/v1/users/${clientId}`);
+        const data = await res.json();
+        
+        if (!data.profile || !data.profile.firstName || !data.profile.lastName || !data.profile.documentNumber) {
+          toast.error("El cliente debe tener un perfil completo");
+          router.push("/dashboard/clientes");
+          return;
+        }
 
-      let res;
-      if (isEditing) {
-        const updateData = {
-          status: formattedData.status,
-          paymentId: formattedData.paymentId,
-        };
-        res = await updateTicket(params.id, updateData);
-      } else {
-        res = await createTicket(formattedData);
+        setClientInfo(data);
+        setValue("userId", clientId);
+      } catch (error) {
+        console.error("Error al cargar cliente:", error);
+        toast.error("Error al cargar información del cliente");
+        router.push("/dashboard/clientes");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchClientInfo();
+  }, [clientId]);
+
+  // Cargar viajes disponibles
+  useEffect(() => {
+    const fetchTrips = async () => {
+      try {
+        const res = await fetch("http://localhost:3001/api/v1/trips/available");
+        const data = await res.json();
+        setTrips(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Error al cargar viajes:", error);
+        toast.error("Error al cargar viajes disponibles");
+      }
+    };
+
+    fetchTrips();
+  }, []);
+
+  // Cargar asientos disponibles cuando se selecciona un viaje
+  useEffect(() => {
+    const fetchAvailableSeats = async () => {
+      if (!watchTripId) {
+        setAvailableSeats([]);
+        return;
       }
 
-      router.push("/dashboard/tickets");
-      router.refresh();
-    } catch (err) {
-      console.error("Error en onSubmit:", err);
-      setBackendError(err.message || "Error al procesar el ticket");
-    } finally {
-      setIsSubmitting(false);
+      try {
+        const res = await fetch(`http://localhost:3001/api/v1/trips/${watchTripId}`);
+        const tripData = await res.json();
+        setSelectedTrip(tripData);
+
+        if (tripData.price) {
+          setValue("price", tripData.price);
+        }
+
+        // Obtener tickets del viaje para saber qué asientos están ocupados
+        const ticketsRes = await fetch(`http://localhost:3001/api/v1/tickets/trip/${watchTripId}`);
+        const ticketsData = await ticketsRes.json();
+        const occupiedSeatIds = ticketsData.map(t => t.seat.id);
+
+        // Obtener todos los asientos del bus
+        if (tripData.bus && tripData.bus.id) {
+          const seatsRes = await fetch(`http://localhost:3001/api/v1/seats?busId=${tripData.bus.id}`);
+          const seatsData = await seatsRes.json();
+          
+          const available = seatsData.data.filter(seat => 
+            !occupiedSeatIds.includes(seat.id) && seat.is_active
+          );
+          
+          setAvailableSeats(available);
+        }
+      } catch (error) {
+        console.error("Error al cargar asientos:", error);
+        toast.error("Error al cargar asientos disponibles");
+      }
+    };
+
+    fetchAvailableSeats();
+  }, [watchTripId]);
+
+  const onSubmit = handleSubmit(async (data) => {
+    try {
+      setBackendError(null);
+
+      if (!data.userId) {
+        toast.error("Debe seleccionar un cliente");
+        return;
+      }
+
+      if (!data.tripId) {
+        toast.error("Debe seleccionar un viaje");
+        return;
+      }
+
+      if (!data.seatId) {
+        toast.error("Debe seleccionar un asiento");
+        return;
+      }
+
+      const ticketData = {
+        userId: data.userId,
+        tripId: data.tripId,
+        seatId: data.seatId,
+        price: parseFloat(data.price),
+        status: "PENDIENTE",
+      };
+
+      await createTicket(ticketData);
+      toast.success("Ticket creado exitosamente");
+      router.push(`/dashboard/clientes/${clientId}/perfil`);
+    } catch (error) {
+      console.error("Error al crear ticket:", error);
+      setBackendError(error.message || "Error al crear el ticket");
+      toast.error(error.message || "Error al crear el ticket");
     }
   });
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando información...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-2xl mx-auto mt-10 p-6 border rounded-2xl shadow-md bg-white">
-      <h2 className="text-2xl font-bold mb-6 text-center">
-        {isEditing ? "Editar Ticket" : "Registrar Nuevo Ticket"}
-      </h2>
+    <div className="max-w-4xl mx-auto p-6">
+      <Button
+        variant="ghost"
+        onClick={() => router.push("/dashboard/clientes")}
+        className="mb-4"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Volver a clientes
+      </Button>
 
-      <form onSubmit={onSubmit} className="space-y-5">
-        {/* Precio */}
-        <div>
-          <Label htmlFor="price">
-            Precio (Bs.) <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="price"
-            type="number"
-            step="0.01"
-            {...register("price", { required: "El precio es obligatorio" })}
-            placeholder="Ej: 150.00"
-            disabled={isEditing}
-          />
-        </div>
-
-        {/* Estado */}
-        <div>
-          <Label>Estado</Label>
-          <Select
-            value={selectedStatus}
-            onValueChange={(val) => setValue("status", val)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un estado" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(TICKET_STATUS).map(([key, value]) => (
-                <SelectItem key={value} value={value}>
-                  {STATUS_LABELS[value]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Relaciones - Solo en creación */}
-        {!isEditing && (
-          <>
-            {/* Viaje */}
-            <div>
-              <Label>Viaje</Label>
-              <Select
-                onValueChange={(val) => setValue("tripId", val)}
-                defaultValue=""
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un viaje" />
-                </SelectTrigger>
-                <SelectContent>
-                  {trips.map((trip) => (
-                    <SelectItem key={trip.id} value={trip.id}>
-                      {trip.route?.originCity?.name} →{" "}
-                      {trip.route?.destinationCity?.name} ({trip.departure_date})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Asiento */}
-            <div>
-              <Label>Asiento</Label>
-              <Select
-                onValueChange={(val) => setValue("seatId", val)}
-                defaultValue=""
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un asiento" />
-                </SelectTrigger>
-                <SelectContent>
-                  {seats.map((seat) => (
-                    <SelectItem key={seat.id} value={seat.id}>
-                      {seat.seat_number}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Usuario */}
-            <div>
-              <Label>Usuario</Label>
-              <Select
-                onValueChange={(val) => setValue("userId", val)}
-                defaultValue=""
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un usuario" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.profile
-                        ? `${user.profile.firstName} ${user.profile.lastName}`
-                        : user.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </>
-        )}
-
-        {/* Pago (opcional) */}
-        <div>
-          <Label>Pago (opcional)</Label>
-          <Select
-            onValueChange={(val) => setValue("paymentId", val)}
-            defaultValue=""
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecciona un pago" />
-            </SelectTrigger>
-            <SelectContent>
-              {payments.map((pay) => (
-                <SelectItem key={pay.id} value={pay.id}>
-                  Pago #{pay.id} — {pay.amount} Bs.
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Errores */}
-        {backendError && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{backendError}</AlertDescription>
-          </Alert>
-        )}
-
-        <div className="flex justify-between pt-4">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Procesando...
-              </>
-            ) : isEditing ? (
-              "Actualizar"
-            ) : (
-              "Registrar"
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl flex items-center gap-2">
+            <TicketIcon className="h-6 w-6 text-orange-600" />
+            Nuevo Ticket
+          </CardTitle>
+          <CardDescription>
+            Cree un nuevo ticket de viaje para el cliente
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit} className="space-y-6">
+            {/* Información del Cliente */}
+            {clientInfo && (
+              <Card className="bg-blue-50 border-blue-200">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <User className="h-5 w-5 text-blue-600" />
+                    Cliente Seleccionado
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600">Nombre Completo</p>
+                      <p className="font-medium">
+                        {clientInfo.profile.firstName} {clientInfo.profile.lastName}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Documento</p>
+                      <p className="font-medium">{clientInfo.profile.documentNumber}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Email</p>
+                      <p className="font-medium">{clientInfo.email || "No especificado"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Teléfono</p>
+                      <p className="font-medium">{clientInfo.profile.phone || clientInfo.phone || "No especificado"}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             )}
-          </Button>
 
-          <Link
-            href="/dashboard/tickets"
-            className="text-blue-600 hover:underline"
-          >
-            Cancelar
-          </Link>
-        </div>
-      </form>
+            {/* Selección de Viaje */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Bus className="h-5 w-5 text-orange-600" />
+                <h3 className="text-lg font-semibold">Seleccionar Viaje</h3>
+              </div>
+
+              <div>
+                <Label>Viaje *</Label>
+                <Select
+                  onValueChange={(value) => setValue("tripId", value)}
+                  value={watchTripId}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Seleccione un viaje" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {trips.length === 0 ? (
+                      <div className="p-2 text-center text-gray-500">
+                        No hay viajes disponibles
+                      </div>
+                    ) : (
+                      trips.map((trip) => (
+                        <SelectItem key={trip.id} value={trip.id}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">
+                              {trip.route?.originCity?.name || "?"} → {trip.route?.destinationCity?.name || "?"}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              Salida: {new Date(trip.departure_time).toLocaleString("es-ES")} | 
+                              Bus: {trip.bus?.plate || "?"} | 
+                              Precio: Bs. {trip.price}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {errors.tripId && (
+                  <p className="text-red-500 text-sm mt-1">{errors.tripId.message}</p>
+                )}
+              </div>
+
+              {/* Información del viaje seleccionado */}
+              {selectedTrip && (
+                <Card className="bg-green-50 border-green-200">
+                  <CardContent className="pt-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <p className="text-gray-600 flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          Ruta
+                        </p>
+                        <p className="font-medium">
+                          {selectedTrip.route?.originCity?.name} → {selectedTrip.route?.destinationCity?.name}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          Salida
+                        </p>
+                        <p className="font-medium">
+                          {new Date(selectedTrip.departure_time).toLocaleDateString("es-ES")}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          {new Date(selectedTrip.departure_time).toLocaleTimeString("es-ES", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 flex items-center gap-1">
+                          <Bus className="h-4 w-4" />
+                          Bus
+                        </p>
+                        <p className="font-medium">{selectedTrip.bus?.plate}</p>
+                        <p className="text-xs text-gray-600">{selectedTrip.bus?.model}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600">Asientos Disponibles</p>
+                        <p className="font-medium text-lg text-green-600">
+                          {availableSeats.length}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Selección de Asiento */}
+            {availableSeats.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <TicketIcon className="h-5 w-5 text-purple-600" />
+                  <h3 className="text-lg font-semibold">Seleccionar Asiento</h3>
+                </div>
+
+                <div>
+                  <Label>Asiento *</Label>
+                  <Select
+                    onValueChange={(value) => setValue("seatId", value)}
+                  >
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Seleccione un asiento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableSeats.map((seat) => (
+                        <SelectItem key={seat.id} value={seat.id}>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="bg-green-50">
+                              {seat.seat_number}
+                            </Badge>
+                            <span className="text-sm text-gray-600">
+                              {seat.stacks?.name || "Piso"} - {seat.seat_type || "Estándar"}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.seatId && (
+                    <p className="text-red-500 text-sm mt-1">{errors.seatId.message}</p>
+                  )}
+                </div>
+
+                {/* Visualización de asientos disponibles */}
+                <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+                  {availableSeats.slice(0, 32).map((seat) => (
+                    <Button
+                      key={seat.id}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setValue("seatId", seat.id)}
+                      className="h-12 bg-green-50 hover:bg-green-100 border-green-300"
+                    >
+                      {seat.seat_number}
+                    </Button>
+                  ))}
+                </div>
+                {availableSeats.length > 32 && (
+                  <p className="text-sm text-gray-500 text-center">
+                    y {availableSeats.length - 32} asientos más...
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Precio */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-green-600" />
+                <h3 className="text-lg font-semibold">Precio</h3>
+              </div>
+
+              <div>
+                <Label>Precio del Ticket (Bs.) *</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  {...register("price", {
+                    required: "El precio es obligatorio",
+                    min: { value: 0.01, message: "El precio debe ser mayor a 0" },
+                  })}
+                  placeholder="0.00"
+                  className="mt-1"
+                />
+                {errors.price && (
+                  <p className="text-red-500 text-sm mt-1">{errors.price.message}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Error del backend */}
+            {backendError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-red-600 text-center font-medium">{backendError}</p>
+              </div>
+            )}
+
+            {/* Botones de acción */}
+            <div className="flex justify-between items-center pt-4 border-t">
+              <Link href="/dashboard/clientes">
+                <Button type="button" variant="outline">
+                  Cancelar
+                </Button>
+              </Link>
+              <Button 
+                type="submit" 
+                className="bg-orange-600 hover:bg-orange-700"
+                disabled={!watchTripId || availableSeats.length === 0}
+              >
+                Crear Ticket
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
