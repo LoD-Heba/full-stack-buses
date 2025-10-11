@@ -73,7 +73,7 @@ export default function Navbar() {
             <UserMenu />
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden p-2 rounded-md hover:bg-slate-700"
+              className="md:hidden p-2 rounded-md hover:bg-slate-700 z-50"
             >
               {isMenuOpen ? (
                 <X className="w-6 h-6" />

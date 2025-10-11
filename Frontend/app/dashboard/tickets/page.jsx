@@ -1,9 +1,11 @@
+// Frontend/app/dashboard/tickets/page.jsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import DataTable from "@/src/components/DataTable";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
   getTickets,
@@ -12,6 +14,8 @@ import {
   confirmTicket,
 } from "./api/api-tickets";
 import { Pagination } from "./components/Pagination";
+import { TicketPreviewModal } from "./components/ticket-preview-modal";
+import { exportTicketsToPDF, exportSingleTicketToPDF } from "./utils/export-pdf";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,8 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, FileText, Download, Eye } from "lucide-react";
 
 const STATUS_COLORS = {
   PENDIENTE: "bg-yellow-100 text-yellow-800",
@@ -41,9 +44,11 @@ export default function TicketsPage() {
   const router = useRouter();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [previewTicket, setPreviewTicket] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
   const [actionDialog, setActionDialog] = useState({
     open: false,
-    type: null, // 'delete', 'cancel', 'confirm'
+    type: null,
     ticket: null,
   });
 
@@ -119,6 +124,38 @@ export default function TicketsPage() {
     router.push(`/dashboard/tickets/${item.id}`);
   };
 
+  // 🎫 Vista previa del ticket
+  const handlePreview = (ticket) => {
+    setPreviewTicket(ticket);
+    setShowPreview(true);
+  };
+
+  // 📄 Exportar ticket individual a PDF
+  const handleExportSingle = (ticket) => {
+    try {
+      exportSingleTicketToPDF(ticket);
+      toast.success(`Ticket ${ticket.code} exportado a PDF`);
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al exportar el ticket");
+    }
+  };
+
+  // 📊 Exportar todos los tickets a PDF
+  const handleExportAll = () => {
+    try {
+      if (tickets.length === 0) {
+        toast.warning("No hay tickets para exportar");
+        return;
+      }
+      exportTicketsToPDF(tickets);
+      toast.success("Reporte de tickets exportado exitosamente");
+    } catch (error) {
+      console.error(error);
+      toast.error("Error al exportar el reporte");
+    }
+  };
+
   const handleDeleteClick = (ticket) => {
     setActionDialog({ open: true, type: "delete", ticket });
   };
@@ -166,7 +203,10 @@ export default function TicketsPage() {
       fetchTicketsList(meta.page, meta.limit);
     } catch (error) {
       console.error(error);
-      toast.error(error.message || `Error al ${type === "delete" ? "eliminar" : type === "cancel" ? "cancelar" : "confirmar"} el ticket`);
+      toast.error(
+        error.message ||
+          `Error al ${type === "delete" ? "eliminar" : type === "cancel" ? "cancelar" : "confirmar"} el ticket`
+      );
     }
   };
 
@@ -207,6 +247,18 @@ export default function TicketsPage() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Botón de exportación */}
+      <div className="flex justify-end">
+        <Button
+          onClick={handleExportAll}
+          variant="outline"
+          className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Exportar Todos a PDF
+        </Button>
+      </div>
+
       {/* Acciones rápidas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-500">
@@ -239,6 +291,28 @@ export default function TicketsPage() {
         onProfile={handleProfile}
         customActions={(ticket) => (
           <div className="flex gap-2">
+            {/* Vista previa con QR */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+              onClick={() => handlePreview(ticket)}
+              title="Vista previa"
+            >
+              <Eye className="w-4 h-4" />
+            </Button>
+
+            {/* Exportar PDF individual */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+              onClick={() => handleExportSingle(ticket)}
+              title="Exportar a PDF"
+            >
+              <FileText className="w-4 h-4" />
+            </Button>
+
             {ticket.status === "PENDIENTE" && (
               <Button
                 size="sm"
@@ -272,6 +346,13 @@ export default function TicketsPage() {
           onLimitChange={handleLimitChange}
         />
       )}
+
+      {/* Modal de vista previa */}
+      <TicketPreviewModal
+        ticket={previewTicket}
+        open={showPreview}
+        onClose={() => setShowPreview(false)}
+      />
 
       {/* Dialog de confirmación */}
       <AlertDialog

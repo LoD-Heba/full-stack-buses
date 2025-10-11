@@ -27,7 +27,7 @@ export default function UserMenu() {
   if (!user) {
 
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 z-0">
         <button
           onClick={() => router.push('/auth/login')}
           className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
@@ -45,7 +45,7 @@ export default function UserMenu() {
   }
 
   return (
-    <div className="relative">
+    <div className="relative ">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"

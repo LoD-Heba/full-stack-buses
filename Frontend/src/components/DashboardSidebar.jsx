@@ -5,7 +5,9 @@ import { usePathname } from 'next/navigation';
 import UserMenu from "@/components/UserMenu"
 import {
   Users, Shield, Key, UserCog, Map, Building2, DollarSign,
-  ShoppingCart, Bus, Layers, Armchair, Clock, FileText, Newspaper, LayoutDashboard
+  ShoppingCart, Bus, Layers, Armchair, Clock, FileText, Newspaper, LayoutDashboard,
+  ShoppingBagIcon,
+  ShoppingBasketIcon
 } from 'lucide-react';
 
 const menuItems = [
@@ -23,6 +25,7 @@ const menuItems = [
   { href: '/dashboard/horarios', label: 'Horarios', icon: Clock },
   { href: '/dashboard/reportes', label: 'Reportes', icon: FileText },
   { href: '/dashboard/noticias', label: 'Noticias', icon: Newspaper },
+  { href: '/dashboard/clientes', label: 'Clientes', icon: ShoppingBasketIcon },
 ];
 
 export default function DashboardSidebar() {
