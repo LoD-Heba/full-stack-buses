@@ -73,53 +73,78 @@ export class UserService {
   }
 
   /********************************* Registro público ************************************** */
-  async register(registerDto: RegisterDto): Promise<User> {
-    const { password, email, phone, ...userData } = registerDto;
+async register(registerDto: RegisterDto): Promise<User> {
+  const { password, email, phone, profile: profileData, ...userData } = registerDto;
 
-    // Validar que se proporciona al menos email o phone
-    if (!email && !phone) {
-      throw new BadRequestException(
-        'Debe proporcionar al menos email o teléfono',
-      );
-    }
-
-    // Verificar que email sea único si se proporciona
-    if (email) {
-      await this.checkEmailUnique(email);
-    }
-
-    // Verificar que phone sea único si se proporciona
-    if (phone) {
-      await this.checkPhoneUnique(phone);
-    }
-
-    // Obtener rol por defecto (ej: "user" o "client")
-    const defaultRole = await this.roleRepository.findOne({
-      where: { name: 'user', isActive: true }, // O el nombre de tu rol por defecto
-    });
-
-    if (!defaultRole) {
-      throw new BadRequestException(
-        'Rol por defecto no configurado en el sistema',
-      );
-    }
-
-    // Hash de la contraseña
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Crear el usuario
-    const user = this.userRepository.create({
-      ...userData,
-      email,
-      phone,
-      password: hashedPassword,
-      roles: defaultRole,
-    });
-
-    const savedUser = await this.userRepository.save(user);
-
-    return this.findOne(savedUser.id);
+  // Validar que se proporciona al menos email o phone
+  if (!email && !phone) {
+    throw new BadRequestException(
+      'Debe proporcionar al menos email o teléfono',
+    );
   }
+
+  // Verificar que email sea único si se proporciona
+  if (email) {
+    await this.checkEmailUnique(email);
+  }
+
+  // Verificar que phone sea único si se proporciona
+  if (phone) {
+    await this.checkPhoneUnique(phone);
+  }
+
+  // Obtener rol por defecto (ej: "user" o "client")
+  const defaultRole = await this.roleRepository.findOne({
+    where: { name: 'user', isActive: true },
+  });
+
+  if (!defaultRole) {
+    throw new BadRequestException(
+      'Rol por defecto no configurado en el sistema',
+    );
+  }
+
+  // Hash de la contraseña
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  // Crear perfil si se proporcionaron datos
+  let createdProfile: UserProfile | null = null;
+  if (profileData && Object.keys(profileData).length > 0) {
+    // Validar que el documentNumber sea único si se proporciona
+    if (profileData.documentNumber) {
+      const existingProfile = await this.userProfileRepository.findOne({
+        where: { documentNumber: profileData.documentNumber }
+      });
+      
+      if (existingProfile) {
+        throw new ConflictException(
+          `Ya existe un perfil con el C.I. ${profileData.documentNumber}`
+        );
+      }
+    }
+
+    // Crear el perfil
+    const profile = this.userProfileRepository.create({
+      ...profileData,
+      isGuest: false,
+    });
+    createdProfile = await this.userProfileRepository.save(profile);
+  }
+
+  // Crear el usuario con el perfil (si existe)
+  const user = this.userRepository.create({
+    ...userData,
+    email,
+    phone,
+    password: hashedPassword,
+    roles: defaultRole,
+    profile: createdProfile,
+  });
+
+  const savedUser = await this.userRepository.save(user);
+
+  return this.findOne(savedUser.id);
+}
 
   /**************************** Buscar todos los usuarios ************************************* */
   async findAll(
@@ -284,57 +309,96 @@ export class UserService {
   }
 
   /******************************* Actualizar un usuario *********************************** */
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    const { roleId, password, email, phone, ...userData } = updateUserDto;
+async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
+  const { roleId, password, email, phone, profile: profileData, ...userData } = updateUserDto;
 
-    // Verificar si el usuario existe
-    const existingUser = await this.findOne(id);
+  // Verificar si el usuario existe
+  const existingUser = await this.findOne(id);
 
-    // Preparar los datos para actualizar
-    const updateData: any = { ...userData };
+  // Preparar los datos para actualizar
+  const updateData: any = { ...userData };
 
-    // Verificar email único si se está cambiando
-    if (email && email !== existingUser.email) {
-      await this.checkEmailUnique(email);
-      updateData.email = email;
-    }
-
-    // Verificar phone único si se está cambiando
-    if (phone && phone !== existingUser.phone) {
-      await this.checkPhoneUnique(phone);
-      updateData.phone = phone;
-    }
-
-    // Hash de nueva contraseña si se proporciona
-    if (password) {
-      updateData.password = await bcrypt.hash(password, 12);
-    }
-
-    // Actualizar rol si se proporciona
-    if (roleId) {
-      if (this.isUUID(roleId)) {
-        // Si lo que recibo es un UUID
-        updateData.roles = await this.findRoleOrThrow(roleId);
-      } else {
-        // Si lo que recibo es un nombre de rol
-        const role = await this.roleRepository.findOne({
-          where: { name: roleId },
-        });
-        if (!role) {
-          throw new NotFoundException(`El rol '${roleId}' no existe`);
-        }
-        updateData.roles = role;
-      }
-    }
-
-    await this.userRepository.save({
-      id,
-      ...updateData,
-    });
-
-    return this.findOne(id);
+  // Verificar email único si se está cambiando
+  if (email && email !== existingUser.email) {
+    await this.checkEmailUnique(email);
+    updateData.email = email;
   }
 
+  // Verificar phone único si se está cambiando
+  if (phone && phone !== existingUser.phone) {
+    await this.checkPhoneUnique(phone);
+    updateData.phone = phone;
+  }
+
+  // Hash de nueva contraseña si se proporciona
+  if (password) {
+    updateData.password = await bcrypt.hash(password, 12);
+  }
+
+  // Actualizar rol si se proporciona
+  if (roleId) {
+    if (this.isUUID(roleId)) {
+      updateData.roles = await this.findRoleOrThrow(roleId);
+    } else {
+      const role = await this.roleRepository.findOne({
+        where: { name: roleId },
+      });
+      if (!role) {
+        throw new NotFoundException(`El rol '${roleId}' no existe`);
+      }
+      updateData.roles = role;
+    }
+  }
+
+  // Actualizar o crear perfil si se proporcionan datos
+  if (profileData && Object.keys(profileData).length > 0) {
+    if (existingUser.profile) {
+      // Actualizar perfil existente
+      // Validar documentNumber único si se está cambiando
+      if (profileData.documentNumber && profileData.documentNumber !== existingUser.profile.documentNumber) {
+        const existingProfile = await this.userProfileRepository.findOne({
+          where: { documentNumber: profileData.documentNumber }
+        });
+        
+        if (existingProfile) {
+          throw new ConflictException(
+            `Ya existe un perfil con el C.I. ${profileData.documentNumber}`
+          );
+        }
+      }
+
+      await this.userProfileRepository.update(existingUser.profile.id, profileData);
+    } else {
+      // Crear nuevo perfil
+      // Validar documentNumber único si se proporciona
+      if (profileData.documentNumber) {
+        const existingProfile = await this.userProfileRepository.findOne({
+          where: { documentNumber: profileData.documentNumber }
+        });
+        
+        if (existingProfile) {
+          throw new ConflictException(
+            `Ya existe un perfil con el C.I. ${profileData.documentNumber}`
+          );
+        }
+      }
+
+      const newProfile = this.userProfileRepository.create({
+        ...profileData,
+        isGuest: false,
+      });
+      const savedProfile = await this.userProfileRepository.save(newProfile);
+      updateData.profile = savedProfile;
+    }
+  }
+
+  await this.userRepository.save({
+    id,
+    ...updateData,
+  });
+
+  return this.findOne(id);
+}
   /************************ Cambiar estado activo ***************************/
   async toggleActive(id: string): Promise<User> {
     const user = await this.findOneDeactive(id);
