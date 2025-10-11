@@ -2,33 +2,20 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  Users,
-  Shield,
-  Map,
-  Building2,
-  ShoppingCart,
-  Bus,
-  Layers,
-  Armchair,
-  LayoutDashboard,
-  ShoppingBasketIcon,
-  TriangleAlertIcon,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const menuItems = [
-  { href: "/dashboard", label: "Panel Principal", icon: LayoutDashboard },
-  { href: "/dashboard/usuarios", label: "Usuarios", icon: Users },
-  { href: "/dashboard/roles", label: "Roles", icon: Shield },
-  { href: "/dashboard/rutas", label: "Rutas", icon: Map },
-  { href: "/dashboard/ciudades", label: "Ciudades", icon: Building2 },
-  { href: "/dashboard/tickets", label: "Tickeds", icon: ShoppingCart },
-  { href: "/dashboard/buses", label: "Buses", icon: Bus },
-  { href: "/dashboard/stack-asientos", label: "Stack Asientos", icon: Layers },
-  { href: "/dashboard/asientos", label: "Asientos", icon: Armchair },
-  { href: "/dashboard/clientes", label: "Clientes", icon: ShoppingBasketIcon },
-  { href: "/dashboard/viajes", label: "Viajes", icon: TriangleAlertIcon },
+  { href: "/dashboard", label: "Panel Principal"},
+  { href: "/dashboard/usuarios", label: "Usuarios"},
+  { href: "/dashboard/roles", label: "Roles"},
+  { href: "/dashboard/rutas", label: "Rutas"},
+  { href: "/dashboard/ciudades", label: "Ciudades"},
+  { href: "/dashboard/tickets", label: "Tickeds"},
+  { href: "/dashboard/buses", label: "Buses"},
+  { href: "/dashboard/stack-asientos", label: "Stack Asientos"},
+  { href: "/dashboard/asientos", label: "Asientos"},
+  { href: "/dashboard/clientes", label: "Clientes"},
+  { href: "/dashboard/viajes", label: "Viajes" },
 ];
 
 export default function DashboardSidebar() {
@@ -52,7 +39,6 @@ export default function DashboardSidebar() {
 
       <nav className="px-3 bg-black ">
         {menuItems.map((item) => {
-          const Icon = item.icon;
           const isActive = pathname === item.href;
 
           return (
@@ -63,7 +49,6 @@ export default function DashboardSidebar() {
                 isActive ? "bg-orange-500" : " hover:bg-slate-800"
               }`}
             >
-              <Icon className="w-5 h-5" />
               <span className="text-sm">{item.label}</span>
             </Link>
           );

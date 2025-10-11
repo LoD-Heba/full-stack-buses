@@ -1,3 +1,6 @@
+import { Suspense } from "react";
+import {NewTicketForm} from "../components/ticket-form"
+
 export default function NewTicketPage() {
   return (
     <Suspense fallback={

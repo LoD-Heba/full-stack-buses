@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-function NewTicketForm() {
+export function NewTicketForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clientId = searchParams.get("clientId");
