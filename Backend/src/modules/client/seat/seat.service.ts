@@ -13,6 +13,8 @@ import { SeatStack } from '../seat-stacks/entities/seat-stack.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
 import { Bus } from '../bus/entities/bus.entity';
+import { Trip } from '../trip/entities/trip.entity';
+import { TicketStatus, TripStatus } from 'src/common/enums/status.enum';
 
 @Injectable()
 export class SeatService {
@@ -23,6 +25,8 @@ export class SeatService {
     private readonly seatStackRepository: Repository<SeatStack>,
     @InjectRepository(Bus)
     private readonly busRepository: Repository<Bus>,
+    @InjectRepository(Trip) // AGREGAR ESTO
+    private readonly tripRepository: Repository<Trip>, // AGREGAR ESTO
   ) {}
 
   async create(createSeatDto: CreateSeatDto): Promise<Seat> {
@@ -220,7 +224,7 @@ export class SeatService {
       .andWhere('stacks.id = :stackId', { stackId })
       .andWhere(
         '(tickets.id IS NULL OR (tickets.status != :confirmed OR trip.departure_time < :now))',
-        { confirmed: 'CONFIRMED', now: new Date() },
+        { confirmed: TicketStatus.CONFIRMED, now: new Date() },
       )
       .orderBy('seat.seat_number', 'ASC')
       .getMany();
@@ -249,8 +253,9 @@ export class SeatService {
 
     // Verificar si el asiento tiene tickets confirmados
     const confirmedTickets =
-      existingSeat.tickets?.filter((ticket) => ticket.status === 'CONFIRMED') ||
-      [];
+      existingSeat.tickets?.filter(
+        (ticket) => ticket.status === TicketStatus.CONFIRMED,
+      ) || [];
 
     if (confirmedTickets.length > 0) {
       // No permitir cambios críticos si tiene tickets confirmados
@@ -356,7 +361,9 @@ export class SeatService {
 
     // Verificar si tiene tickets confirmados
     const confirmedTickets =
-      seat.tickets?.filter((ticket) => ticket.status === 'CONFIRMED') || [];
+      seat.tickets?.filter(
+        (ticket) => ticket.status === TicketStatus.CONFIRMED,
+      ) || [];
 
     if (confirmedTickets.length > 0) {
       throw new BadRequestException(
@@ -371,6 +378,30 @@ export class SeatService {
 
     // Actualizar capacidad del bus
     await this.updateBusCapacity(stackId);
+
+    // ====== AGREGAR: Actualizar available_seats de viajes activos del bus ======
+    const stack = await this.seatStackRepository.findOne({
+      where: { id: stackId },
+      relations: { bus: { trips: true } },
+    });
+
+    if (stack?.bus?.trips) {
+      const activeTrips = stack.bus.trips.filter(
+        (trip) => trip.status === TripStatus.SCHEDULED && trip.is_active,
+      );
+
+      // Actualizar cada viaje activo (necesitarás inyectar TripService)
+      for (const trip of activeTrips) {
+        // Recalcular manualmente aquí para evitar dependencia circular
+        const totalSeats = await this.seatRepository.count({
+          where: { stacks: { id: stackId }, is_active: true },
+        });
+        await this.tripRepository.update(trip.id, {
+          available_seats: totalSeats,
+        });
+      }
+    }
+    // ====================================
 
     return { ...seat, is_active: false };
   }
@@ -428,10 +459,10 @@ export class SeatService {
       .leftJoin('seat.tickets', 'tickets')
       .select([
         'COUNT(tickets.ticket_id) as total_tickets',
-        "COUNT(CASE WHEN tickets.status = 'CONFIRMADO' THEN 1 END) as confirmed_tickets",
-        "COUNT(CASE WHEN tickets.status = 'PENDIENTE' THEN 1 END) as pending_tickets",
-        "COUNT(CASE WHEN tickets.status = 'CANCELADO' THEN 1 END) as cancelled_tickets",
-        "SUM(CASE WHEN tickets.status = 'CONFIRMADO' THEN tickets.price ELSE 0 END) as total_revenue",
+        `COUNT(CASE WHEN tickets.status = '${TicketStatus.CONFIRMED}' THEN 1 END) as confirmed_tickets`,
+        `COUNT(CASE WHEN tickets.status = '${TicketStatus.PENDING}' THEN 1 END) as pending_tickets`,
+        `COUNT(CASE WHEN tickets.status = '${TicketStatus.CANCELLED}' THEN 1 END) as cancelled_tickets`,
+        `SUM(CASE WHEN tickets.status = '${TicketStatus.CONFIRMED}' THEN tickets.price ELSE 0 END) as total_revenue`,
       ])
       .where('seat.id = :id', { id })
       .getRawOne();
