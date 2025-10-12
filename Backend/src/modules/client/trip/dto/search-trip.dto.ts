@@ -1,5 +1,5 @@
 import { IsOptional, IsDateString, IsUUID, IsEnum } from 'class-validator';
-import { TripStatus } from './create-trip.dto';
+import { TripStatus } from 'src/common/enums/status.enum';
 
 export class SearchTripsDto {
   @IsOptional()

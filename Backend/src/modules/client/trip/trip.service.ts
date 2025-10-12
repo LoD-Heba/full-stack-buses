@@ -1,11 +1,11 @@
-import { 
-  Injectable, 
-  NotFoundException, 
-  BadRequestException 
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
-import { CreateTripDto, TripStatus } from './dto/create-trip.dto';
+import { CreateTripDto } from './dto/create-trip.dto';
 import { UpdateTripDto } from './dto/update-trip.dto';
 import { SearchTripsDto } from './dto/search-trip.dto';
 import { Trip } from './entities/trip.entity';
@@ -15,16 +15,16 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
 import { User } from 'src/modules/admin/user/entities/user.entity';
 import { UserProfile } from 'src/modules/admin/user-profile/entities/user-profile.entity';
-
+import { TripStatus, TicketStatus } from 'src/common/enums/status.enum';
 @Injectable()
 export class TripService {
   constructor(
     @InjectRepository(Trip)
     private readonly tripRepository: Repository<Trip>,
-    
+
     @InjectRepository(Bus)
     private readonly busRepository: Repository<Bus>,
-    
+
     @InjectRepository(Route)
     private readonly routeRepository: Repository<Route>,
 
@@ -32,11 +32,12 @@ export class TripService {
     private readonly userRepository: Repository<User>,
 
     @InjectRepository(UserProfile)
-    private readonly userProfileRepository: Repository<UserProfile>
+    private readonly userProfileRepository: Repository<UserProfile>,
   ) {}
 
   async create(createTripDto: CreateTripDto): Promise<Trip> {
-    const { busId, routeId, departure_time, arrival_time, ...tripData } = createTripDto;
+    const { busId, routeId, departure_time, arrival_time, ...tripData } =
+      createTripDto;
 
     // Validar fechas
     const departureDate = new Date(departure_time);
@@ -44,19 +45,19 @@ export class TripService {
 
     if (departureDate >= arrivalDate) {
       throw new BadRequestException(
-        'La fecha de llegada debe ser posterior a la fecha de salida'
+        'La fecha de llegada debe ser posterior a la fecha de salida',
       );
     }
 
     if (departureDate < new Date()) {
       throw new BadRequestException(
-        'La fecha de salida no puede ser en el pasado'
+        'La fecha de salida no puede ser en el pasado',
       );
     }
 
     // Validar que el bus existe y está activo
     const bus = await this.findBus(busId);
-    
+
     // Validar que la ruta existe
     const route = await this.findRoute(routeId);
 
@@ -70,16 +71,24 @@ export class TripService {
         '(trip.departure_time BETWEEN :start AND :end) OR (trip.arrival_time BETWEEN :start AND :end) OR (trip.departure_time <= :start AND trip.arrival_time >= :end)',
         {
           start: departure_time,
-          end: arrival_time
-        }
+          end: arrival_time,
+        },
       )
       .getOne();
 
     if (conflictingTrip) {
       throw new BadRequestException(
-        `El bus ya tiene un viaje programado que se solapa con estos horarios`
+        `El bus ya tiene un viaje programado que se solapa con estos horarios`,
       );
     }
+    // Verificar que el bus está asignado a la ruta
+    const busInRoute = route.buses?.some((b) => b.id === busId);
+    if (!busInRoute) {
+      throw new BadRequestException(
+        `El bus ${bus.plate} no está asignado a la ruta ${route.name}. Debe asignar el bus a la ruta primero.`,
+      );
+    }
+    // ====================================
 
     // Calcular asientos disponibles basado en el bus
     const availableSeats = await this.calculateAvailableSeats(busId);
@@ -91,13 +100,15 @@ export class TripService {
       arrival_time: arrivalDate,
       available_seats: availableSeats,
       bus,
-      route,
+      route:{},
     });
 
     return this.tripRepository.save(trip);
   }
 
-  async findAll(paginationDto: PaginationDto): Promise<PaginatedResponse<Trip>> {
+  async findAll(
+    paginationDto: PaginationDto,
+  ): Promise<PaginatedResponse<Trip>> {
     const { page = 1, limit = 10 } = paginationDto;
 
     const take = Math.min(Math.max(limit, 1), 100);
@@ -115,12 +126,12 @@ export class TripService {
       where: { is_active: true },
       relations: {
         bus: {
-          user: true
+          user: true,
         },
         route: true,
         tickets: {
-          user:true
-        }
+          user: true,
+        },
       },
       order: { departure_time: 'ASC' },
       skip,
@@ -143,30 +154,31 @@ export class TripService {
   async findOne(id: string): Promise<Trip> {
     const trip = await this.tripRepository.findOne({
       where: { id, is_active: true },
-      relations: { 
+      relations: {
         bus: {
           user: true,
-          stacks: true
+          stacks: true,
         },
         route: true,
         tickets: {
           seat: true,
           payment: true,
           user: true,
-        }
-      }
+        },
+      },
     });
 
     if (!trip) {
       throw new NotFoundException(`El viaje con ID ${id} no existe`);
     }
-    
+
     return trip;
   }
 
   async search(searchDto: SearchTripsDto, paginationDto: PaginationDto) {
     const { page = 1, limit = 10 } = paginationDto;
-    const { routeId, busId, departureDate, fromDate, toDate, status } = searchDto;
+    const { routeId, busId, departureDate, fromDate, toDate, status } =
+      searchDto;
 
     const take = Math.min(Math.max(limit, 1), 100);
     const skip = (page - 1) * take;
@@ -192,11 +204,14 @@ export class TripService {
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(departureDate);
       endOfDay.setHours(23, 59, 59, 999);
-      
-      queryBuilder.andWhere('trip.departure_time BETWEEN :startOfDay AND :endOfDay', {
-        startOfDay,
-        endOfDay
-      });
+
+      queryBuilder.andWhere(
+        'trip.departure_time BETWEEN :startOfDay AND :endOfDay',
+        {
+          startOfDay,
+          endOfDay,
+        },
+      );
     }
 
     if (fromDate) {
@@ -255,28 +270,33 @@ export class TripService {
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
-      
-      queryBuilder.andWhere('trip.departure_time BETWEEN :startOfDay AND :endOfDay', {
-        startOfDay,
-        endOfDay
-      });
+
+      queryBuilder.andWhere(
+        'trip.departure_time BETWEEN :startOfDay AND :endOfDay',
+        {
+          startOfDay,
+          endOfDay,
+        },
+      );
     }
 
-    return queryBuilder
-      .orderBy('trip.departure_time', 'ASC')
-      .getMany();
+    return queryBuilder.orderBy('trip.departure_time', 'ASC').getMany();
   }
 
   async update(id: string, updateTripDto: UpdateTripDto): Promise<Trip> {
-    const { busId, routeId, departure_time, arrival_time, ...tripData } = updateTripDto;
+    const { busId, routeId, departure_time, arrival_time, ...tripData } =
+      updateTripDto;
 
     // Verificar que el viaje existe
     const existingTrip = await this.findOne(id);
 
     // No permitir actualizar viajes en progreso o completados
-    if (existingTrip.status === 'IN_PROGRESS' || existingTrip.status === 'COMPLETED') {
+    if (
+      existingTrip.status === TripStatus.IN_PROGRESS ||
+      existingTrip.status === TripStatus.COMPLETED
+    ) {
       throw new BadRequestException(
-        'No se puede actualizar un viaje en progreso o completado'
+        'No se puede actualizar un viaje en progreso o completado',
       );
     }
 
@@ -284,17 +304,37 @@ export class TripService {
 
     // Validar fechas si se están actualizando
     if (departure_time || arrival_time) {
-      const newDeparture = departure_time ? new Date(departure_time) : existingTrip.departure_time;
-      const newArrival = arrival_time ? new Date(arrival_time) : existingTrip.arrival_time;
+      const newDeparture = departure_time
+        ? new Date(departure_time)
+        : existingTrip.departure_time;
+      const newArrival = arrival_time
+        ? new Date(arrival_time)
+        : existingTrip.arrival_time;
 
       if (newDeparture >= newArrival) {
         throw new BadRequestException(
-          'La fecha de llegada debe ser posterior a la fecha de salida'
+          'La fecha de llegada debe ser posterior a la fecha de salida',
         );
       }
 
       updateData.departure_time = newDeparture;
       updateData.arrival_time = newArrival;
+    }
+
+    //Validar si bus tiene ruta
+    if (busId || routeId) {
+      const newBusId = busId || existingTrip.bus.id;
+      const newRouteId = routeId || existingTrip.route.id;
+
+      const route = await this.findRoute(newRouteId);
+      const busInRoute = route.buses?.some((b) => b.id === newBusId);
+
+      if (!busInRoute) {
+        const bus = await this.findBus(newBusId);
+        throw new BadRequestException(
+          `El bus ${bus.plate} no está asignado a la ruta ${route.name}`,
+        );
+      }
     }
 
     // Actualizar bus si se proporciona
@@ -324,13 +364,13 @@ export class TripService {
     const trip = await this.findOne(id);
 
     // No permitir eliminar viajes con tickets confirmados
-    const confirmedTicketsCount = trip.tickets?.filter(
-      ticket => ticket.status === 'CONFIRMADO'
-    ).length || 0;
+    const confirmedTicketsCount =
+      trip.tickets?.filter((ticket) => ticket.status === 'CONFIRMADO').length ||
+      0;
 
     if (confirmedTicketsCount > 0) {
       throw new BadRequestException(
-        'No se puede eliminar un viaje que tiene tickets confirmados'
+        'No se puede eliminar un viaje que tiene tickets confirmados',
       );
     }
 
@@ -343,16 +383,16 @@ export class TripService {
   async cancelTrip(id: string): Promise<Trip> {
     const trip = await this.findOne(id);
 
-    if (trip.status === 'CANCELLED') {
+    if (trip.status === TripStatus.CANCELLED) {
       throw new BadRequestException('El viaje ya está cancelado');
     }
 
-    if (trip.status === 'COMPLETED') {
+    if (trip.status === TripStatus.COMPLETED) {
       throw new BadRequestException('No se puede cancelar un viaje completado');
     }
 
-    await this.tripRepository.update(id, { 
-      status: TripStatus.CANCELLED 
+    await this.tripRepository.update(id, {
+      status: TripStatus.CANCELLED,
     });
 
     return this.findOne(id);
@@ -361,12 +401,14 @@ export class TripService {
   async startTrip(id: string): Promise<Trip> {
     const trip = await this.findOne(id);
 
-    if (trip.status !== 'SCHEDULED') {
-      throw new BadRequestException('Solo se pueden iniciar viajes programados');
+    if (trip.status !== TripStatus.SCHEDULED) {
+      throw new BadRequestException(
+        'Solo se pueden iniciar viajes programados',
+      );
     }
 
-    await this.tripRepository.update(id, { 
-      status: TripStatus.IN_PROGRESS 
+    await this.tripRepository.update(id, {
+      status: TripStatus.IN_PROGRESS,
     });
 
     return this.findOne(id);
@@ -375,12 +417,14 @@ export class TripService {
   async completeTrip(id: string): Promise<Trip> {
     const trip = await this.findOne(id);
 
-    if (trip.status !== 'IN_PROGRESS') {
-      throw new BadRequestException('Solo se pueden completar viajes en progreso');
+    if (trip.status !== TripStatus.IN_PROGRESS) {
+      throw new BadRequestException(
+        'Solo se pueden completar viajes en progreso',
+      );
     }
 
-    await this.tripRepository.update(id, { 
-      status: TripStatus.COMPLETED 
+    await this.tripRepository.update(id, {
+      status: TripStatus.COMPLETED,
     });
 
     return this.findOne(id);
@@ -394,10 +438,10 @@ export class TripService {
       .leftJoin('trip.tickets', 'ticket')
       .select([
         'COUNT(ticket.ticket_id) as total_tickets',
-        'COUNT(CASE WHEN ticket.status = \'CONFIRMED\' THEN 1 END) as confirmed_tickets',
-        'COUNT(CASE WHEN ticket.status = \'PENDING\' THEN 1 END) as pending_tickets',
-        'COUNT(CASE WHEN ticket.status = \'CANCELLED\' THEN 1 END) as cancelled_tickets',
-        'SUM(CASE WHEN ticket.status = \'CONFIRMED\' THEN ticket.price ELSE 0 END) as total_revenue'
+        `COUNT(CASE WHEN ticket.status = '${TicketStatus.CONFIRMED}' THEN 1 END) as confirmed_tickets`,
+        `COUNT(CASE WHEN ticket.status = '${TicketStatus.PENDING}' THEN 1 END) as pending_tickets`,
+        `COUNT(CASE WHEN ticket.status = '${TicketStatus.CANCELLED}' THEN 1 END) as cancelled_tickets`,
+        `SUM(CASE WHEN ticket.status = '${TicketStatus.CONFIRMED}' THEN ticket.price ELSE 0 END) as total_revenue`,
       ])
       .where('trip.id = :id', { id })
       .getRawOne();
@@ -410,45 +454,51 @@ export class TripService {
         pendingTickets: parseInt(stats.pending_tickets) || 0,
         cancelledTickets: parseInt(stats.cancelled_tickets) || 0,
         availableSeats: trip.available_seats,
-        occupancyRate: trip.available_seats > 0 
-          ? ((parseInt(stats.confirmed_tickets) || 0) / (trip.available_seats + (parseInt(stats.confirmed_tickets) || 0)) * 100).toFixed(2)
-          : '0',
-        totalRevenue: parseFloat(stats.total_revenue) || 0
-      }
+        occupancyRate:
+          trip.available_seats > 0
+            ? (
+                ((parseInt(stats.confirmed_tickets) || 0) /
+                  (trip.available_seats +
+                    (parseInt(stats.confirmed_tickets) || 0))) *
+                100
+              ).toFixed(2)
+            : '0',
+        totalRevenue: parseFloat(stats.total_revenue) || 0,
+      },
     };
   }
 
   // Métodos auxiliares privados
   private async findBus(busId: string): Promise<Bus> {
     const bus = await this.busRepository.findOne({
-      where: { id: busId, is_active: true }
+      where: { id: busId, is_active: true },
     });
-    
+
     if (!bus) {
       throw new NotFoundException(`El bus ${busId} no existe o no está activo`);
     }
-    
+
     return bus;
   }
 
   private async findRoute(routeId: string): Promise<Route> {
     const route = await this.routeRepository.findOne({
-      where: { id: routeId }
+      where: { id: routeId, is_active: true }, // AGREGAR is_active
+      relations: { buses: true }, // AGREGAR relación buses
     });
-    
+
     if (!route) {
       throw new NotFoundException(`La ruta ${routeId} no existe`);
     }
-    
+
     return route;
   }
-
   private async calculateAvailableSeats(busId: string): Promise<number> {
     // Esto depende de cómo tengas estructurado el conteo de asientos en el bus
     // Por ahora asumo que tienes una relación con seats o un campo capacity
     const bus = await this.busRepository.findOne({
       where: { id: busId },
-      relations: { stacks: { seats: true } }
+      relations: { stacks: { seats: true } },
     });
 
     if (!bus || !bus.stacks) {
@@ -456,6 +506,37 @@ export class TripService {
     }
 
     // Contar todos los asientos activos del bus
-    return bus.stacks.seats?.filter(seat => seat.is_active).length || 0;
+    return bus.stacks.seats?.filter((seat) => seat.is_active).length || 0;
+  }
+
+  // Después del método privado calculateAvailableSeats
+  async updateAvailableSeats(tripId: string): Promise<void> {
+    const trip = await this.tripRepository.findOne({
+      where: { id: tripId },
+      relations: {
+        bus: { stacks: { seats: true } },
+        tickets: true,
+      },
+    });
+
+    if (!trip) {
+      throw new NotFoundException(`El viaje ${tripId} no existe`);
+    }
+
+    // Contar asientos totales del bus
+    const totalSeats =
+      trip.bus.stacks?.seats?.filter((seat) => seat.is_active).length || 0;
+
+    // Contar tickets confirmados
+    const confirmedTickets =
+      trip.tickets?.filter((ticket) => ticket.status === 'CONFIRMADO').length ||
+      0;
+
+    // Calcular disponibles
+    const available = totalSeats - confirmedTickets;
+
+    await this.tripRepository.update(tripId, {
+      available_seats: Math.max(0, available),
+    });
   }
 }

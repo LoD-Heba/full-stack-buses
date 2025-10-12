@@ -11,13 +11,7 @@ import {
   ValidateIf
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-
-export enum TripStatus {
-  SCHEDULED = 'SCHEDULED',
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED'
-}
+import { TripStatus } from 'src/common/enums/status.enum';
 
 export class CreateTripDto {
   @IsNotEmpty()
