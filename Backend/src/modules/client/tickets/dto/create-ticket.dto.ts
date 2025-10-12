@@ -7,12 +7,7 @@ import {
   IsPositive
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-
-export enum TicketStatus {
-  PENDING = 'PENDIENTE',
-  CONFIRMED = 'CONFIRMADO',
-  CANCELLED = 'CANCELADO'
-}
+import { TicketStatus } from 'src/common/enums/status.enum';
 
 export class CreateTicketDto {
   @IsNotEmpty()
