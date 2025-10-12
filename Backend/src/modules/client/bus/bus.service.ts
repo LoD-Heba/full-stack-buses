@@ -13,7 +13,7 @@ import { User } from 'src/modules/admin/user/entities/user.entity';
 import { SeatStack } from '../seat-stacks/entities/seat-stack.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
-import { TripStatus } from '../trip/dto/create-trip.dto';
+import { TripStatus, TicketStatus } from 'src/common/enums/status.enum';
 
 @Injectable()
 export class BusService {
@@ -33,7 +33,9 @@ export class BusService {
 
     // Validar que el usuario existe y está activo
     const user = await this.findUser(userId);
+    // Validar que el bus existe y está activo
 
+    // Validar que la ruta existe
     // Verificar placa única (case-insensitive)
     const existsPlate = await this.busRepository.findOne({
       where: { plate: createBusDto.plate.toUpperCase() },
@@ -330,7 +332,9 @@ export class BusService {
     // Verificar si tiene viajes programados o en progreso
     const activeTrips =
       bus.trips?.filter(
-        (trip) => trip.status === TripStatus.SCHEDULED || trip.status === TripStatus.IN_PROGRESS ///////////////
+        (trip) =>
+          trip.status === TripStatus.SCHEDULED ||
+          trip.status === TripStatus.IN_PROGRESS, ///////////////
       ) || [];
 
     if (activeTrips.length > 0) {
@@ -356,7 +360,13 @@ export class BusService {
         );
       }
     }
-
+    const activeSeatsCount =
+      bus.stacks.seats?.filter((s) => s.is_active).length || 0;
+    if (activeSeatsCount === 0) {
+      throw new BadRequestException(
+        'El bus debe tener al menos un asiento activo antes de ponerse en uso',
+      );
+    }
     if (status === BusStatus.DISPONIBLE && bus.status === BusStatus.EN_USO) {
       // Verificar que no tenga viajes en progreso
       const activeTrips =
@@ -383,7 +393,7 @@ export class BusService {
       .leftJoin('trips.tickets', 'tickets')
       .select([
         'COUNT(DISTINCT trips.id) as total_trips',
-        "COUNT(DISTINCT CASE WHEN trips.status = 'COMPLETED' THEN trips.id END) as completed_trips",
+        `COUNT(DISTINCT CASE WHEN trips.status = '${TripStatus.COMPLETED}' THEN trips.id END) as completed_trips`,
         'COUNT(tickets.ticket_id) as total_tickets',
         "SUM(CASE WHEN tickets.status = 'CONFIRMADO' THEN tickets.price ELSE 0 END) as total_revenue",
       ])
