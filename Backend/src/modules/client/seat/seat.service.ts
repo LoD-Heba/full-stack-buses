@@ -428,10 +428,10 @@ export class SeatService {
       .leftJoin('seat.tickets', 'tickets')
       .select([
         'COUNT(tickets.ticket_id) as total_tickets',
-        "COUNT(CASE WHEN tickets.status = 'CONFIRMED' THEN 1 END) as confirmed_tickets",
-        "COUNT(CASE WHEN tickets.status = 'PENDING' THEN 1 END) as pending_tickets",
-        "COUNT(CASE WHEN tickets.status = 'CANCELLED' THEN 1 END) as cancelled_tickets",
-        "SUM(CASE WHEN tickets.status = 'CONFIRMED' THEN tickets.price ELSE 0 END) as total_revenue",
+        "COUNT(CASE WHEN tickets.status = 'CONFIRMADO' THEN 1 END) as confirmed_tickets",
+        "COUNT(CASE WHEN tickets.status = 'PENDIENTE' THEN 1 END) as pending_tickets",
+        "COUNT(CASE WHEN tickets.status = 'CANCELADO' THEN 1 END) as cancelled_tickets",
+        "SUM(CASE WHEN tickets.status = 'CONFIRMADO' THEN tickets.price ELSE 0 END) as total_revenue",
       ])
       .where('seat.id = :id', { id })
       .getRawOne();

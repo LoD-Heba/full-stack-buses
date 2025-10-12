@@ -13,6 +13,7 @@ import { City } from '../city/entities/city.entity';
 import { Bus } from '../bus/entities/bus.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
+import { TripStatus } from '../trip/dto/create-trip.dto';
 
 @Injectable()
 export class RouteService {
@@ -270,7 +271,7 @@ export class RouteService {
 
     // Verificar si hay viajes programados o en progreso
     const activeTrips = existingRoute.trips?.filter(
-      trip => trip.status === 'SCHEDULED' || trip.status === 'IN_PROGRESS'
+      trip => trip.status === TripStatus.SCHEDULED || trip.status === TripStatus.IN_PROGRESS
     ) || [];
 
     if (activeTrips.length > 0 && (originCityId || destinationCityId)) {
@@ -343,7 +344,7 @@ export class RouteService {
 
     // Verificar si tiene viajes programados o en progreso
     const activeTrips = route.trips?.filter(
-      trip => trip.status === 'SCHEDULED' || trip.status === 'IN_PROGRESS'
+      trip => trip.status === TripStatus.SCHEDULED || trip.status === TripStatus.IN_PROGRESS
     ) || [];
 
     if (activeTrips.length > 0) {

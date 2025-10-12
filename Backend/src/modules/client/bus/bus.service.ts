@@ -13,6 +13,7 @@ import { User } from 'src/modules/admin/user/entities/user.entity';
 import { SeatStack } from '../seat-stacks/entities/seat-stack.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
+import { TripStatus } from '../trip/dto/create-trip.dto';
 
 @Injectable()
 export class BusService {
@@ -329,7 +330,7 @@ export class BusService {
     // Verificar si tiene viajes programados o en progreso
     const activeTrips =
       bus.trips?.filter(
-        (trip) => trip.status === 'SCHEDULED' || trip.status === 'IN_PROGRESS', ///////////////
+        (trip) => trip.status === TripStatus.SCHEDULED || trip.status === TripStatus.IN_PROGRESS ///////////////
       ) || [];
 
     if (activeTrips.length > 0) {

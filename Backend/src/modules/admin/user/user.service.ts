@@ -547,9 +547,9 @@ async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
       .leftJoin('user.buses', 'buses')
       .select([
         'COUNT(DISTINCT tickets.ticket_id) as total_tickets',
-        "COUNT(DISTINCT CASE WHEN tickets.status = 'CONFIRMED' THEN tickets.ticket_id END) as confirmed_tickets",
+        "COUNT(DISTINCT CASE WHEN tickets.status = 'CONFIRMADO' THEN tickets.ticket_id END) as confirmed_tickets",
         'COUNT(DISTINCT buses.id) as total_buses',
-        "SUM(CASE WHEN tickets.status = 'CONFIRMED' THEN tickets.price ELSE 0 END) as total_spent",
+        "SUM(CASE WHEN tickets.status = 'CONFIRMADO' THEN tickets.price ELSE 0 END) as total_spent",
       ])
       .where('user.id = :userId', { userId })
       .getRawOne();

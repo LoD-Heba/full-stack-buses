@@ -325,7 +325,7 @@ export class TripService {
 
     // No permitir eliminar viajes con tickets confirmados
     const confirmedTicketsCount = trip.tickets?.filter(
-      ticket => ticket.status === 'CONFIRMED'
+      ticket => ticket.status === 'CONFIRMADO'
     ).length || 0;
 
     if (confirmedTicketsCount > 0) {
