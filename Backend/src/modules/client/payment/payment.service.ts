@@ -27,17 +27,18 @@ export class PaymentService {
       CASH: 1,
       CARD: 5,
       QR: 1,
-      TRANSFER: 10
+      TRANSFER: 10,
     };
 
     if (amount < minAmounts[method]) {
       throw new BadRequestException(
-        `El monto mínimo para ${method} es ${minAmounts[method]}`
+        `El monto mínimo para ${method} es ${minAmounts[method]}`,
       );
     }
 
     // Generar referencia automática si no se proporciona
-    const transaction_reference = paymentData.transaction_reference || 
+    const transaction_reference =
+      paymentData.transaction_reference ||
       this.generateTransactionReference(method);
 
     const payment = this.paymentRepository.create({
@@ -51,7 +52,9 @@ export class PaymentService {
     return this.paymentRepository.save(payment);
   }
 
-  async findAll(paginationDto: PaginationDto): Promise<PaginatedResponse<Payment>> {
+  async findAll(
+    paginationDto: PaginationDto,
+  ): Promise<PaginatedResponse<Payment>> {
     const { page = 1, limit = 10 } = paginationDto;
 
     const take = Math.min(Math.max(limit, 1), 100);
@@ -70,16 +73,16 @@ export class PaymentService {
       relations: {
         tickets: {
           user: {
-            profile: true
+            profile: true,
           },
           trip: {
             route: {
               originCity: true,
-              destinationCity: true
-            }
+              destinationCity: true,
+            },
           },
-          seat: true
-        }
+          seat: true,
+        },
       },
       order: { created_at: 'DESC' },
       skip,
@@ -105,18 +108,18 @@ export class PaymentService {
       relations: {
         tickets: {
           user: {
-            profile: true
+            profile: true,
           },
           trip: {
             route: {
               originCity: true,
-              destinationCity: true
+              destinationCity: true,
             },
-            bus: true
+            bus: true,
           },
-          seat: true
-        }
-      }
+          seat: true,
+        },
+      },
     });
 
     if (!payment) {
@@ -128,15 +131,15 @@ export class PaymentService {
 
   async search(searchDto: SearchPaymentDto, paginationDto: PaginationDto) {
     const { page = 1, limit = 10 } = paginationDto;
-    const { 
-      method, 
-      status, 
-      category, 
-      minAmount, 
-      maxAmount, 
-      fromDate, 
-      toDate, 
-      searchTerm 
+    const {
+      method,
+      status,
+      category,
+      minAmount,
+      maxAmount,
+      fromDate,
+      toDate,
+      searchTerm,
     } = searchDto;
 
     const take = Math.min(Math.max(limit, 1), 100);
@@ -180,7 +183,7 @@ export class PaymentService {
     if (searchTerm) {
       queryBuilder.andWhere(
         '(payment.transaction_reference ILIKE :searchTerm OR payment.notes ILIKE :searchTerm)',
-        { searchTerm: `%${searchTerm}%` }
+        { searchTerm: `%${searchTerm}%` },
       );
     }
 
@@ -211,38 +214,41 @@ export class PaymentService {
 
   async findByStatus(status: PaymentStatus): Promise<Payment[]> {
     return this.paymentRepository.find({
-      where: { 
-        status, 
-        is_active: true 
+      where: {
+        status,
+        is_active: true,
       },
       relations: { tickets: true },
-      order: { created_at: 'DESC' }
+      order: { created_at: 'DESC' },
     });
   }
 
   async findByMethod(method: string): Promise<Payment[]> {
     return this.paymentRepository.find({
-      where: { 
-        method, 
-        is_active: true 
+      where: {
+        method,
+        is_active: true,
       },
       relations: { tickets: true },
-      order: { created_at: 'DESC' }
+      order: { created_at: 'DESC' },
     });
   }
 
   async findByDateRange(fromDate: Date, toDate: Date): Promise<Payment[]> {
     return this.paymentRepository.find({
-      where: { 
+      where: {
         payment_date: Between(fromDate, toDate),
-        is_active: true 
+        is_active: true,
       },
       relations: { tickets: true },
-      order: { payment_date: 'DESC' }
+      order: { payment_date: 'DESC' },
     });
   }
 
-  async update(id: string, updatePaymentDto: UpdatePaymentDto): Promise<Payment> {
+  async update(
+    id: string,
+    updatePaymentDto: UpdatePaymentDto,
+  ): Promise<Payment> {
     // Verificar que el pago exists
     const existingPayment = await this.findOne(id);
 
@@ -251,26 +257,26 @@ export class PaymentService {
       // Solo permitir ciertos cambios en pagos completados
       const allowedFields = ['notes', 'transaction_reference'];
       const hasRestrictedChanges = Object.keys(updatePaymentDto).some(
-        field => !allowedFields.includes(field)
+        (field) => !allowedFields.includes(field),
       );
-      
+
       if (hasRestrictedChanges) {
         throw new BadRequestException(
-          'Solo se pueden modificar notas y referencia en pagos completados'
+          'Solo se pueden modificar notas y referencia en pagos completados',
         );
       }
     }
 
     if (existingPayment.status === PaymentStatus.REFUNDED) {
       throw new BadRequestException(
-        'No se pueden modificar pagos reembolsados'
+        'No se pueden modificar pagos reembolsados',
       );
     }
 
     // Validar cambio de monto si se proporciona
     if (updatePaymentDto.amount && existingPayment.tickets.length > 0) {
       throw new BadRequestException(
-        'No se puede cambiar el monto de un pago que tiene tickets asociados'
+        'No se puede cambiar el monto de un pago que tiene tickets asociados',
       );
     }
 
@@ -285,7 +291,7 @@ export class PaymentService {
     // Verificar si tiene tickets asociados
     if (payment.tickets && payment.tickets.length > 0) {
       throw new BadRequestException(
-        'No se puede eliminar un pago que tiene tickets asociados'
+        'No se puede eliminar un pago que tiene tickets asociados',
       );
     }
 
@@ -302,16 +308,25 @@ export class PaymentService {
       throw new BadRequestException('Solo se pueden procesar pagos pendientes');
     }
 
-    // Aquí irían las validaciones específicas según el método de pago
-    const processResult = await this.simulatePaymentProcessing(payment);
+    // ====== SIMPLIFICADO PARA COMPRENSIÓN ======
+    // Simulación BÁSICA: todos los pagos se aprueban automáticamente
+    // En producción real, aquí irían las integraciones con pasarelas de pago
 
-    const newStatus = processResult.success ? 
-      PaymentStatus.COMPLETED : PaymentStatus.FAILED;
+    let newStatus = PaymentStatus.COMPLETED;
+    let notes = `Pago procesado exitosamente vía ${payment.method}`;
 
-    await this.paymentRepository.update(id, { 
+    // Simulación opcional: 5% de fallos aleatorios para pruebas
+    const randomFail = Math.random() < 0.05; // 5% de probabilidad
+    if (randomFail) {
+      newStatus = PaymentStatus.FAILED;
+      notes = `Fallo simulado en procesamiento de ${payment.method}`;
+    }
+
+    await this.paymentRepository.update(id, {
       status: newStatus,
-      notes: processResult.notes
+      notes: payment.notes ? `${payment.notes}\n${notes}` : notes,
     });
+    // ====================================
 
     return this.findOne(id);
   }
@@ -320,15 +335,16 @@ export class PaymentService {
     const payment = await this.findOne(id);
 
     if (payment.status !== PaymentStatus.COMPLETED) {
-      throw new BadRequestException('Solo se pueden reembolsar pagos completados');
+      throw new BadRequestException(
+        'Solo se pueden reembolsar pagos completados',
+      );
     }
 
-    const refundNotes = reason ? 
-      `Reembolso: ${reason}` : 'Reembolso procesado';
+    const refundNotes = reason ? `Reembolso: ${reason}` : 'Reembolso procesado';
 
-    await this.paymentRepository.update(id, { 
+    await this.paymentRepository.update(id, {
       status: PaymentStatus.REFUNDED,
-      notes: payment.notes ? `${payment.notes}\n${refundNotes}` : refundNotes
+      notes: payment.notes ? `${payment.notes}\n${refundNotes}` : refundNotes,
     });
 
     return this.findOne(id);
@@ -350,17 +366,21 @@ export class PaymentService {
     const stats = await queryBuilder
       .select([
         'COUNT(*) as total_payments',
-        'COUNT(CASE WHEN payment.status = \'COMPLETED\' THEN 1 END) as completed_payments',
-        'COUNT(CASE WHEN payment.status = \'PENDING\' THEN 1 END) as pending_payments',
-        'COUNT(CASE WHEN payment.status = \'FAILED\' THEN 1 END) as failed_payments',
-        'COUNT(CASE WHEN payment.status = \'REFUNDED\' THEN 1 END) as refunded_payments',
-        'SUM(CASE WHEN payment.status = \'COMPLETED\' THEN payment.amount ELSE 0 END) as total_revenue',
-        'AVG(CASE WHEN payment.status = \'COMPLETED\' THEN payment.amount END) as average_payment'
+        `COUNT(CASE WHEN payment.status = '${PaymentStatus.COMPLETED}' THEN 1 END) as completed_payments`,
+        `COUNT(CASE WHEN payment.status = '${PaymentStatus.PENDING}' THEN 1 END) as pending_payments`,
+        `COUNT(CASE WHEN payment.status = '${PaymentStatus.FAILED}' THEN 1 END) as failed_payments`,
+        `COUNT(CASE WHEN payment.status = '${PaymentStatus.REFUNDED}' THEN 1 END) as refunded_payments`,
+        `SUM(CASE WHEN payment.status = '${PaymentStatus.COMPLETED}' THEN payment.amount ELSE 0 END) as total_revenue`,
+        `AVG(CASE WHEN payment.status = '${PaymentStatus.COMPLETED}' THEN payment.amount END) as average_payment`,
       ])
       .getRawOne();
 
     const methodStats = await queryBuilder
-      .select(['payment.method', 'COUNT(*) as count', 'SUM(payment.amount) as total'])
+      .select([
+        'payment.method',
+        'COUNT(*) as count',
+        'SUM(payment.amount) as total',
+      ])
       .andWhere('payment.status = :status', { status: PaymentStatus.COMPLETED })
       .groupBy('payment.method')
       .getRawMany();
@@ -373,62 +393,23 @@ export class PaymentService {
         failedPayments: parseInt(stats.failed_payments) || 0,
         refundedPayments: parseInt(stats.refunded_payments) || 0,
         totalRevenue: parseFloat(stats.total_revenue) || 0,
-        averagePayment: parseFloat(stats.average_payment) || 0
+        averagePayment: parseFloat(stats.average_payment) || 0,
       },
-      byMethod: methodStats.map(stat => ({
+      byMethod: methodStats.map((stat) => ({
         method: stat.payment_method,
         count: parseInt(stat.count),
-        total: parseFloat(stat.total)
-      }))
+        total: parseFloat(stat.total),
+      })),
     };
   }
 
   // Métodos auxiliares privados
   private generateTransactionReference(method: string): string {
     const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const random = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, '0');
     return `${method}-${timestamp}-${random}`;
   }
 
-  private async simulatePaymentProcessing(payment: Payment): Promise<{
-    success: boolean;
-    notes: string;
-  }> {
-    // Simulación de procesamiento según el método
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    // Simular algunos fallos aleatorios para métodos electrónicos
-    const failureRate = {
-      CASH: 0.01, // 1% fallo (error humano)
-      CARD: 0.05, // 5% fallo 
-      QR: 0.03,   // 3% fallo
-      TRANSFER: 0.02 // 2% fallo
-    };
-
-    const shouldFail = Math.random() < failureRate[payment.method];
-
-    if (shouldFail) {
-      return {
-        success: false,
-        notes: `Fallo en procesamiento de ${payment.method}: ${this.getRandomFailureReason()}`
-      };
-    }
-
-    return {
-      success: true,
-      notes: `Pago procesado exitosamente vía ${payment.method}`
-    };
-  }
-
-  private getRandomFailureReason(): string {
-    const reasons = [
-      'Fondos insuficientes',
-      'Tarjeta expirada',
-      'Error de conexión',
-      'Transacción rechazada por el banco',
-      'Código QR inválido',
-      'Tiempo de espera agotado'
-    ];
-    return reasons[Math.floor(Math.random() * reasons.length)];
-  }
 }
