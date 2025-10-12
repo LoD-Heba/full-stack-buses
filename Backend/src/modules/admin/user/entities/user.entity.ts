@@ -56,6 +56,7 @@ export class User {
   // Muchos usuarios pueden tener un rol (N:1)
   @ManyToOne(() => Role, (role) => role.user, {
     nullable: false,
+    onDelete: 'SET NULL'
   })
   @JoinColumn({ name: 'role_id' })
   roles: Role;

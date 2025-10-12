@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { Role } from './entities/role.entity';
@@ -25,24 +30,12 @@ export class RoleService {
   async create(createRoleDto: CreateRoleDto) {
     const { name } = createRoleDto;
 
-    // Validar nombre único
+    // 🔎 Verificar nombre único
     const exists = await this.roleRepository.findOne({ where: { name } });
     if (exists) throw new ConflictException(`El rol "${name}" ya existe.`);
 
-    // // Validar permisos
-    // if (!permissionIds || permissionIds.length === 0) {
-    //   throw new BadRequestException('Debe asignar al menos un permiso.');
-    // }
-
-    // const permissions = await this.permissionRepository.find({
-    //   where: { id: In(permissionIds) },
-    // });
-
-    // if (permissions.length !== permissionIds.length) {
-    //   throw new BadRequestException('Algunos permisos no existen.');
-    // }
-
-    const newRole = this.roleRepository.create(createRoleDto); // permissions: permissions })
+    // Crear y guardar rol
+    const newRole = this.roleRepository.create(createRoleDto);
     return await this.roleRepository.save(newRole);
   }
 
@@ -55,16 +48,15 @@ export class RoleService {
       order: { createdAt: 'DESC' },
       skip: offset,
       take: limit,
-      relations: {
-        user:true,
-      }
+      relations: { user: true },
     });
   }
 
   /************************ FIND ONE ***************************/
   async findOne(id: string) {
     const role = await this.roleRepository.findOne({
-      where: { id }
+      where: { id },
+      relations: ['user'],
     });
 
     if (!role) throw new NotFoundException(`Rol con ID ${id} no existe.`);
@@ -75,31 +67,25 @@ export class RoleService {
   async update(id: string, updateRoleDto: UpdateRoleDto) {
     const { name } = updateRoleDto;
 
-    // Verificar rol
+    // Verificar existencia
     await this.findOne(id);
 
     // Validar nombre único
     if (name) {
       const exists = await this.roleRepository.findOne({ where: { name } });
-      if (exists && exists.id !== id) { // Si el rol existe y no es el mismo que se está actualizando
+      if (exists && exists.id !== id) {
         throw new ConflictException(`Ya existe un rol con el nombre "${name}".`);
       }
     }
 
-    // let permissions;
-    // if (permissionIds && permissionIds.length > 0) { // Si se proporcionan nuevos permisos
-    //   permissions = await this.permissionRepository.find({ 
-    //     where: { id: In(permissionIds) }, //Donde el id esté en el arreglo permissionId
-    //   });
-    // }
-
-    const role = await this.roleRepository.preload({ //preload busca el rol por
+    const role = await this.roleRepository.preload({
       id,
-      ...updateRoleDto, // Si permissions es undefined, no actualizará los permisos
+      ...updateRoleDto,
     });
 
-    if (!role) throw new NotFoundException(`Rol con ID ${id} no se ha encontrado.`);
-    
+    if (!role)
+      throw new NotFoundException(`Rol con ID ${id} no se ha encontrado.`);
+
     return await this.roleRepository.save(role);
   }
 
@@ -107,11 +93,12 @@ export class RoleService {
   async deactivate(id: string) {
     const role = await this.findOne(id);
 
-    // Evitar desactivar rol "user"
+    // Proteger rol base
     if (role.name === 'user') {
       throw new BadRequestException('El rol "user" no puede ser desactivado.');
     }
 
+    // Marcar como inactivo
     role.isActive = false;
     return await this.roleRepository.save(role);
   }
@@ -129,29 +116,46 @@ export class RoleService {
   async remove(id: string) {
     const roleToDelete = await this.findOne(id);
 
-    // Proteger rol "user"
+    // 🔒 Evitar eliminar roles críticos
     if (roleToDelete.name === 'user' || roleToDelete.name === 'admin') {
-      throw new BadRequestException('El rol user y admin no puede ser eliminado.');
+      throw new BadRequestException(
+        'Los roles "user" y "admin" no pueden ser eliminados.',
+      );
     }
 
-    // Buscar rol por defecto "user"
+    // ⚠️ Solo se puede eliminar si está desactivado
+    if (roleToDelete.isActive) {
+      throw new BadRequestException(
+        'Debes desactivar el rol antes de eliminarlo.',
+      );
+    }
+
+    // 🔍 Buscar rol por defecto "user"
     const defaultRole = await this.roleRepository.findOne({
       where: { name: 'user', isActive: true },
     });
     if (!defaultRole) {
-      throw new BadRequestException('El rol "user" no existe. Debes crearlo primero.');
+      throw new BadRequestException(
+        'El rol "user" no existe o está inactivo. Debes crearlo primero.',
+      );
     }
 
-    // Reasignar usuarios al rol "user"
-    if (roleToDelete.user && roleToDelete.user.length > 0) {
-      for (const user of roleToDelete.user) {
-        user.roles = defaultRole;
-        await this.userRepository.save(user);
-      }
+    // 🔄 Buscar y reasignar usuarios que tengan este rol
+    const usersWithRole = await this.userRepository.find({
+      where: { roles: { id } }, // Usa "roles" si tu relación es ManyToMany
+      relations: ['role'],
+    });
+
+    for (const user of usersWithRole) {
+      user.roles = defaultRole; // ⚠️ Asegúrate de usar el nombre correcto en tu entidad User
+      await this.userRepository.save(user);
     }
 
-    // Eliminar rol definitivamente
+    // 🗑️ Eliminar el rol definitivamente
     await this.roleRepository.remove(roleToDelete);
-    return { message: `Rol "${roleToDelete.name}" eliminado y usuarios reasignados al rol "user".` };
+
+    return {
+      message: `Rol "${roleToDelete.name}" eliminado y ${usersWithRole.length} usuario(s) reasignado(s) al rol "user".`,
+    };
   }
 }
