@@ -1,7 +1,7 @@
-import { 
-  Injectable, 
-  NotFoundException, 
-  BadRequestException 
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In, Like } from 'typeorm';
@@ -13,34 +13,29 @@ import { City } from '../city/entities/city.entity';
 import { Bus } from '../bus/entities/bus.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
-import { TripStatus } from '../trip/dto/create-trip.dto';
+import { TripStatus, TicketStatus } from 'src/common/enums/status.enum';
 
 @Injectable()
 export class RouteService {
   constructor(
     @InjectRepository(Route)
     private readonly routeRepository: Repository<Route>,
-    
+
     @InjectRepository(City)
     private readonly cityRepository: Repository<City>,
-    
+
     @InjectRepository(Bus)
     private readonly busRepository: Repository<Bus>,
   ) {}
 
   async create(createRouteDto: CreateRouteDto): Promise<Route> {
-    const { 
-      originCityId, 
-      destinationCityId, 
-      busIds, 
-      name,
-      ...routeData 
-    } = createRouteDto;
+    const { originCityId, destinationCityId, busIds, name, ...routeData } =
+      createRouteDto;
 
     // Validar que origen y destino son diferentes
     if (originCityId === destinationCityId) {
       throw new BadRequestException(
-        'La ciudad de origen y destino no pueden ser la misma'
+        'La ciudad de origen y destino no pueden ser la misma',
       );
     }
 
@@ -53,13 +48,13 @@ export class RouteService {
       where: {
         originCity: { id: originCityId },
         destinationCity: { id: destinationCityId },
-        is_active: true
-      }
+        is_active: true,
+      },
     });
 
     if (existingRoute) {
       throw new BadRequestException(
-        `Ya existe una ruta de ${originCity.city} a ${destinationCity.city}`
+        `Ya existe una ruta de ${originCity.city} a ${destinationCity.city}`,
       );
     }
 
@@ -84,7 +79,9 @@ export class RouteService {
     return this.routeRepository.save(route);
   }
 
-  async findAll(paginationDto: PaginationDto): Promise<PaginatedResponse<Route>> {
+  async findAll(
+    paginationDto: PaginationDto,
+  ): Promise<PaginatedResponse<Route>> {
     const { page = 1, limit = 10 } = paginationDto;
 
     const take = Math.min(Math.max(limit, 1), 100);
@@ -104,9 +101,9 @@ export class RouteService {
         originCity: true,
         destinationCity: true,
         buses: {
-          user: true
+          user: true,
         },
-        trips: true
+        trips: true,
       },
       order: { created_at: 'DESC' },
       skip,
@@ -129,25 +126,25 @@ export class RouteService {
   async findOne(id: string): Promise<Route> {
     const route = await this.routeRepository.findOne({
       where: { id, is_active: true },
-      relations: { 
+      relations: {
         originCity: true,
         destinationCity: true,
         buses: {
           user: true,
           stacks: {
-            seats: true
-          }
+            seats: true,
+          },
         },
         trips: {
-          tickets: true
-        }
-      }
+          tickets: true,
+        },
+      },
     });
 
     if (!route) {
       throw new NotFoundException(`La ruta con ID ${id} no existe`);
     }
-    
+
     return route;
   }
 
@@ -171,13 +168,15 @@ export class RouteService {
     }
 
     if (destinationCityId) {
-      queryBuilder.andWhere('destinationCity.id = :destinationCityId', { destinationCityId });
+      queryBuilder.andWhere('destinationCity.id = :destinationCityId', {
+        destinationCityId,
+      });
     }
 
     if (searchTerm) {
       queryBuilder.andWhere(
         '(route.name ILIKE :searchTerm OR route.description ILIKE :searchTerm OR originCity.name ILIKE :searchTerm OR destinationCity.name ILIKE :searchTerm)',
-        { searchTerm: `%${searchTerm}%` }
+        { searchTerm: `%${searchTerm}%` },
       );
     }
 
@@ -213,11 +212,7 @@ export class RouteService {
       .leftJoinAndSelect('route.destinationCity', 'destinationCity')
       .leftJoin('route.trips', 'trips')
       .leftJoin('trips.tickets', 'tickets')
-      .select([
-        'route',
-        'originCity',
-        'destinationCity'
-      ])
+      .select(['route', 'originCity', 'destinationCity'])
       .addSelect('COUNT(tickets.ticket_id)', 'ticket_count')
       .where('route.is_active = :active', { active: true })
       .groupBy('route.id')
@@ -228,7 +223,10 @@ export class RouteService {
       .getMany();
   }
 
-  async findByCity(cityId: string, type: 'origin' | 'destination' | 'both' = 'both') {
+  async findByCity(
+    cityId: string,
+    type: 'origin' | 'destination' | 'both' = 'both',
+  ) {
     const queryBuilder = this.routeRepository
       .createQueryBuilder('route')
       .leftJoinAndSelect('route.originCity', 'originCity')
@@ -242,41 +240,42 @@ export class RouteService {
     } else {
       queryBuilder.andWhere(
         '(originCity.id = :cityId OR destinationCity.id = :cityId)',
-        { cityId }
+        { cityId },
       );
     }
 
-    return queryBuilder
-      .orderBy('route.name', 'ASC')
-      .getMany();
+    return queryBuilder.orderBy('route.name', 'ASC').getMany();
   }
 
   async update(id: string, updateRouteDto: UpdateRouteDto): Promise<Route> {
-    const { 
-      originCityId, 
-      destinationCityId, 
-      busIds, 
-      ...routeData 
-    } = updateRouteDto;
+    const { originCityId, destinationCityId, busIds, ...routeData } =
+      updateRouteDto;
 
     // Verificar que la ruta existe
     const existingRoute = await this.findOne(id);
 
     // Validar que origen y destino son diferentes si se están actualizando
-    if (originCityId && destinationCityId && originCityId === destinationCityId) {
+    if (
+      originCityId &&
+      destinationCityId &&
+      originCityId === destinationCityId
+    ) {
       throw new BadRequestException(
-        'La ciudad de origen y destino no pueden ser la misma'
+        'La ciudad de origen y destino no pueden ser la misma',
       );
     }
 
     // Verificar si hay viajes programados o en progreso
-    const activeTrips = existingRoute.trips?.filter(
-      trip => trip.status === TripStatus.SCHEDULED || trip.status === TripStatus.IN_PROGRESS
-    ) || [];
+    const activeTrips =
+      existingRoute.trips?.filter(
+        (trip) =>
+          trip.status === TripStatus.SCHEDULED ||
+          trip.status === TripStatus.IN_PROGRESS,
+      ) || [];
 
     if (activeTrips.length > 0 && (originCityId || destinationCityId)) {
       throw new BadRequestException(
-        'No se pueden cambiar las ciudades de una ruta que tiene viajes programados o en progreso'
+        'No se pueden cambiar las ciudades de una ruta que tiene viajes programados o en progreso',
       );
     }
 
@@ -296,14 +295,15 @@ export class RouteService {
 
     // Actualizar nombre automáticamente si se cambian las ciudades
     if (originCityId || destinationCityId) {
-      const origin = originCityId 
-        ? await this.findCity(originCityId) 
+      const origin = originCityId
+        ? await this.findCity(originCityId)
         : existingRoute.originCity;
-      const destination = destinationCityId 
-        ? await this.findCity(destinationCityId) 
+      const destination = destinationCityId
+        ? await this.findCity(destinationCityId)
         : existingRoute.destinationCity;
-      
-      updateData.name = updateRouteDto.name || `${origin.city} - ${destination.city}`;
+
+      updateData.name =
+        updateRouteDto.name || `${origin.city} - ${destination.city}`;
     }
 
     // Verificar que hay algo para actualizar
@@ -323,7 +323,7 @@ export class RouteService {
     if (hasBusesToUpdate) {
       const route = await this.routeRepository.findOne({
         where: { id },
-        relations: { buses: true }
+        relations: { buses: true },
       });
 
       if (busIds && busIds.length > 0) {
@@ -333,7 +333,7 @@ export class RouteService {
         route!.buses = [];
       }
 
-      await this.routeRepository.save(route!); 
+      await this.routeRepository.save(route!);
     }
 
     return this.findOne(id);
@@ -343,13 +343,16 @@ export class RouteService {
     const route = await this.findOne(id);
 
     // Verificar si tiene viajes programados o en progreso
-    const activeTrips = route.trips?.filter(
-      trip => trip.status === TripStatus.SCHEDULED || trip.status === TripStatus.IN_PROGRESS
-    ) || [];
+    const activeTrips =
+      route.trips?.filter(
+        (trip) =>
+          trip.status === TripStatus.SCHEDULED ||
+          trip.status === TripStatus.IN_PROGRESS,
+      ) || [];
 
     if (activeTrips.length > 0) {
       throw new BadRequestException(
-        'No se puede eliminar una ruta que tiene viajes programados o en progreso'
+        'No se puede eliminar una ruta que tiene viajes programados o en progreso',
       );
     }
 
@@ -361,8 +364,8 @@ export class RouteService {
 
   async assignBus(routeId: string, busId: string): Promise<Route> {
     const route = await this.routeRepository.findOne({
-      where: { id: routeId },
-      relations: { buses: true }
+      where: { id: routeId, is_active: true }, // AGREGAR is_active
+      relations: { buses: true },
     });
 
     if (!route) {
@@ -370,9 +373,28 @@ export class RouteService {
     }
 
     const bus = await this.findBus(busId);
+    // Verificar que el bus tenga asientos configurados
+    const busWithSeats = await this.busRepository.findOne({
+      where: { id: busId },
+      relations: { stacks: { seats: true } },
+    });
 
+    if (!busWithSeats?.stacks) {
+      throw new BadRequestException(
+        `El bus ${bus.plate} no tiene un stack de asientos configurado`,
+      );
+    }
+
+    const activeSeats =
+      busWithSeats.stacks.seats?.filter((s) => s.is_active).length || 0;
+    if (activeSeats === 0) {
+      throw new BadRequestException(
+        `El bus ${bus.plate} no tiene asientos activos`,
+      );
+    }
+    // ====================================
     // Verificar si el bus ya está asignado
-    const busAlreadyAssigned = route.buses.some(b => b.id === busId);
+    const busAlreadyAssigned = route.buses.some((b) => b.id === busId);
     if (busAlreadyAssigned) {
       throw new BadRequestException('El bus ya está asignado a esta ruta');
     }
@@ -386,14 +408,14 @@ export class RouteService {
   async removeBus(routeId: string, busId: string): Promise<Route> {
     const route = await this.routeRepository.findOne({
       where: { id: routeId },
-      relations: { buses: true }
+      relations: { buses: true },
     });
 
     if (!route) {
       throw new NotFoundException(`La ruta ${routeId} no existe`);
     }
 
-    route.buses = route.buses.filter(bus => bus.id !== busId);
+    route.buses = route.buses.filter((bus) => bus.id !== busId);
     await this.routeRepository.save(route);
 
     return this.findOne(routeId);
@@ -408,10 +430,10 @@ export class RouteService {
       .leftJoin('trips.tickets', 'tickets')
       .select([
         'COUNT(DISTINCT trips.id) as total_trips',
-        'COUNT(DISTINCT CASE WHEN trips.status = \'SCHEDULED\' THEN trips.id END) as scheduled_trips',
-        'COUNT(DISTINCT CASE WHEN trips.status = \'COMPLETED\' THEN trips.id END) as completed_trips',
+        `COUNT(DISTINCT CASE WHEN trips.status = '${TripStatus.SCHEDULED}' THEN trips.id END) as scheduled_trips`,
+        `COUNT(DISTINCT CASE WHEN trips.status = '${TripStatus.COMPLETED}' THEN trips.id END) as completed_trips`,
         'COUNT(tickets.ticket_id) as total_tickets',
-        'SUM(CASE WHEN tickets.status = \'CONFIRMED\' THEN tickets.price ELSE 0 END) as total_revenue'
+        `SUM(CASE WHEN tickets.status = '${TicketStatus.CONFIRMED}' THEN tickets.price ELSE 0 END) as total_revenue`,
       ])
       .where('route.id = :id', { id })
       .getRawOne();
@@ -424,45 +446,47 @@ export class RouteService {
         completedTrips: parseInt(stats.completed_trips) || 0,
         totalTickets: parseInt(stats.total_tickets) || 0,
         totalRevenue: parseFloat(stats.total_revenue) || 0,
-        assignedBuses: route.buses?.length || 0
-      }
+        assignedBuses: route.buses?.length || 0,
+      },
     };
   }
 
   // Métodos auxiliares privados
   private async findCity(cityId: string): Promise<City> {
     const city = await this.cityRepository.findOne({
-      where: { id: cityId }
+      where: { id: cityId },
     });
-    
+
     if (!city) {
       throw new NotFoundException(`La ciudad ${cityId} no existe`);
     }
-    
+
     return city;
   }
 
   private async findBus(busId: string): Promise<Bus> {
     const bus = await this.busRepository.findOne({
-      where: { id: busId, is_active: true }
+      where: { id: busId, is_active: true },
     });
-    
+
     if (!bus) {
       throw new NotFoundException(`El bus ${busId} no existe o no está activo`);
     }
-    
+
     return bus;
   }
 
   private async findBuses(busIds: string[]): Promise<Bus[]> {
     const buses = await this.busRepository.find({
-      where: { id: In(busIds), is_active: true }
+      where: { id: In(busIds), is_active: true },
     });
-    
+
     if (buses.length !== busIds.length) {
-      throw new NotFoundException('Algunos buses no existen o no están activos');
+      throw new NotFoundException(
+        'Algunos buses no existen o no están activos',
+      );
     }
-    
+
     return buses;
   }
 }
