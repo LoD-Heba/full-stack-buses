@@ -400,9 +400,23 @@ export class BusService {
 
     // Validaciones según el estado
     if (status === BusStatus.EN_USO) {
-      if (!bus.stacks) {
+
+      // Validar antiguedad de bus
+      const currentYear = new Date().getFullYear();
+      const busAge = currentYear - (bus.year || currentYear);
+      if (busAge > 15) {
         throw new BadRequestException(
-          'Un bus debe tener un stack de asientos antes de ponerse en uso',
+          `El bus tiene ${busAge} años de antigüedad. Solo se permiten buses con menos de 15 años en servicio`,
+        );
+      }
+      // 
+      const activeSeatsCount =
+        bus.stacks.seats?.filter((s) => s.is_active).length || 0;
+
+      // Validación de capacidad mínima
+      if (activeSeatsCount < 15) {
+        throw new BadRequestException(
+          `El bus debe tener al menos 15 asientos activos (actual: ${activeSeatsCount})`,
         );
       }
     }
@@ -477,13 +491,11 @@ export class BusService {
     });
 
     if (!user) {
-      throw new NotFoundException(
-        `El usuario no ha llenado su formulario`,
-      );
+      throw new NotFoundException(`El usuario no ha llenado su formulario`);
     }
 
     // Validar rol
-    if (user.profile===null && user.roles.name !== 'empleado') {
+    if (user.profile === null && user.roles.name !== 'empleado') {
       throw new ForbiddenException(`El usuario no tiene permisos suficientes`);
     }
 
