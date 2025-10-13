@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSearchParams, useRouter } from "next/navigation";
-
+import { tripsAPI, routesAPI } from "./api/tripsApi";
 import {
   Dialog,
   DialogContent,
@@ -77,11 +77,11 @@ export default function TripsManagement() {
 
   const fetchRoutes = async () => {
     try {
-      const response = await fetch(`${API_URL}/routes?limit=100`);
-      const data = await response.json();
+      const data = await routesAPI.getAll(100);
       setRoutes(data.data || []);
     } catch (error) {
       console.error("Error al cargar rutas:", error);
+      showAlert("Error al cargar rutas", "error");
     }
   };
 
@@ -124,6 +124,10 @@ export default function TripsManagement() {
   };
 
   const openEditModal = (trip) => {
+    if (trip.status === 'IN_PROGRESS' || trip.status === 'COMPLETED') {
+    showAlert("No se puede editar un viaje en progreso o completado", "error");
+    return;
+  }
     setModalMode("edit");
     setSelectedTrip(trip);
     setFormData({
@@ -144,12 +148,29 @@ export default function TripsManagement() {
 
   const handleSubmit = async () => {
     try {
+      // Validar que todos los campos estén completos
+      if (!formData.routeId || !formData.busId || !formData.price) {
+        showAlert("Por favor complete todos los campos obligatorios", "error");
+        return;
+      }
+
       // Validar que la fecha de salida no sea en el pasado
       const departureDate = new Date(formData.departure_time);
       const now = new Date();
 
       if (departureDate < now) {
         showAlert("La fecha de salida no puede ser en el pasado", "error");
+        return;
+      }
+
+      // Validar anticipación mínima de 2 horas
+      const hoursUntilDeparture =
+        (departureDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+      if (hoursUntilDeparture < 2) {
+        showAlert(
+          "Los viajes deben crearse con al menos 2 horas de anticipación",
+          "error"
+        );
         return;
       }
 
@@ -163,33 +184,52 @@ export default function TripsManagement() {
         return;
       }
 
-      // Validar que todos los campos estén completos
-      if (!formData.routeId || !formData.busId || !formData.price) {
-        showAlert("Por favor complete todos los campos obligatorios", "error");
+      // Validar duración del viaje (30 min - 24 horas)
+      const tripDurationHours =
+        (arrivalDate.getTime() - departureDate.getTime()) / (1000 * 60 * 60);
+      if (tripDurationHours < 0.5) {
+        showAlert("La duración mínima de un viaje es 30 minutos", "error");
         return;
       }
-      // ====================================
-
-      const url =
-        modalMode === "create"
-          ? `${API_URL}/trips`
-          : `${API_URL}/trips/${selectedTrip.id}`;
-
-      const method = modalMode === "create" ? "POST" : "PATCH";
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Error al guardar");
+      if (tripDurationHours > 24) {
+        showAlert("La duración máxima de un viaje es 24 horas", "error");
+        return;
       }
-      showAlert(
-        modalMode === "create"
-          ? "Viaje creado exitosamente"
-          : "Viaje actualizado exitosamente"
-      );
+
+      // Validar horario comercial (5 AM - 11 PM)
+      const departureHour = departureDate.getHours();
+      if (departureHour < 5 || departureHour >= 23) {
+        showAlert(
+          "Los viajes solo pueden programarse entre las 5:00 AM y las 11:00 PM",
+          "error"
+        );
+        return;
+      }
+
+      // Validar precio positivo
+      if (parseFloat(formData.price) <= 0) {
+        showAlert("El precio debe ser mayor a 0", "error");
+        return;
+      }
+
+      // Preparar datos para envío
+      const submitData = {
+        departure_time: formData.departure_time,
+        arrival_time: formData.arrival_time,
+        price: parseFloat(formData.price),
+        busId: formData.busId,
+        routeId: formData.routeId,
+        status: formData.status || "SCHEDULED",
+      };
+
+      if (modalMode === "create") {
+        await tripsAPI.create(submitData);
+        showAlert("Viaje creado exitosamente");
+      } else {
+        await tripsAPI.update(selectedTrip.id, submitData);
+        showAlert("Viaje actualizado exitosamente");
+      }
+
       setIsModalOpen(false);
       fetchTrips();
     } catch (error) {
@@ -201,15 +241,7 @@ export default function TripsManagement() {
     if (!confirm("¿Estás seguro de eliminar este viaje?")) return;
 
     try {
-      const response = await fetch(`${API_URL}/trips/${id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Error al eliminar");
-      }
-
+      await tripsAPI.delete(id);
       showAlert("Viaje eliminado exitosamente");
       fetchTrips();
     } catch (error) {
@@ -219,24 +251,17 @@ export default function TripsManagement() {
 
   const handleStatusChange = async (id, action) => {
     try {
-      const response = await fetch(`${API_URL}/trips/${id}/${action}`, {
-        method: "PATCH",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Error al actualizar estado");
+      if (action === "start") {
+        await tripsAPI.start(id);
+        showAlert("Viaje iniciado exitosamente");
+      } else if (action === "complete") {
+        await tripsAPI.complete(id);
+        showAlert("Viaje completado exitosamente");
+      } else if (action === "cancel") {
+        await tripsAPI.cancel(id);
+        showAlert("Viaje cancelado exitosamente");
       }
 
-      showAlert(
-        `Viaje ${
-          action === "start"
-            ? "iniciado"
-            : action === "complete"
-            ? "completado"
-            : "cancelado"
-        } exitosamente`
-      );
       fetchTrips();
     } catch (error) {
       showAlert(error.message, "error");
@@ -313,12 +338,12 @@ export default function TripsManagement() {
   const fetchTrips = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${API_URL}/trips?page=${pagination.page}&limit=${pagination.limit}`
-      );
-      const data = await response.json();
+      const data = await tripsAPI.getAll(pagination.page, pagination.limit);
       setTrips(data.data || []);
-      setPagination((prev) => ({ ...prev, total: data.meta?.total || 0 }));
+      setPagination((prev) => ({
+        ...prev,
+        total: data.meta?.total || 0,
+      }));
     } catch (error) {
       showAlert("Error al cargar los viajes", "error");
     } finally {
@@ -467,6 +492,17 @@ export default function TripsManagement() {
                   }
                   disabled={!formData.routeId} // Deshabilitar si no hay ruta
                 >
+                  {formData.busId &&
+                    filteredBuses.find((b) => b.id === formData.busId) && (
+                      <p className="text-green-600 text-xs mt-1">
+                        ✅ Bus válido con{" "}
+                        {filteredBuses
+                          .find((b) => b.id === formData.busId)
+                          ?.stacks?.seats?.filter((s) => s.is_active).length ||
+                          0}{" "}
+                        asientos activos
+                      </p>
+                    )}
                   <SelectTrigger>
                     <SelectValue
                       placeholder={
@@ -524,6 +560,9 @@ export default function TripsManagement() {
                   className="mb-2"
                 />
                 <Label htmlFor="departure_time_hour">Hora de Salida *</Label>
+                <p className="text-xs text-gray-500 mt-1">
+                Anticipación 2 horas | Horarios 5AM - 11PM
+                </p>
                 <Select
                   value={formData.departure_time.split("T")[1] || "08:00"}
                   onValueChange={(value) => {
@@ -558,6 +597,7 @@ export default function TripsManagement() {
               </div>
               <div>
                 <Label htmlFor="arrival_time">Fecha de Llegada *</Label>
+
                 <Input
                   id="arrival_date"
                   type="date"
@@ -577,6 +617,9 @@ export default function TripsManagement() {
                   className="mb-2"
                 />
                 <Label htmlFor="arrival_time_hour">Hora de Llegada *</Label>
+                <p className="text-xs text-gray-500 mt-1">
+                   Duración: Entre 30 minutos y 24 horas
+                </p>
                 <Select
                   value={formData.arrival_time.split("T")[1] || "18:00"}
                   onValueChange={(value) => {
