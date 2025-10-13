@@ -6,19 +6,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  User, 
-  MapPin, 
-  Calendar, 
+import {
+  User,
+  MapPin,
+  Calendar,
   Bus as BusIcon,
   ArrowLeft,
   CheckCircle,
   X,
-  AlertCircle
+  AlertCircle,
 } from "lucide-react";
-import SeatSelector from "../components/seat-selector";
+import BusLayoutDesigner from "../components/bus-layout-designer";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 
 export default function SeatSelectionPage() {
   const router = useRouter();
@@ -32,16 +33,26 @@ export default function SeatSelectionPage() {
   const [seats, setSeats] = useState([]);
   const [occupiedSeats, setOccupiedSeats] = useState([]);
   const [selectedSeats, setSelectedSeats] = useState([]);
-  const [alert, setAlert] = useState({ show: false, message: "", type: "success" });
+  const [alert, setAlert] = useState({
+    show: false,
+    message: "",
+    type: "success",
+  });
 
   const showAlert = (message, type = "success") => {
     setAlert({ show: true, message, type });
-    setTimeout(() => setAlert({ show: false, message: "", type: "success" }), 3000);
+    setTimeout(
+      () => setAlert({ show: false, message: "", type: "success" }),
+      3000
+    );
   };
 
   useEffect(() => {
     if (!clientId || !tripId) {
-      showAlert("Faltan datos. Por favor inicie desde la selección de cliente.", "error");
+      showAlert(
+        "Faltan datos. Por favor inicie desde la selección de cliente.",
+        "error"
+      );
       router.push("/dashboard/clientes");
       return;
     }
@@ -73,21 +84,20 @@ export default function SeatSelectionPage() {
       const ticketsRes = await fetch(`${API_URL}/tickets/trip/${tripId}`);
       const ticketsData = await ticketsRes.json();
       const occupiedSeatIds = ticketsData
-        .filter(t => t.status === "CONFIRMADO" || t.status === "PENDIENTE")
-        .map(t => t.seat?.id)
+        .filter((t) => t.status === "CONFIRMADO" || t.status === "PENDIENTE")
+        .map((t) => t.seat?.id)
         .filter(Boolean);
-      
+
       setOccupiedSeats(occupiedSeatIds);
 
       // Procesar asientos para el componente
       const processedSeats = tripData.bus.stacks.seats.map((seat, idx) => ({
         ...seat,
         row: seat.row || Math.floor(idx / 3) + 1, // Calcular row si no existe
-        col: seat.col || (idx % 3) + 1 // Calcular col si no existe
+        col: seat.col || (idx % 3) + 1, // Calcular col si no existe
       }));
-      
-      setSeats(processedSeats);
 
+      setSeats(processedSeats);
     } catch (error) {
       console.error("Error al cargar datos:", error);
       showAlert("Error al cargar la información", "error");
@@ -103,7 +113,7 @@ export default function SeatSelectionPage() {
     }
 
     // Redirigir a tickets con todos los datos
-    const seatIds = selectedSeats.map(s => s.id).join(',');
+    const seatIds = selectedSeats.map((s) => s.id).join(",");
     router.push(
       `/dashboard/tickets/nuevo?clientId=${clientId}&tripId=${tripId}&seatIds=${seatIds}`
     );
@@ -129,15 +139,29 @@ export default function SeatSelectionPage() {
   }
 
   const availableSeatsCount = seats.filter(
-    s => s.is_active && !occupiedSeats.includes(s.id)
+    (s) => s.is_active && !occupiedSeats.includes(s.id)
   ).length;
 
   return (
     <div className="container mx-auto p-6 max-w-6xl space-y-6">
       {alert.show && (
-        <Alert className={alert.type === "error" ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"}>
-          <AlertCircle className={`h-4 w-4 ${alert.type === "error" ? "text-red-600" : "text-green-600"}`} />
-          <AlertDescription className={alert.type === "error" ? "text-red-800" : "text-green-800"}>
+        <Alert
+          className={
+            alert.type === "error"
+              ? "bg-red-50 border-red-200"
+              : "bg-green-50 border-green-200"
+          }
+        >
+          <AlertCircle
+            className={`h-4 w-4 ${
+              alert.type === "error" ? "text-red-600" : "text-green-600"
+            }`}
+          />
+          <AlertDescription
+            className={
+              alert.type === "error" ? "text-red-800" : "text-green-800"
+            }
+          >
             {alert.message}
           </AlertDescription>
         </Alert>
@@ -163,7 +187,9 @@ export default function SeatSelectionPage() {
               <p className="text-lg font-bold text-blue-900">
                 {client.firstName} {client.lastName}
               </p>
-              <p className="text-sm text-blue-600">C.I.: {client.documentNumber}</p>
+              <p className="text-sm text-blue-600">
+                C.I.: {client.documentNumber}
+              </p>
             </div>
           </div>
         </CardContent>
@@ -178,7 +204,8 @@ export default function SeatSelectionPage() {
               <div>
                 <p className="text-sm text-green-700">Ruta:</p>
                 <p className="font-bold text-green-900">
-                  {trip.route?.originCity?.name} → {trip.route?.destinationCity?.name}
+                  {trip.route?.originCity?.name} →{" "}
+                  {trip.route?.destinationCity?.name}
                 </p>
               </div>
             </div>
@@ -241,7 +268,9 @@ export default function SeatSelectionPage() {
                 Este viaje está completo. Por favor seleccione otro viaje.
               </p>
               <Button
-                onClick={() => router.push(`/dashboard/viajes?clientId=${clientId}`)}
+                onClick={() =>
+                  router.push(`/dashboard/viajes?clientId=${clientId}`)
+                }
                 className="mt-4"
               >
                 Ver otros viajes
@@ -249,26 +278,53 @@ export default function SeatSelectionPage() {
             </div>
           ) : (
             <>
-              <SeatSelector
+              <BusLayoutDesigner
                 seats={seats}
                 occupiedSeats={occupiedSeats}
                 selectedSeats={selectedSeats}
-                onSeatSelect={setSelectedSeats}
-                columns={4} // Puedes hacerlo dinámico según la configuración del bus
-                maxSelection={5} // Permitir seleccionar hasta 5 asientos
-                showLegend={true}
-              />
+                onSeatClick={(seat) => {
+                  // Solo permitir clicks en asientos, no en pasillos, baños, etc.
+                  if (seat.visual_type !== "seat") return;
 
+                  const isOccupied = occupiedSeats.includes(seat.id);
+                  const isSelected = selectedSeats.some(
+                    (s) => s.id === seat.id
+                  );
+
+                  if (isOccupied || !seat.is_active) return;
+
+                  if (isSelected) {
+                    // Deseleccionar
+                    setSelectedSeats(
+                      selectedSeats.filter((s) => s.id !== seat.id)
+                    );
+                  } else {
+                    // Seleccionar (máximo 5)
+                    if (selectedSeats.length < 5) {
+                      setSelectedSeats([...selectedSeats, seat]);
+                    }
+                  }
+                }}
+                mode="selection"
+                gridWidth={5} // Ajusta según la configuración real del bus
+                gridHeight={12} // Ajusta según la configuración real del bus
+                showControls={true} // Mostrar leyenda de colores
+              />
               {/* Información de asientos seleccionados */}
               {selectedSeats.length > 0 && (
                 <Card className="bg-orange-50 border-orange-300 mt-6">
                   <CardContent className="pt-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-orange-700">Asientos Seleccionados:</p>
+                        <p className="text-sm text-orange-700">
+                          Asientos Seleccionados:
+                        </p>
                         <div className="flex gap-2 mt-2">
-                          {selectedSeats.map(seat => (
-                            <Badge key={seat.id} className="bg-orange-500 text-white text-lg px-3 py-1">
+                          {selectedSeats.map((seat) => (
+                            <Badge
+                              key={seat.id}
+                              className="bg-orange-500 text-white text-lg px-3 py-1"
+                            >
                               #{seat.seat_number}
                             </Badge>
                           ))}
@@ -278,12 +334,18 @@ export default function SeatSelectionPage() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-orange-700">Total a Pagar:</p>
+                        <p className="text-sm text-orange-700">
+                          Total a Pagar:
+                        </p>
                         <p className="text-3xl font-bold text-green-600">
-                          Bs. {(parseFloat(trip.price) * selectedSeats.length).toFixed(2)}
+                          Bs.{" "}
+                          {(
+                            parseFloat(trip.price) * selectedSeats.length
+                          ).toFixed(2)}
                         </p>
                         <p className="text-xs text-gray-600">
-                          {selectedSeats.length} x Bs. {parseFloat(trip.price).toFixed(2)}
+                          {selectedSeats.length} x Bs.{" "}
+                          {parseFloat(trip.price).toFixed(2)}
                         </p>
                       </div>
                     </div>
@@ -295,7 +357,9 @@ export default function SeatSelectionPage() {
               <div className="flex justify-between items-center mt-6 pt-6 border-t">
                 <Button
                   variant="outline"
-                  onClick={() => router.push(`/dashboard/viajes?clientId=${clientId}`)}
+                  onClick={() =>
+                    router.push(`/dashboard/viajes?clientId=${clientId}`)
+                  }
                 >
                   Cancelar
                 </Button>

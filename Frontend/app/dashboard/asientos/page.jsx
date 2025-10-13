@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import BusLayoutDesigner from "./components/bus-layout-designer";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
@@ -198,22 +199,50 @@ export default function BusSeatDesigner() {
     const floor1Seats = [];
     const floor2Seats = [];
 
+    // Generar piso 1
     for (let row = 1; row <= config.rows; row++) {
+      let seatCount = 0;
+
       for (let col = 1; col <= config.columns; col++) {
         const middleCol = Math.ceil(config.columns / 2);
-        if (config.columns >= 4 && col === middleCol) continue;
 
-        const seatNumber = floor1Seats.length + 1;
+        // Pasillo en el medio
+        if (config.columns >= 4 && col === middleCol) {
+          floor1Seats.push({
+            id: `F1-aisle-${row}`,
+            row,
+            col,
+            position_x: col,
+            position_y: row,
+            deck: 1,
+            visual_type: "aisle",
+            is_active: true,
+          });
+          continue;
+        }
+
+        seatCount++;
+        const seatNumber =
+          floor1Seats.filter((s) => s.visual_type === "seat").length + 1;
+
         floor1Seats.push({
           id: `F1-${row}-${col}`,
           seat_number: seatNumber,
           seat_code: `S${seatNumber.toString().padStart(2, "0")}`,
           row,
           col,
-          deck: 1, // ASEGURAR que siempre tenga deck
+          position_x: col,
+          position_y: row,
+          deck: 1,
           type: config.busType,
+          visual_type: "seat",
           is_active: true,
           status: "available",
+          rotation: 0,
+          meta: {
+            hasWindow: col === 1 || col === config.columns, // ventanas en los extremos
+            hasTV: row === 1, // TV en primera fila
+          },
         });
       }
     }
@@ -379,6 +408,11 @@ export default function BusSeatDesigner() {
                 type: seat.type,
                 stackId: stackId,
                 is_active: seat.is_active,
+                position_x: seat.position_x || seat.col,
+                position_y: seat.position_y || seat.row,
+                visual_type: seat.visual_type || "seat",
+                rotation: seat.rotation || 0,
+                meta: seat.meta || {},
               }),
             });
 
@@ -866,12 +900,15 @@ export default function BusSeatDesigner() {
           {/* Vista del Bus */}
           <div className="lg:col-span-2 space-y-6">
             {seats.floor1.length > 0 ? (
-              <>
-                {renderBusFloor(seats.floor1, 1)}
-                {config.hasSecondFloor &&
-                  seats.floor2.length > 0 &&
-                  renderBusFloor(seats.floor2, 2)}
-              </>
+              <BusLayoutDesigner
+                seats={[...seats.floor1, ...seats.floor2]}
+                onSeatClick={mode === "design" ? setSelectedSeat : null}
+                mode={mode}
+                selectedSeats={selectedSeat ? [selectedSeat] : []}
+                gridWidth={config.columns}
+                gridHeight={Math.max(config.rows, config.secondFloorRows)}
+                showControls={mode === "design"}
+              />
             ) : (
               <Card className="p-12 text-center">
                 <div className="text-6xl mb-4">🚌</div>
