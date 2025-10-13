@@ -64,7 +64,7 @@ export default function SeatSelectionPage() {
           ticketsData
             .filter(
               (ticket) =>
-                ticket.status === "CONFIRMED" || ticket.status === "PENDING"
+                ticket.status === "CONFIRMADO" || ticket.status === "PENDIENTE"
             )
             .map((ticket) => ticket.seat?.id)
         );
@@ -258,7 +258,7 @@ export default function SeatSelectionPage() {
           },
           body: JSON.stringify({
             price: trip.price,
-            status: "PENDING",
+            status: "PENDIENTE",
             tripId: tripId,
             seatId: seat.id,
             userId: user.id,
