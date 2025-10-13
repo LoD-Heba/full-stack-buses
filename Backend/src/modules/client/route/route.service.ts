@@ -14,6 +14,7 @@ import { Bus } from '../bus/entities/bus.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
 import { TripStatus, TicketStatus } from 'src/common/enums/status.enum';
+import { BusStatus } from '../bus/dto/create-bus.dto';
 
 @Injectable()
 export class RouteService {
@@ -76,6 +77,21 @@ export class RouteService {
       buses,
     });
 
+    //No puede recorrer 500km en 10 minutos
+    if (createRouteDto.distance_km && createRouteDto.approx_duration) {
+      const [hours, minutes] = createRouteDto.approx_duration
+        .split(':')
+        .map(Number);
+      const totalHours = hours + minutes / 60;
+      const avgSpeed = createRouteDto.distance_km / totalHours;
+
+      // Validar velocidad promedio razonable (20-100 km/h)
+      if (avgSpeed < 20 || avgSpeed > 100) {
+        throw new BadRequestException(
+          `La duración no es coherente con la distancia. Velocidad promedio: ${avgSpeed.toFixed(1)} km/h (debe estar entre 20-100 km/h)`,
+        );
+      }
+    }
     return this.routeRepository.save(route);
   }
 
@@ -376,6 +392,16 @@ export class RouteService {
     }
 
     const bus = await this.findBus(busId);
+
+    //Validar que el bus no esté en mantenimiento o fuera de servicio
+    if (
+      bus.status === BusStatus.MANTENIMIENTO ||
+      bus.status === BusStatus.FUERA_DE_SERVICIO
+    ) {
+      throw new BadRequestException(
+        `No se puede asignar el bus ${bus.plate} porque está en estado: ${bus.status}`,
+      );
+    }
     // Verificar que el bus tenga asientos configurados
     const busWithSeats = await this.busRepository.findOne({
       where: { id: busId },
@@ -436,11 +462,26 @@ export class RouteService {
   async removeBus(routeId: string, busId: string): Promise<Route> {
     const route = await this.routeRepository.findOne({
       where: { id: routeId },
-      relations: { buses: true },
+      relations: { buses: true, trips: true },
     });
 
     if (!route) {
       throw new NotFoundException(`La ruta ${routeId} no existe`);
+    }
+
+    // Validar que el bus no tenga viajes activos en esta ruta
+    const activeTripsWithBus =
+      route.trips?.filter(
+        (trip) =>
+          trip.bus.id === busId &&
+          (trip.status === TripStatus.SCHEDULED ||
+            trip.status === TripStatus.IN_PROGRESS),
+      ) || [];
+
+    if (activeTripsWithBus.length > 0) {
+      throw new BadRequestException(
+        `No se puede desasignar el bus porque tiene ${activeTripsWithBus.length} viajes activos en esta ruta`,
+      );
     }
 
     route.buses = route.buses.filter((bus) => bus.id !== busId);

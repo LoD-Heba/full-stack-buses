@@ -1,13 +1,15 @@
-import { 
-  IsNotEmpty, 
-  IsString, 
-  IsNumber, 
-  IsOptional, 
+import {
+  IsNotEmpty,
+  IsString,
+  IsNumber,
+  IsOptional,
   IsUUID,
   IsPositive,
   MaxLength,
   Matches,
-  IsArray
+  IsArray,
+  Min,
+  Max,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
@@ -20,13 +22,14 @@ export class CreateRouteDto {
   @IsOptional()
   @IsString()
   @Matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/, {
-    message: 'approx_duration debe tener formato HH:MM:SS (ej: 04:30:00)'
+    message: 'approx_duration debe tener formato HH:MM:SS (ej: 04:30:00)',
   })
   approx_duration?: string;
 
-  @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
   @IsPositive()
+  @Min(5, { message: 'La distancia mínima es 5 km' })
+  @Max(3000, { message: 'La distancia máxima es 3000 km' })
   @Transform(({ value }) => parseFloat(value))
   distance_km?: number;
 
