@@ -1,7 +1,21 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe, ParseUUIDPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  ParseIntPipe,
+  ParseUUIDPipe,
+  BadRequestException,
+} from '@nestjs/common';
 import { CityService } from './city.service';
 import { CreateCityDto } from './dto/create-city.dto';
 import { UpdateCityDto } from './dto/update-city.dto';
+import { UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { createMulterOptions } from 'src/config/upload.config';
 
 @Controller('city')
 export class CityController {
@@ -11,7 +25,19 @@ export class CityController {
   create(@Body() createCityDto: CreateCityDto) {
     return this.cityService.create(createCityDto);
   }
-
+  @Post(':id/upload-image')
+  @UseInterceptors(FileInterceptor('image', createMulterOptions('cities')))
+  async uploadImage(
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No se proporcionó ninguna imagen');
+    }
+    const imageUrl = `/uploads/cities/${file.filename}`;
+    return this.cityService.updateImageUrl(id, imageUrl);
+  }
+  
   @Get()
   findAll() {
     return this.cityService.findAll();
@@ -23,7 +49,10 @@ export class CityController {
   }
 
   @Patch(':id')
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() updateCityDto: UpdateCityDto) {
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateCityDto: UpdateCityDto,
+  ) {
     return this.cityService.update(id, updateCityDto);
   }
 

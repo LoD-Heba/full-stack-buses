@@ -19,8 +19,14 @@ export class City {
   @Column({ length: 100 })
   department: string;
 
-  @Column({type:'text', nullable: true})
-  description: string
+  @Column({ type: 'text', nullable: true })
+  description: string;
+
+  @Column({ type: 'text', nullable: true, name: 'image_url' })
+  image_url: string;
+
+  @Column({ type: 'simple-array', nullable: true, name: 'schedule' })
+  schedule: string[]; 
 
   @Column({ default: true, name: 'is_active' })
   is_active: boolean;

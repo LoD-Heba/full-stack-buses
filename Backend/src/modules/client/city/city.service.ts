@@ -73,7 +73,11 @@ export class CityService {
 
     return await this.cityRepository.save(updateCity);
   }
-
+  async updateImageUrl(id: string, imageUrl: string): Promise<City> {
+    const city = await this.findOne(id);
+    await this.cityRepository.update(id, { image_url: imageUrl });
+    return this.findOne(id);
+  }
   async remove(id: string) {
     const deleteCity = await this.findOne(id);
     await this.cityRepository.remove(deleteCity!);
