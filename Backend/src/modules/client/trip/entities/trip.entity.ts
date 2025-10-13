@@ -7,14 +7,17 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 import { Bus } from '../../bus/entities/bus.entity';
 import { Route } from '../../route/entities/route.entity';
 import { Ticket } from '../../tickets/entities/ticket.entity';
 
 @Entity('trips')
+@Index(['departure_time', 'status', 'is_active']) // Para búsquedas de viajes disponibles
+@Index(['bus', 'departure_time', 'arrival_time']) // Para validar conflictos
 export class Trip {
-  @PrimaryGeneratedColumn('uuid') // Cambiado a UUID por consistencia
+  @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column({ type: 'timestamp' })

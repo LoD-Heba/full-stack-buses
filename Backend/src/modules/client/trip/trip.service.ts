@@ -4,7 +4,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
+import {
+  Repository,
+  Between,
+  MoreThanOrEqual,
+  LessThanOrEqual,
+  In,
+} from 'typeorm';
 import { CreateTripDto } from './dto/create-trip.dto';
 import { UpdateTripDto } from './dto/update-trip.dto';
 import { SearchTripsDto } from './dto/search-trip.dto';
@@ -16,6 +22,7 @@ import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
 import { User } from 'src/modules/admin/user/entities/user.entity';
 import { UserProfile } from 'src/modules/admin/user-profile/entities/user-profile.entity';
 import { TripStatus, TicketStatus } from 'src/common/enums/status.enum';
+import { Ticket } from '../tickets/entities/ticket.entity';
 @Injectable()
 export class TripService {
   constructor(
@@ -33,6 +40,9 @@ export class TripService {
 
     @InjectRepository(UserProfile)
     private readonly userProfileRepository: Repository<UserProfile>,
+
+    @InjectRepository(Ticket)
+    private readonly ticketRepository: Repository<Ticket>,
   ) {}
 
   async create(createTripDto: CreateTripDto): Promise<Trip> {
@@ -54,6 +64,40 @@ export class TripService {
         'La fecha de salida no puede ser en el pasado',
       );
     }
+    // Evitar que la hora programada de salida no sea 10 minutos despues
+    const hoursUntilDeparture =
+      (departureDate.getTime() - new Date().getTime()) / (1000 * 60 * 60);
+
+    const MINIMUM_LEAD_TIME_HOURS = 2;
+    if (hoursUntilDeparture < MINIMUM_LEAD_TIME_HOURS) {
+      throw new BadRequestException(
+        `Los viajes deben crearse con al menos ${MINIMUM_LEAD_TIME_HOURS} horas de anticipación`,
+      );
+    }
+    // Validar que un viaje no llegue en mas de 1 dia
+    const tripDurationHours =
+      (arrivalDate.getTime() - departureDate.getTime()) / (1000 * 60 * 60);
+
+    if (tripDurationHours > 24) {
+      throw new BadRequestException(
+        'La duración máxima de un viaje es 24 horas',
+      );
+    }
+
+    if (tripDurationHours < 0.5) {
+      throw new BadRequestException(
+        'La duración mínima de un viaje es 30 minutos',
+      );
+    }
+    // Validar hora de salida de bus
+    const departureHour = departureDate.getHours();
+
+    // Validar horario comercial (ejemplo: 5:00 AM - 11:00 PM)
+    if (departureHour < 5 || departureHour >= 23) {
+      throw new BadRequestException(
+        'Los viajes solo pueden programarse entre las 5:00 AM y las 11:00 PM',
+      );
+    }
 
     // Validar que el bus existe y está activo
     const bus = await this.findBus(busId);
@@ -61,6 +105,59 @@ export class TripService {
     // Validar que la ruta existe
     const route = await this.findRoute(routeId);
 
+    //Validar viajes simultaneos
+    const simultaneousTrips = await this.tripRepository
+      .createQueryBuilder('trip')
+      .where('trip.route = :routeId', { routeId })
+      .andWhere('trip.is_active = :active', { active: true })
+      .andWhere('trip.status = :scheduled', { scheduled: TripStatus.SCHEDULED })
+      .andWhere(
+        '(trip.departure_time BETWEEN :start AND :end) OR ' +
+          '(trip.arrival_time BETWEEN :start AND :end)',
+        { start: departure_time, end: arrival_time },
+      )
+      .getCount();
+
+    const MAX_SIMULTANEOUS_TRIPS = 5;
+    if (simultaneousTrips >= MAX_SIMULTANEOUS_TRIPS) {
+      throw new BadRequestException(
+        `No se pueden tener más de ${MAX_SIMULTANEOUS_TRIPS} viajes simultáneos en la misma ruta`,
+      );
+    }
+
+    // Validar que la duración de un viaje concuerde con la duración de la ruta
+    if (route.approx_duration) {
+      const [routeHours, routeMinutes] = route.approx_duration
+        .split(':')
+        .map(Number);
+      const routeDurationHours = routeHours + routeMinutes / 60;
+
+      const tripDurationHours =
+        (arrivalDate.getTime() - departureDate.getTime()) / (1000 * 60 * 60);
+
+      // Permitir máximo 100% de variación (el doble de tiempo por tráfico, etc)
+      const maxDuration = routeDurationHours * 2;
+      const minDuration = routeDurationHours * 0.5;
+
+      if (tripDurationHours > maxDuration || tripDurationHours < minDuration) {
+        throw new BadRequestException(
+          `La duración del viaje (${tripDurationHours.toFixed(1)}h) no es coherente con la duración de la ruta (${routeDurationHours.toFixed(1)}h). Rango permitido: ${minDuration.toFixed(1)}h - ${maxDuration.toFixed(1)}h`,
+        );
+      }
+    }
+
+    //Validar precio intermedio entre precio base y de boleto
+    if (route.base_price) {
+      const priceVariation =
+        Math.abs(tripData.price - route.base_price) / route.base_price;
+
+      // Permitir máximo 50% de variación
+      if (priceVariation > 0.5) {
+        throw new BadRequestException(
+          `El precio del viaje (${tripData.price}) varía más del 50% respecto al precio base de la ruta (${route.base_price})`,
+        );
+      }
+    }
     // Verificar que el bus no tenga otro viaje en conflicto de horarios
     const conflictingTrip = await this.tripRepository
       .createQueryBuilder('trip')
@@ -81,6 +178,35 @@ export class TripService {
         `El bus ya tiene un viaje programado que se solapa con estos horarios`,
       );
     }
+
+    //Validar tiempo de llegada de bus
+    const MINIMUM_TURNAROUND_MINUTES = 60; // 1 hora de turnaround
+
+    const recentTrip = await this.tripRepository
+      .createQueryBuilder('trip')
+      .where('trip.bus = :busId', { busId })
+      .andWhere('trip.is_active = :active', { active: true })
+      .andWhere('trip.status != :cancelled', {
+        cancelled: TripStatus.CANCELLED,
+      })
+      .andWhere('trip.arrival_time <= :newDeparture', {
+        newDeparture: departure_time,
+      })
+      .orderBy('trip.arrival_time', 'DESC')
+      .getOne();
+
+    if (recentTrip) {
+      const minutesBetween =
+        (new Date(departure_time).getTime() -
+          new Date(recentTrip.arrival_time).getTime()) /
+        (1000 * 60);
+
+      if (minutesBetween < MINIMUM_TURNAROUND_MINUTES) {
+        throw new BadRequestException(
+          `Debe haber al menos ${MINIMUM_TURNAROUND_MINUTES} minutos entre la llegada del viaje anterior y la salida de este viaje`,
+        );
+      }
+    }
     // Verificar que el bus está asignado a la ruta
     const busInRoute = route.buses?.some((b) => b.id === busId);
     if (!busInRoute) {
@@ -92,6 +218,19 @@ export class TripService {
 
     // Calcular asientos disponibles basado en el bus
     const availableSeats = await this.calculateAvailableSeats(busId);
+
+    //Validar que el bus no tenga 0 asientos
+    if (availableSeats === 0) {
+      throw new BadRequestException(
+        `No se puede crear un viaje porque el bus ${bus.plate} no tiene asientos activos`,
+      );
+    }
+
+    if (availableSeats < 15) {
+      throw new BadRequestException(
+        `El bus debe tener al menos 15 asientos activos para operar un viaje (actual: ${availableSeats})`,
+      );
+    }
 
     // Crear el trip
     const trip = this.tripRepository.create({
@@ -321,6 +460,35 @@ export class TripService {
       updateData.arrival_time = newArrival;
     }
 
+    //Validar choque de horarios
+    if (updateData.departure_time || updateData.arrival_time || busId) {
+      const checkBusId = busId || existingTrip.bus.id;
+      const checkDeparture =
+        updateData.departure_time || existingTrip.departure_time;
+      const checkArrival = updateData.arrival_time || existingTrip.arrival_time;
+
+      const conflictingTrip = await this.tripRepository
+        .createQueryBuilder('trip')
+        .where('trip.bus.id = :checkBusId', { checkBusId })
+        .andWhere('trip.id != :currentTripId', { currentTripId: id })
+        .andWhere('trip.is_active = :active', { active: true })
+        .andWhere('trip.status != :cancelled', {
+          cancelled: TripStatus.CANCELLED,
+        })
+        .andWhere(
+          '(trip.departure_time BETWEEN :start AND :end) OR ' +
+            '(trip.arrival_time BETWEEN :start AND :end) OR ' +
+            '(trip.departure_time <= :start AND trip.arrival_time >= :end)',
+          { start: checkDeparture, end: checkArrival },
+        )
+        .getOne();
+
+      if (conflictingTrip) {
+        throw new BadRequestException(
+          'El bus ya tiene un viaje programado que se solapa con estos horarios',
+        );
+      }
+    }
     //Validar si bus tiene ruta
     if (busId || routeId) {
       const newBusId = busId || existingTrip.bus.id;
@@ -344,6 +512,22 @@ export class TripService {
       updateData.available_seats = await this.calculateAvailableSeats(busId);
     }
 
+    //Evitar que cambien de bus si tienen tickets vendidos, invilidando asientos
+    if (busId) {
+      const confirmedTicketsCount =
+        existingTrip.tickets?.filter((t) => t.status === TicketStatus.CONFIRMED)
+          .length || 0;
+
+      if (confirmedTicketsCount > 0) {
+        throw new BadRequestException(
+          `No se puede cambiar el bus de un viaje que tiene ${confirmedTicketsCount} tickets confirmados`,
+        );
+      }
+
+      const bus = await this.findBus(busId);
+      updateData.bus = bus;
+      updateData.available_seats = await this.calculateAvailableSeats(busId);
+    }
     // Actualizar ruta si se proporciona
     if (routeId) {
       const route = await this.findRoute(routeId);
@@ -363,6 +547,12 @@ export class TripService {
   async remove(id: string): Promise<Trip> {
     const trip = await this.findOne(id);
 
+    //No se puede eluminar viajes en progreso
+    if (trip.status === TripStatus.IN_PROGRESS) {
+      throw new BadRequestException(
+        'No se puede eliminar un viaje que está en progreso',
+      );
+    }
     // No permitir eliminar viajes con tickets confirmados
     const confirmedTicketsCount =
       trip.tickets?.filter((ticket) => ticket.status === 'CONFIRMADO').length ||
@@ -389,6 +579,22 @@ export class TripService {
 
     if (trip.status === TripStatus.COMPLETED) {
       throw new BadRequestException('No se puede cancelar un viaje completado');
+    }
+
+    // Cancelar todos los tickets activos
+    if (trip.tickets && trip.tickets.length > 0) {
+      const activeTickets = trip.tickets.filter(
+        (t) =>
+          t.is_active &&
+          (t.status === TicketStatus.CONFIRMED ||
+            t.status === TicketStatus.PENDING),
+      );
+
+      for (const ticket of activeTickets) {
+        await this.ticketRepository.update(ticket.ticket_id, {
+          status: TicketStatus.CANCELLED,
+        });
+      }
     }
 
     await this.tripRepository.update(id, {
@@ -423,8 +629,18 @@ export class TripService {
       );
     }
 
+    // AGREGAR: Desactivar todos los tickets del viaje
+    if (trip.tickets && trip.tickets.length > 0) {
+      const ticketIds = trip.tickets.map((t) => t.ticket_id);
+      await this.ticketRepository.update(
+        { ticket_id: In(ticketIds) },
+        { is_active: false },
+      );
+    }
+
     await this.tripRepository.update(id, {
       status: TripStatus.COMPLETED,
+      is_active: false, // AGREGAR: También desactivar el viaje
     });
 
     return this.findOne(id);
