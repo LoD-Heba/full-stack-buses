@@ -4,13 +4,20 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
+import {
+  Repository,
+  Between,
+  MoreThanOrEqual,
+  LessThanOrEqual,
+  LessThan,
+} from 'typeorm';
 import { CreatePaymentDto, PaymentStatus } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { Payment } from './entities/payment.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
 import { SearchPaymentDto } from './dto/search-payment.dto';
+import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class PaymentService {
@@ -340,7 +347,34 @@ export class PaymentService {
       );
     }
 
-    const refundNotes = reason ? `Reembolso: ${reason}` : 'Reembolso procesado';
+    // Calcular monto de reembolso según política
+    let refundPercentage = 100;
+    let refundAmount = payment.amount;
+
+    //Validar tiempo de reserva de ticket
+    if (payment.tickets && payment.tickets.length > 0) {
+      const ticket = payment.tickets[0]; // Asumir un ticket por pago
+      const hoursUntilDeparture =
+        (new Date(ticket.trip.departure_time).getTime() -
+          new Date().getTime()) /
+        (1000 * 60 * 60);
+
+      if (hoursUntilDeparture < 2) {
+        throw new BadRequestException(
+          'No se permiten reembolsos con menos de 2 horas de anticipación',
+        );
+      } else if (hoursUntilDeparture < 24) {
+        refundPercentage = 50;
+        refundAmount = payment.amount * 0.5;
+      } else if (hoursUntilDeparture < 48) {
+        refundPercentage = 80;
+        refundAmount = payment.amount * 0.8;
+      }
+    }
+
+    const refundNotes = reason
+      ? `Reembolso (${refundPercentage}%): ${reason}. Monto: $${refundAmount.toFixed(2)}`
+      : `Reembolso procesado (${refundPercentage}%). Monto: $${refundAmount.toFixed(2)}`;
 
     await this.paymentRepository.update(id, {
       status: PaymentStatus.REFUNDED,
@@ -412,4 +446,27 @@ export class PaymentService {
     return `${method}-${timestamp}-${random}`;
   }
 
+  //Para evitar que un pago esté pendiente para siempre
+  @Cron('0 * * * *') // Cada hora
+  async expirePendingPayments() {
+    const expirationTime = new Date();
+    expirationTime.setHours(expirationTime.getHours() - 24); // 24 horas
+
+    const expiredPayments = await this.paymentRepository.find({
+      where: {
+        status: PaymentStatus.PENDING,
+        created_at: LessThan(expirationTime),
+        is_active: true,
+      },
+    });
+
+    for (const payment of expiredPayments) {
+      await this.paymentRepository.update(payment.id, {
+        status: PaymentStatus.FAILED,
+        notes: payment.notes
+          ? `${payment.notes}\nPago expirado automáticamente por tiempo`
+          : 'Pago expirado automáticamente por tiempo',
+      });
+    }
+  }
 }
