@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not } from 'typeorm';
+import { Repository, Not, EntityManager } from 'typeorm';
 import { CreateSeatDto, SeatType } from './dto/create-seat.dto';
 import { UpdateSeatDto } from './dto/update-seat.dto';
 import { SearchSeatDto } from './dto/search-seat.dto';
@@ -30,54 +30,68 @@ export class SeatService {
   ) {}
 
   async create(createSeatDto: CreateSeatDto): Promise<Seat> {
-    const { stackId, ...seatData } = createSeatDto;
+    return await this.seatRepository.manager.transaction(async (manager) => {
+      const { stackId, ...seatData } = createSeatDto;
 
-    // Verificar que el stack existe
-    const stack = await this.findSeatStack(stackId);
+      //Evitar agregar asientos a un bus inactivo
+      const stackWithBus = await this.seatStackRepository.findOne({
+        where: { id: stackId },
+        relations: { bus: true },
+      });
 
-    // Verificar que el código de asiento sea único dentro del stack
-    const existingSeatCode = await this.seatRepository.findOne({
-      where: {
+      if (stackWithBus?.bus && !stackWithBus.bus.is_active) {
+        throw new BadRequestException(
+          'No se pueden agregar asientos a un stack de un bus inactivo',
+        );
+      }
+      // Verificar que el stack existe
+      const stack = await this.findSeatStack(stackId);
+
+      // Verificar que el código de asiento sea único dentro del stack
+      const existingSeatCode = await this.seatRepository.findOne({
+        where: {
+          seat_code: seatData.seat_code.toUpperCase(),
+          stacks: { id: stackId },
+          is_active: true,
+        },
+      });
+
+      if (existingSeatCode) {
+        throw new BadRequestException(
+          `Ya existe un asiento con código ${seatData.seat_code} en este stack`,
+        );
+      }
+
+      // Verificar que el número de asiento sea único dentro del stack
+      const existingSeatNumber = await this.seatRepository.findOne({
+        where: {
+          seat_number: seatData.seat_number,
+          stacks: { id: stackId },
+          is_active: true,
+        },
+      });
+
+      if (existingSeatNumber) {
+        throw new BadRequestException(
+          `Ya existe un asiento con número ${seatData.seat_number} en este stack`,
+        );
+      }
+
+      // Crear el asiento
+      const seat = manager.create(Seat, {
+        ...seatData,
         seat_code: seatData.seat_code.toUpperCase(),
-        stacks: { id: stackId },
-        is_active: true,
-      },
+        stacks: stack,
+      });
+
+      const savedSeat = await manager.save(seat);
+      await this.updateBusCapacityInTransaction(stackId, manager);
+
+      // Actualizar la capacidad del bus automáticamente
+      await this.updateBusCapacity(stackId);
+
+      return this.findOne(savedSeat.id);
     });
-
-    if (existingSeatCode) {
-      throw new BadRequestException(
-        `Ya existe un asiento con código ${seatData.seat_code} en este stack`,
-      );
-    }
-
-    // Verificar que el número de asiento sea único dentro del stack
-    const existingSeatNumber = await this.seatRepository.findOne({
-      where: {
-        seat_number: seatData.seat_number,
-        stacks: { id: stackId },
-        is_active: true,
-      },
-    });
-
-    if (existingSeatNumber) {
-      throw new BadRequestException(
-        `Ya existe un asiento con número ${seatData.seat_number} en este stack`,
-      );
-    }
-
-    // Crear el asiento
-    const seat = this.seatRepository.create({
-      ...seatData,
-      seat_code: seatData.seat_code.toUpperCase(),
-      stacks: stack,
-    });
-
-    const savedSeat = await this.seatRepository.save(seat);
-
-    // Actualizar la capacidad del bus automáticamente
-    await this.updateBusCapacity(stackId);
-
-    return this.findOne(savedSeat.id);
   }
 
   async findAll(
@@ -420,6 +434,24 @@ export class SeatService {
     // Verificar que el stack existe
     const stack = await this.findSeatStack(stackId);
 
+    // Validar límite según tipo de bus
+    const existingSeatsCount = await this.seatRepository.count({
+      where: { stacks: { id: stackId }, is_active: true },
+    });
+
+    const maxSeats =
+      stack.bus.service_type === 'cama'
+        ? 40
+        : stack.bus.service_type === 'semi_cama'
+          ? 48
+          : 60;
+
+    if (existingSeatsCount + count > maxSeats) {
+      throw new BadRequestException(
+        `El bus tipo ${stack.bus.service_type} no puede tener más de ${maxSeats} asientos (actual: ${existingSeatsCount})`,
+      );
+    }
+
     // Obtener el número más alto existente en el stack
     const lastSeat = await this.seatRepository.findOne({
       where: { stacks: { id: stackId } },
@@ -519,6 +551,30 @@ export class SeatService {
     if (stack?.bus) {
       // Actualizar la capacidad del bus
       await this.busRepository.update(stack.bus.id, {
+        capacity: activeSeatsCount,
+      });
+    }
+  }
+
+  //Metodo auxiliar
+  private async updateBusCapacityInTransaction(
+    stackId: string,
+    manager: EntityManager,
+  ): Promise<void> {
+    const activeSeatsCount = await manager.count(Seat, {
+      where: {
+        stacks: { id: stackId },
+        is_active: true,
+      },
+    });
+
+    const stack = await manager.findOne(SeatStack, {
+      where: { id: stackId },
+      relations: { bus: true },
+    });
+
+    if (stack?.bus) {
+      await manager.update(Bus, stack.bus.id, {
         capacity: activeSeatsCount,
       });
     }
