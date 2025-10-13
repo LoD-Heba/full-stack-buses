@@ -186,7 +186,16 @@ export default async function TicketDetailPage({ params }) {
                     <p className="text-2xl font-bold">
                       {ticket.seat?.seat_number || "-"}
                     </p>
+                    <span className="text-sm text-gray-500">
+                      ({ticket.seat?.seat_code || "-"})
+                    </span>
                   </div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Tipo de Asiento</p>
+                  <p className="font-medium capitalize">
+                    {ticket.seat?.type?.replace("_", " ") || "-"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Tipo</p>

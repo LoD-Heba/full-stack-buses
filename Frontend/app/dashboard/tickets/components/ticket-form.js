@@ -2,14 +2,28 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { createTicket } from "../api/api-tickets";
-import { ArrowLeft, User, Ticket as TicketIcon, Bus, MapPin, Calendar, DollarSign } from "lucide-react";
+import { createTicket, getAvailableSeatsForTrip } from "../api/api-tickets";
+import {
+  ArrowLeft,
+  User,
+  Ticket as TicketIcon,
+  Bus,
+  MapPin,
+  Calendar,
+  DollarSign,
+} from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -24,7 +38,7 @@ export function NewTicketForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clientId = searchParams.get("clientId");
-  
+
   const [loading, setLoading] = useState(true);
   const [clientInfo, setClientInfo] = useState(null);
   const [trips, setTrips] = useState([]);
@@ -58,10 +72,17 @@ export function NewTicketForm() {
       }
 
       try {
-        const res = await fetch(`http://localhost:3001/api/v1/users/${clientId}`);
+        const res = await fetch(
+          `http://localhost:3001/api/v1/users/${clientId}`
+        );
         const data = await res.json();
-        
-        if (!data.profile || !data.profile.firstName || !data.profile.lastName || !data.profile.documentNumber) {
+
+        if (
+          !data.profile ||
+          !data.profile.firstName ||
+          !data.profile.lastName ||
+          !data.profile.documentNumber
+        ) {
           toast.error("El cliente debe tener un perfil completo");
           router.push("/dashboard/clientes");
           return;
@@ -97,42 +118,38 @@ export function NewTicketForm() {
     fetchTrips();
   }, []);
 
-  // Cargar asientos disponibles cuando se selecciona un viaje
   useEffect(() => {
     const fetchAvailableSeats = async () => {
       if (!watchTripId) {
         setAvailableSeats([]);
+        setSelectedTrip(null);
         return;
       }
 
       try {
-        const res = await fetch(`http://localhost:3001/api/v1/trips/${watchTripId}`);
-        const tripData = await res.json();
-        setSelectedTrip(tripData);
+        // Usar la nueva función del API
+        const { trip, availableSeats: seats } = await getAvailableSeatsForTrip(
+          watchTripId
+        );
 
-        if (tripData.price) {
-          setValue("price", tripData.price);
+        setSelectedTrip(trip);
+        setAvailableSeats(seats);
+
+        // Establecer el precio del viaje
+        if (trip.price) {
+          setValue("price", trip.price);
         }
 
-        // Obtener tickets del viaje para saber qué asientos están ocupados
-        const ticketsRes = await fetch(`http://localhost:3001/api/v1/tickets/trip/${watchTripId}`);
-        const ticketsData = await ticketsRes.json();
-        const occupiedSeatIds = ticketsData.map(t => t.seat.id);
-
-        // Obtener todos los asientos del bus
-        if (tripData.bus && tripData.bus.id) {
-          const seatsRes = await fetch(`http://localhost:3001/api/v1/seats?busId=${tripData.bus.id}`);
-          const seatsData = await seatsRes.json();
-          
-          const available = seatsData.data.filter(seat => 
-            !occupiedSeatIds.includes(seat.id) && seat.is_active
-          );
-          
-          setAvailableSeats(available);
+        // Limpiar asiento seleccionado si ya no está disponible
+        const currentSeatId = watch("seatId");
+        if (currentSeatId && !seats.find((s) => s.id === currentSeatId)) {
+          setValue("seatId", "");
         }
       } catch (error) {
         console.error("Error al cargar asientos:", error);
         toast.error("Error al cargar asientos disponibles");
+        setAvailableSeats([]);
+        setSelectedTrip(null);
       }
     };
 
@@ -224,20 +241,29 @@ export function NewTicketForm() {
                     <div>
                       <p className="text-sm text-gray-600">Nombre Completo</p>
                       <p className="font-medium">
-                        {clientInfo.profile.firstName} {clientInfo.profile.lastName}
+                        {clientInfo.profile.firstName}{" "}
+                        {clientInfo.profile.lastName}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Documento</p>
-                      <p className="font-medium">{clientInfo.profile.documentNumber}</p>
+                      <p className="font-medium">
+                        {clientInfo.profile.documentNumber}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Email</p>
-                      <p className="font-medium">{clientInfo.email || "No especificado"}</p>
+                      <p className="font-medium">
+                        {clientInfo.email || "No especificado"}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Teléfono</p>
-                      <p className="font-medium">{clientInfo.profile.phone || clientInfo.phone || "No especificado"}</p>
+                      <p className="font-medium">
+                        {clientInfo.profile.phone ||
+                          clientInfo.phone ||
+                          "No especificado"}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -270,12 +296,16 @@ export function NewTicketForm() {
                         <SelectItem key={trip.id} value={trip.id}>
                           <div className="flex flex-col">
                             <span className="font-medium">
-                              {trip.route?.originCity?.name || "?"} → {trip.route?.destinationCity?.name || "?"}
+                              {trip.route?.originCity?.name || "?"} →{" "}
+                              {trip.route?.destinationCity?.name || "?"}
                             </span>
                             <span className="text-xs text-gray-500">
-                              Salida: {new Date(trip.departure_time).toLocaleString("es-ES")} | 
-                              Bus: {trip.bus?.plate || "?"} | 
-                              Precio: Bs. {trip.price}
+                              Salida:{" "}
+                              {new Date(trip.departure_time).toLocaleString(
+                                "es-ES"
+                              )}{" "}
+                              | Bus: {trip.bus?.plate || "?"} | Precio: Bs.{" "}
+                              {trip.price}
                             </span>
                           </div>
                         </SelectItem>
@@ -284,7 +314,9 @@ export function NewTicketForm() {
                   </SelectContent>
                 </Select>
                 {errors.tripId && (
-                  <p className="text-red-500 text-sm mt-1">{errors.tripId.message}</p>
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.tripId.message}
+                  </p>
                 )}
               </div>
 
@@ -299,7 +331,8 @@ export function NewTicketForm() {
                           Ruta
                         </p>
                         <p className="font-medium">
-                          {selectedTrip.route?.originCity?.name} → {selectedTrip.route?.destinationCity?.name}
+                          {selectedTrip.route?.originCity?.name} →{" "}
+                          {selectedTrip.route?.destinationCity?.name}
                         </p>
                       </div>
                       <div>
@@ -308,10 +341,14 @@ export function NewTicketForm() {
                           Salida
                         </p>
                         <p className="font-medium">
-                          {new Date(selectedTrip.departure_time).toLocaleDateString("es-ES")}
+                          {new Date(
+                            selectedTrip.departure_time
+                          ).toLocaleDateString("es-ES")}
                         </p>
                         <p className="text-xs text-gray-600">
-                          {new Date(selectedTrip.departure_time).toLocaleTimeString("es-ES", {
+                          {new Date(
+                            selectedTrip.departure_time
+                          ).toLocaleTimeString("es-ES", {
                             hour: "2-digit",
                             minute: "2-digit",
                           })}
@@ -323,7 +360,9 @@ export function NewTicketForm() {
                           Bus
                         </p>
                         <p className="font-medium">{selectedTrip.bus?.plate}</p>
-                        <p className="text-xs text-gray-600">{selectedTrip.bus?.model}</p>
+                        <p className="text-xs text-gray-600">
+                          {selectedTrip.bus?.model}
+                        </p>
                       </div>
                       <div>
                         <p className="text-gray-600">Asientos Disponibles</p>
@@ -340,16 +379,20 @@ export function NewTicketForm() {
             {/* Selección de Asiento */}
             {availableSeats.length > 0 && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <TicketIcon className="h-5 w-5 text-purple-600" />
-                  <h3 className="text-lg font-semibold">Seleccionar Asiento</h3>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-gray-600">
+                    {availableSeats.length} asientos disponibles
+                  </p>
+                  {selectedTrip && (
+                    <p className="text-sm text-gray-600">
+                      Capacidad total: {selectedTrip.bus?.capacity || 0}
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <Label>Asiento *</Label>
-                  <Select
-                    onValueChange={(value) => setValue("seatId", value)}
-                  >
+                  <Select onValueChange={(value) => setValue("seatId", value)}>
                     <SelectTrigger className="mt-1">
                       <SelectValue placeholder="Seleccione un asiento" />
                     </SelectTrigger>
@@ -361,7 +404,8 @@ export function NewTicketForm() {
                               {seat.seat_number}
                             </Badge>
                             <span className="text-sm text-gray-600">
-                              {seat.stacks?.name || "Piso"} - {seat.seat_type || "Estándar"}
+                              {seat.stacks?.name || "Piso"} -{" "}
+                              {seat.seat_type || "Estándar"}
                             </span>
                           </div>
                         </SelectItem>
@@ -369,29 +413,49 @@ export function NewTicketForm() {
                     </SelectContent>
                   </Select>
                   {errors.seatId && (
-                    <p className="text-red-500 text-sm mt-1">{errors.seatId.message}</p>
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.seatId.message}
+                    </p>
                   )}
                 </div>
 
                 {/* Visualización de asientos disponibles */}
                 <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-                  {availableSeats.slice(0, 32).map((seat) => (
-                    <Button
-                      key={seat.id}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setValue("seatId", seat.id)}
-                      className="h-12 bg-green-50 hover:bg-green-100 border-green-300"
-                    >
-                      {seat.seat_number}
-                    </Button>
-                  ))}
+                  {availableSeats.slice(0, 40).map((seat) => {
+                    const isSelected = watch("seatId") === seat.id;
+
+                    return (
+                      <Button
+                        key={seat.id}
+                        type="button"
+                        variant={isSelected ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setValue("seatId", seat.id)}
+                        className={`h-14 flex flex-col items-center justify-center ${
+                          isSelected
+                            ? "bg-orange-500 hover:bg-orange-600 text-white"
+                            : "bg-green-50 hover:bg-green-100 border-green-300"
+                        }`}
+                      >
+                        <span className="text-lg font-bold">
+                          {seat.seat_number}
+                        </span>
+                        <span className="text-xs">{seat.seat_code}</span>
+                      </Button>
+                    );
+                  })}
                 </div>
-                {availableSeats.length > 32 && (
+                {availableSeats.length > 40 && (
                   <p className="text-sm text-gray-500 text-center">
-                    y {availableSeats.length - 32} asientos más...
+                    y {availableSeats.length - 40} asientos más disponibles...
                   </p>
+                )}
+                {availableSeats.length === 0 && (
+                  <div className="text-center py-8 bg-red-50 rounded-lg border border-red-200">
+                    <p className="text-red-600 font-medium">
+                      No hay asientos disponibles en este viaje
+                    </p>
+                  </div>
                 )}
               </div>
             )}
@@ -410,13 +474,18 @@ export function NewTicketForm() {
                   step="0.01"
                   {...register("price", {
                     required: "El precio es obligatorio",
-                    min: { value: 0.01, message: "El precio debe ser mayor a 0" },
+                    min: {
+                      value: 0.01,
+                      message: "El precio debe ser mayor a 0",
+                    },
                   })}
                   placeholder="0.00"
                   className="mt-1"
                 />
                 {errors.price && (
-                  <p className="text-red-500 text-sm mt-1">{errors.price.message}</p>
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.price.message}
+                  </p>
                 )}
               </div>
             </div>
@@ -424,7 +493,9 @@ export function NewTicketForm() {
             {/* Error del backend */}
             {backendError && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-red-600 text-center font-medium">{backendError}</p>
+                <p className="text-red-600 text-center font-medium">
+                  {backendError}
+                </p>
               </div>
             )}
 
@@ -435,8 +506,8 @@ export function NewTicketForm() {
                   Cancelar
                 </Button>
               </Link>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="bg-orange-600 hover:bg-orange-700"
                 disabled={!watchTripId || availableSeats.length === 0}
               >

@@ -1,6 +1,11 @@
 "use client";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { QRCodeSVG } from "qrcode.react";
@@ -21,7 +26,6 @@ export function TicketPreviewModal({ ticket, open, onClose }) {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      
       <DialogContent className="">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
@@ -33,10 +37,15 @@ export function TicketPreviewModal({ ticket, open, onClose }) {
         </DialogHeader>
 
         {/* Ticket Preview */}
-        <div id="ticket-preview" className="space-y-4 p-6 border-2 border-dashed border-orange-300 rounded-lg bg-gradient-to-br from-orange-50 to-white">
+        <div
+          id="ticket-preview"
+          className="space-y-4 p-6 border-2 border-dashed border-orange-300 rounded-lg bg-gradient-to-br from-orange-50 to-white"
+        >
           {/* Header con logo */}
           <div className="text-center border-b-2 border-orange-200 pb-4">
-            <h2 className="text-2xl font-bold text-orange-600">🚌 Mi Empresa</h2>
+            <h2 className="text-2xl font-bold text-orange-600">
+              🚌 Mi Empresa
+            </h2>
             <p className="text-sm text-gray-600">Viajes Seguros y Cómodos</p>
           </div>
 
@@ -44,7 +53,13 @@ export function TicketPreviewModal({ ticket, open, onClose }) {
           <div className="flex justify-center py-4">
             <div className="p-4 bg-white rounded-lg shadow-md">
               <QRCodeSVG
-                value={`TICKET-${ticket.code}`}
+                value={JSON.stringify({
+                  code: ticket.code,
+                  passenger: ticket.passenger,
+                  seat: ticket.seat,
+                  trip: ticket.trip_route,
+                  price: ticket.price,
+                })}
                 size={120}
                 level="H"
                 includeMargin={true}
@@ -67,7 +82,7 @@ export function TicketPreviewModal({ ticket, open, onClose }) {
             <div className="grid grid-cols-2 gap-2 text-sm">
               <span className="text-gray-600">Nombre:</span>
               <span className="font-medium">{ticket.passenger}</span>
-              
+
               <span className="text-gray-600">Documento:</span>
               <span className="font-medium">{ticket.document}</span>
             </div>
@@ -75,26 +90,32 @@ export function TicketPreviewModal({ ticket, open, onClose }) {
 
           {/* Información del viaje */}
           <div className="bg-white rounded-lg p-4 space-y-2 shadow-sm">
-            <h3 className="font-semibold text-orange-600 mb-2">🚍 Detalles del Viaje</h3>
+            <h3 className="font-semibold text-orange-600 mb-2">
+              🚍 Detalles del Viaje
+            </h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Ruta:</span>
-                <span className="font-medium text-right">{ticket.trip_route}</span>
+                <span className="font-medium text-right">
+                  {ticket.trip_route}
+                </span>
               </div>
-              
+
               <div className="flex justify-between">
                 <span className="text-gray-600">Salida:</span>
                 <span className="font-medium">{ticket.departure_time}</span>
               </div>
-              
+
               <div className="flex justify-between">
                 <span className="text-gray-600">Bus:</span>
                 <span className="font-medium">{ticket.bus_plate}</span>
               </div>
-              
+
               <div className="flex justify-between">
                 <span className="text-gray-600">Asiento:</span>
-                <span className="font-medium text-lg text-orange-600">{ticket.seat}</span>
+                <span className="font-medium text-lg text-orange-600">
+                  {ticket.seat}
+                </span>
               </div>
             </div>
           </div>
@@ -125,11 +146,7 @@ export function TicketPreviewModal({ ticket, open, onClose }) {
             <Printer className="w-4 h-4 mr-2" />
             Imprimir
           </Button>
-          <Button
-            onClick={onClose}
-            variant="outline"
-            className="flex-1"
-          >
+          <Button onClick={onClose} variant="outline" className="flex-1">
             Cerrar
           </Button>
         </div>

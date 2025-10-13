@@ -220,3 +220,42 @@ export async function deleteTicket(id) {
     throw error;
   }
 }
+
+export async function getAvailableSeatsForTrip(tripId) {
+  try {
+    if (!tripId) {
+      throw new Error("ID de viaje requerido");
+    }
+
+    // Obtener el viaje completo con sus relaciones
+    const tripRes = await fetch(`http://localhost:3001/api/v1/trips/${tripId}`, {
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+    });
+    const trip = await handleApiResponse(tripRes);
+
+    // Obtener tickets del viaje para saber qué asientos están ocupados
+    const ticketsRes = await fetch(`${BASE_URL}/trip/${tripId}`, {
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+    });
+    const tickets = await handleApiResponse(ticketsRes);
+    
+    const occupiedSeatIds = tickets.map(t => t.seat?.id).filter(Boolean);
+
+    // Filtrar asientos disponibles del stack del bus
+    const availableSeats = trip.bus?.stacks?.seats?.filter(
+      seat => seat.is_active && !occupiedSeatIds.includes(seat.id)
+    ) || [];
+
+    return {
+      trip,
+      availableSeats,
+      occupiedCount: occupiedSeatIds.length,
+      totalSeats: trip.bus?.stacks?.seats?.length || 0
+    };
+  } catch (error) {
+    console.error(`Error al obtener asientos del viaje ${tripId}:`, error);
+    throw error;
+  }
+}

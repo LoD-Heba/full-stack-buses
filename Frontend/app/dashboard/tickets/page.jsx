@@ -8,6 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
+  canConfirmTicket,
+  canCancelTicket,
+  canDeleteTicket,
+} from "./utils/ticket-validators";
+import {
   getTickets,
   deleteTicket,
   cancelTicket,
@@ -15,7 +20,10 @@ import {
 } from "./api/api-tickets";
 import { Pagination } from "./components/Pagination";
 import { TicketPreviewModal } from "./components/ticket-preview-modal";
-import { exportTicketsToPDF, exportSingleTicketToPDF } from "./utils/export-pdf";
+import {
+  exportTicketsToPDF,
+  exportSingleTicketToPDF,
+} from "./utils/export-pdf";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,9 +37,9 @@ import {
 import { CheckCircle, XCircle, FileText, Download, Eye } from "lucide-react";
 
 const STATUS_COLORS = {
-  PENDIENTE: "bg-yellow-100 text-yellow-800",
-  CONFIRMADO: "bg-green-100 text-green-800",
-  CANCELADO: "bg-red-100 text-red-800",
+  PENDIENTE: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  CONFIRMADO: "bg-green-100 text-green-800 border-green-300",
+  CANCELADO: "bg-red-100 text-red-800 border-red-300",
 };
 
 const STATUS_LABELS = {
@@ -83,7 +91,9 @@ export default function TicketsPage() {
         user_email: ticket.user?.email || "-",
         document: ticket.user?.profile?.documentNumber || "-",
         trip_route: ticket.trip?.route
-          ? `${ticket.trip.route.originCity?.name || "?"} → ${ticket.trip.route.destinationCity?.name || "?"}`
+          ? `${ticket.trip.route.originCity?.name || "?"} → ${
+              ticket.trip.route.destinationCity?.name || "?"
+            }`
           : "-",
         departure_time: ticket.trip?.departure_time
           ? new Date(ticket.trip.departure_time).toLocaleString("es-ES")
@@ -141,28 +151,25 @@ export default function TicketsPage() {
     }
   };
 
-
-  const handleDeleteClick = (ticket) => {
-    setActionDialog({ open: true, type: "delete", ticket });
-  };
-
-  const handleCancelClick = (ticket) => {
-    if (ticket.status === "CANCELADO") {
-      toast.info("El ticket ya está cancelado");
-      return;
-    }
-    setActionDialog({ open: true, type: "cancel", ticket });
-  };
+const handleDeleteClick = (ticket) => {
+  const validation = canDeleteTicket(ticket);
+  
+  if (!validation.valid) {
+    toast.error(validation.reason);
+    return;
+  }
+  
+  setActionDialog({ open: true, type: "delete", ticket });
+};
 
   const handleConfirmClick = (ticket) => {
-    if (ticket.status === "CONFIRMADO") {
-      toast.info("El ticket ya está confirmado");
+    const validation = canConfirmTicket(ticket);
+
+    if (!validation.valid) {
+      toast.error(validation.reason);
       return;
     }
-    if (ticket.status === "CANCELADO") {
-      toast.error("No se puede confirmar un ticket cancelado");
-      return;
-    }
+
     setActionDialog({ open: true, type: "confirm", ticket });
   };
 
@@ -191,7 +198,13 @@ export default function TicketsPage() {
       console.error(error);
       toast.error(
         error.message ||
-          `Error al ${type === "delete" ? "eliminar" : type === "cancel" ? "cancelar" : "confirmar"} el ticket`
+          `Error al ${
+            type === "delete"
+              ? "eliminar"
+              : type === "cancel"
+              ? "cancelar"
+              : "confirmar"
+          } el ticket`
       );
     }
   };
@@ -233,8 +246,6 @@ export default function TicketsPage() {
 
   return (
     <div className="p-6 space-y-6">
-    
-
       {/* Acciones rápidas */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg shadow border-l-4 border-yellow-500">
@@ -262,7 +273,6 @@ export default function TicketsPage() {
         columns={columns}
         data={tickets}
         onAdd={handleAdd}
-        onEdit={handleEdit}
         onDelete={handleDeleteClick}
         onProfile={handleProfile}
         customActions={(ticket) => (
@@ -380,8 +390,8 @@ export default function TicketsPage() {
                 actionDialog.type === "delete"
                   ? "bg-red-600 hover:bg-red-700"
                   : actionDialog.type === "cancel"
-                    ? "bg-orange-600 hover:bg-orange-700"
-                    : "bg-green-600 hover:bg-green-700"
+                  ? "bg-orange-600 hover:bg-orange-700"
+                  : "bg-green-600 hover:bg-green-700"
               }
             >
               {actionDialog.type === "delete" && "Eliminar"}
