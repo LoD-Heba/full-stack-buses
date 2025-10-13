@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { Ticket } from './entities/ticket.entity';
@@ -15,7 +15,11 @@ import { Payment } from '../payment/entities/payment.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
 import { TripService } from '../trip/trip.service';
-import { TicketStatus, TripStatus } from 'src/common/enums/status.enum';
+import {
+  PaymentStatus,
+  TicketStatus,
+  TripStatus,
+} from 'src/common/enums/status.enum';
 
 @Injectable()
 export class TicketService {
@@ -43,14 +47,56 @@ export class TicketService {
 
     // Validar que el usuario existe y está activo
     const user = await this.findUser(userId);
+
+    // Validar que un usuario no tenga mas de 3 tickets pendientes
+    const pendingTicketsCount = await this.ticketRepository.count({
+      where: {
+        user: { id: userId },
+        status: TicketStatus.PENDING,
+        is_active: true,
+      },
+    });
+
+    const MAX_PENDING_TICKETS = 3;
+    if (pendingTicketsCount >= MAX_PENDING_TICKETS) {
+      throw new BadRequestException(
+        `Tienes ${pendingTicketsCount} tickets pendientes de pago. Por favor completa o cancela tus reservas antes de crear nuevas.`,
+      );
+    }
+
+    //Validar limite de compras de tickets
+    const userTicketsInTrip = await this.ticketRepository.count({
+      where: {
+        trip: { id: tripId },
+        user: { id: userId },
+        status: In([TicketStatus.CONFIRMED, TicketStatus.PENDING]),
+        is_active: true,
+      },
+    });
+
+    const MAX_TICKETS_PER_USER = 5;
+    if (userTicketsInTrip >= MAX_TICKETS_PER_USER) {
+      throw new BadRequestException(
+        `No puedes comprar más de ${MAX_TICKETS_PER_USER} tickets del mismo viaje`,
+      );
+    }
     // Validar Trip
     const trip = await this.findTrip(tripId);
 
-    
     // Verificar que el viaje esté programado y no haya comenzado
     if (trip.status !== TripStatus.SCHEDULED) {
       throw new BadRequestException(
         'Solo se pueden comprar tickets para viajes programados',
+      );
+    }
+
+    const minutosAntesDeSalida =
+      (new Date(trip.departure_time).getTime() - new Date().getTime()) /
+      (1000 * 60);
+
+    if (minutosAntesDeSalida < 30) {
+      throw new BadRequestException(
+        'No se pueden comprar tickets con menos de 30 minutos antes de la salida',
       );
     }
     if (new Date(trip.departure_time) <= new Date()) {
@@ -81,19 +127,33 @@ export class TicketService {
     // Validar Seat
     const seat = await this.findSeat(seatId);
 
+    //Valicacion de asientos inexistentes
+    const seatBelongsToBus = await this.seatRepository
+      .createQueryBuilder('seat')
+      .innerJoin('seat.stacks', 'stack')
+      .innerJoin('stack.bus', 'bus')
+      .where('seat.id = :seatId', { seatId })
+      .andWhere('bus.id = :busId', { busId: trip.bus.id })
+      .getOne();
+
+    if (!seatBelongsToBus) {
+      throw new BadRequestException(
+        `El asiento ${seat.seat_code} no pertenece al bus de este viaje`,
+      );
+    }
     // Verificar que el asiento no esté ocupado en este viaje
     const existingTicket = await this.ticketRepository.findOne({
       where: {
         trip: { id: tripId },
         seat: { id: seatId },
-        status: TicketStatus.CONFIRMED,
+        status: In([TicketStatus.CONFIRMED, TicketStatus.PENDING]), // AGREGAR PENDING
         is_active: true,
       },
     });
 
     if (existingTicket) {
       throw new BadRequestException(
-        `El asiento ${seat.seat_number} ya está ocupado en este viaje`,
+        `El asiento ${seat.seat_number} ya está reservado en este viaje`,
       );
     }
 
@@ -117,6 +177,19 @@ export class TicketService {
     let payment: Payment | undefined;
     if (paymentId) {
       payment = await this.findPayment(paymentId);
+    }
+    if (payment) {
+      if (Math.abs(payment.amount - ticketData.price) > 0.01) {
+        throw new BadRequestException(
+          `El monto del pago (${payment.amount}) no coincide con el precio del ticket (${ticketData.price})`,
+        );
+      }
+
+      if (payment.status !== PaymentStatus.COMPLETED) {
+        throw new BadRequestException(
+          'Solo se pueden asociar pagos completados a tickets',
+        );
+      }
     }
 
     // Generar código único del ticket
@@ -339,7 +412,15 @@ export class TicketService {
       // USAR ENUM
       throw new BadRequestException('El ticket ya está cancelado');
     }
+    const horasAntesDeSalida =
+      (new Date(ticket.trip.departure_time).getTime() - new Date().getTime()) /
+      (1000 * 60 * 60);
 
+    if (horasAntesDeSalida < 2) {
+      throw new BadRequestException(
+        'No se pueden cancelar tickets con menos de 2 horas antes de la salida',
+      );
+    }
     // Verificar si el viaje ya comenzó
     if (new Date(ticket.trip.departure_time) <= new Date()) {
       throw new BadRequestException(
@@ -370,6 +451,20 @@ export class TicketService {
       // USAR ENUM
       throw new BadRequestException(
         'No se puede confirmar un ticket cancelado',
+      );
+    }
+    const trip = await this.tripRepository.findOne({
+      where: { id: ticket.trip.id },
+      lock: { mode: 'pessimistic_write' }, // Lock para evitar race conditions
+    });
+
+    if (!trip) {
+      throw new NotFoundException(`El viaje ${ticket.trip.id} no existe`);
+    }
+
+    if (trip.available_seats <= 0) {
+      throw new BadRequestException(
+        'Ya no hay asientos disponibles en este viaje',
       );
     }
 
