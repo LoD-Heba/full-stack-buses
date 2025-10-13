@@ -2,15 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { 
-  User, 
-  Phone, 
-  Calendar, 
+import {
+  User,
+  Phone,
+  Calendar,
   MapPin,
   Edit,
   ArrowLeft,
@@ -43,7 +49,7 @@ export default function ClientProfilePage() {
     setLoading(true);
     try {
       const clientData = await getClientWithTickets(params.id);
-      
+
       // Categorizar tickets
       const now = new Date();
       const upcoming = [];
@@ -77,23 +83,27 @@ export default function ClientProfilePage() {
   }, [params.id]);
 
   const handleAddTicket = () => {
-    router.push(`/dashboard/tickets/nuevo?clientId=${params.id}`);
+    // Redirigir a viajes con el clientId en la URL
+    router.push(`/dashboard/viajes?clientId=${params.id}`);
   };
-
   const handlePreviewTicket = (ticket) => {
     const formattedTicket = {
       code: ticket.code,
       status: ticket.status,
       passenger: `${client.firstName} ${client.lastName}`,
       document: client.documentNumber,
-      trip_route: `${ticket.trip?.route?.originCity?.name || "?"} → ${ticket.trip?.route?.destinationCity?.name || "?"}`,
-      departure_time: new Date(ticket.trip?.departure_time).toLocaleString("es-ES"),
+      trip_route: `${ticket.trip?.route?.originCity?.name || "?"} → ${
+        ticket.trip?.route?.destinationCity?.name || "?"
+      }`,
+      departure_time: new Date(ticket.trip?.departure_time).toLocaleString(
+        "es-ES"
+      ),
       bus_plate: ticket.trip?.bus?.plate || "—",
       seat: ticket.seat?.seat_number || "—",
       price: ticket.price,
       booking_date: new Date(ticket.booking_date).toLocaleDateString("es-ES"),
     };
-    
+
     setPreviewTicket(formattedTicket);
     setShowPreview(true);
   };
@@ -104,14 +114,18 @@ export default function ClientProfilePage() {
       status: ticket.status,
       passenger: `${client.firstName} ${client.lastName}`,
       document: client.documentNumber,
-      trip_route: `${ticket.trip?.route?.originCity?.name || "?"} → ${ticket.trip?.route?.destinationCity?.name || "?"}`,
-      departure_time: new Date(ticket.trip?.departure_time).toLocaleString("es-ES"),
+      trip_route: `${ticket.trip?.route?.originCity?.name || "?"} → ${
+        ticket.trip?.route?.destinationCity?.name || "?"
+      }`,
+      departure_time: new Date(ticket.trip?.departure_time).toLocaleString(
+        "es-ES"
+      ),
       bus_plate: ticket.trip?.bus?.plate || "—",
       seat: ticket.seat?.seat_number || "—",
       price: ticket.price,
       booking_date: new Date(ticket.booking_date).toLocaleDateString("es-ES"),
     };
-    
+
     try {
       exportSingleTicketToPDF(formattedTicket);
       toast.success(`Ticket ${ticket.code} exportado a PDF`);
@@ -152,7 +166,11 @@ export default function ClientProfilePage() {
     });
   };
 
-  const { upcoming = [], past = [], cancelled = [] } = client.ticketHistory || {};
+  const {
+    upcoming = [],
+    past = [],
+    cancelled = [],
+  } = client.ticketHistory || {};
   const totalTickets = upcoming.length + past.length + cancelled.length;
 
   return (
@@ -190,20 +208,24 @@ export default function ClientProfilePage() {
                     {client.phone}
                   </div>
                 </div>
-                <Badge className={client.isActive ? "bg-green-500" : "bg-gray-500"}>
+                <Badge
+                  className={client.isActive ? "bg-green-500" : "bg-gray-500"}
+                >
                   {client.isActive ? "Activo" : "Inactivo"}
                 </Badge>
               </div>
             </div>
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={() => router.push(`/dashboard/clientes/${params.id}/editar`)}
+              <Button
+                variant="outline"
+                onClick={() =>
+                  router.push(`/dashboard/clientes/${params.id}/editar`)
+                }
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
               </Button>
-              <Button 
+              <Button
                 onClick={handleAddTicket}
                 className="bg-orange-600 hover:bg-orange-700"
               >
@@ -227,7 +249,9 @@ export default function ClientProfilePage() {
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm text-gray-500">Nombre Completo</p>
-              <p className="font-medium">{client.firstName} {client.lastName}</p>
+              <p className="font-medium">
+                {client.firstName} {client.lastName}
+              </p>
             </div>
             <Separator />
             <div>
@@ -245,7 +269,9 @@ export default function ClientProfilePage() {
                 <MapPin className="h-4 w-4" />
                 Dirección
               </p>
-              <p className="font-medium">{client.address || "No especificado"}</p>
+              <p className="font-medium">
+                {client.address || "No especificado"}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -261,7 +287,9 @@ export default function ClientProfilePage() {
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm text-gray-500">ID de Cliente</p>
-              <p className="font-mono text-xs bg-gray-100 p-2 rounded">{client.id}</p>
+              <p className="font-mono text-xs bg-gray-100 p-2 rounded">
+                {client.id}
+              </p>
             </div>
             <Separator />
             <div>
@@ -327,7 +355,10 @@ export default function ClientProfilePage() {
             <CardContent>
               <div className="space-y-3">
                 {upcoming.map((ticket) => (
-                  <Card key={ticket.id} className="bg-green-50 border-green-200">
+                  <Card
+                    key={ticket.id}
+                    className="bg-green-50 border-green-200"
+                  >
                     <CardContent className="pt-4">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -339,16 +370,21 @@ export default function ClientProfilePage() {
                           </div>
                           <p className="text-sm text-gray-700 mb-1">
                             <span className="font-medium">Ruta:</span>{" "}
-                            {ticket.trip?.route?.originCity?.name} → {ticket.trip?.route?.destinationCity?.name}
+                            {ticket.trip?.route?.originCity?.name} →{" "}
+                            {ticket.trip?.route?.destinationCity?.name}
                           </p>
                           <p className="text-sm text-gray-700 mb-1">
                             <span className="font-medium">Salida:</span>{" "}
-                            {new Date(ticket.trip?.departure_time).toLocaleString("es-ES")}
+                            {new Date(
+                              ticket.trip?.departure_time
+                            ).toLocaleString("es-ES")}
                           </p>
                           <div className="flex gap-4 text-sm text-gray-600">
                             <span>Asiento: {ticket.seat?.seat_number}</span>
                             <span>Bus: {ticket.trip?.bus?.plate}</span>
-                            <span className="font-semibold text-green-700">Bs. {parseFloat(ticket.price).toFixed(2)}</span>
+                            <span className="font-semibold text-green-700">
+                              Bs. {parseFloat(ticket.price).toFixed(2)}
+                            </span>
                           </div>
                         </div>
                         <div className="flex flex-col gap-2">
@@ -390,7 +426,10 @@ export default function ClientProfilePage() {
             <CardContent>
               <div className="space-y-3">
                 {[...past, ...cancelled]
-                  .sort((a, b) => new Date(b.booking_date) - new Date(a.booking_date))
+                  .sort(
+                    (a, b) =>
+                      new Date(b.booking_date) - new Date(a.booking_date)
+                  )
                   .slice(0, 10)
                   .map((ticket) => (
                     <div
@@ -405,10 +444,12 @@ export default function ClientProfilePage() {
                           </Badge>
                         </div>
                         <p className="text-sm text-gray-600">
-                          {ticket.trip?.route?.originCity?.name} → {ticket.trip?.route?.destinationCity?.name}
+                          {ticket.trip?.route?.originCity?.name} →{" "}
+                          {ticket.trip?.route?.destinationCity?.name}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {formatDate(ticket.booking_date)} | Bs. {parseFloat(ticket.price).toFixed(2)}
+                          {formatDate(ticket.booking_date)} | Bs.{" "}
+                          {parseFloat(ticket.price).toFixed(2)}
                         </p>
                       </div>
                       <div className="flex gap-2">

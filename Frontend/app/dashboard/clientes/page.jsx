@@ -7,7 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { getClients, deleteClient, toggleClientActive } from "./api/api-clients";
+import {
+  getClients,
+  deleteClient,
+  toggleClientActive,
+} from "./api/api-clients";
 import { Pagination } from "../usuarios/components/Pagination";
 import { Ticket, Search } from "lucide-react";
 
@@ -29,7 +33,7 @@ export default function ClientesPage() {
     setLoading(true);
     try {
       const response = await getClients(page, limit, search);
-      
+
       const clientsData = response.data.map((client) => ({
         id: client.id,
         nombre: `${client.firstName} ${client.lastName}`.trim(),
@@ -41,7 +45,7 @@ export default function ClientesPage() {
         isActive: client.isActive,
         createdAt: new Date(client.createdAt).toLocaleDateString("es-ES"),
       }));
-      
+
       setClientes(clientsData);
       setMeta(response.meta);
     } catch (error) {
@@ -81,8 +85,7 @@ export default function ClientesPage() {
   };
 
   const handleAddTicket = (item) => {
-    toast.info(`Agregando ticket para ${item.nombre}`);
-    router.push(`/dashboard/tickets/nuevo?clientId=${item.id}`);
+    router.push(`/dashboard/viajes?clientId=${item.id}`);
   };
 
   const handleDelete = async (item) => {
@@ -100,7 +103,9 @@ export default function ClientesPage() {
   const handleToggleActive = async (item) => {
     try {
       await toggleClientActive(item.id);
-      toast.success(`Cliente ${item.isActive ? "desactivado" : "activado"} correctamente`);
+      toast.success(
+        `Cliente ${item.isActive ? "desactivado" : "activado"} correctamente`
+      );
       fetchClientsList(meta.page, meta.limit, searchTerm);
     } catch (error) {
       toast.error("Error al cambiar el estado del cliente");
@@ -131,7 +136,6 @@ export default function ClientesPage() {
         </div>
       </div>
 
-   
       <DataTable
         title="Gestión de Clientes"
         columns={[
@@ -167,7 +171,7 @@ export default function ClientesPage() {
           </Button>
         )}
       />
-      
+
       <Pagination
         meta={meta}
         onPageChange={handlePageChange}
