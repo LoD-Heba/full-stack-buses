@@ -22,6 +22,7 @@ import { CreateBusDto, BusStatus } from './dto/create-bus.dto';
 import { UpdateBusDto } from './dto/update-bus.dto';
 import { SearchBusDto } from './dto/search-bus.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { createMulterOptions } from 'src/config/upload.config';
 
 @Controller('buses')
 export class BusController {
@@ -33,32 +34,7 @@ export class BusController {
   }
 
   @Post(':id/upload-image')
-  @UseInterceptors(
-    FileInterceptor('image', {
-      storage: diskStorage({
-        destination: './uploads/buses',
-        filename: (req, file, cb) => {
-          const randomName = Array(32)
-            .fill(null)
-            .map(() => Math.round(Math.random() * 16).toString(16))
-            .join('');
-          cb(null, `${randomName}${extname(file.originalname)}`);
-        },
-      }),
-      fileFilter: (req, file, cb) => {
-        if (!file.originalname.match(/\.(jpg|jpeg|png|gif|webp)$/)) {
-          return cb(
-            new BadRequestException('Solo se permiten imágenes (jpg, jpeg, png, gif, webp)'),
-            false,
-          );
-        }
-        cb(null, true);
-      },
-      limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB
-      },
-    }),
-  )
+  @UseInterceptors(FileInterceptor('image', createMulterOptions('buses')))
   async uploadImage(
     @Param('id', ParseUUIDPipe) id: string,
     @UploadedFile() file: Express.Multer.File,
@@ -66,7 +42,6 @@ export class BusController {
     if (!file) {
       throw new BadRequestException('No se proporcionó ninguna imagen');
     }
-
     const imageUrl = `/uploads/buses/${file.filename}`;
     return this.busService.updateImageUrl(id, imageUrl);
   }
@@ -79,7 +54,7 @@ export class BusController {
   @Get('search')
   search(
     @Query() searchDto: SearchBusDto,
-    @Query() paginationDto: PaginationDto
+    @Query() paginationDto: PaginationDto,
   ) {
     return this.busService.search(searchDto, paginationDto);
   }
@@ -107,7 +82,7 @@ export class BusController {
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateBusDto: UpdateBusDto
+    @Body() updateBusDto: UpdateBusDto,
   ) {
     return this.busService.update(id, updateBusDto);
   }
@@ -115,7 +90,7 @@ export class BusController {
   @Patch(':id/status')
   changeStatus(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('status', new ParseEnumPipe(BusStatus)) status: BusStatus
+    @Body('status', new ParseEnumPipe(BusStatus)) status: BusStatus,
   ) {
     return this.busService.changeStatus(id, status);
   }

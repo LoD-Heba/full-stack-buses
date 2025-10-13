@@ -65,7 +65,7 @@ export class BusService {
     // Crear el bus
     const newBus = this.busRepository.create({
       ...busData,
-      plate: busData.plate.toUpperCase(), // Normalizar placa
+      plate: busData.plate.toUpperCase(), 
       user,
       stacks,
     });
