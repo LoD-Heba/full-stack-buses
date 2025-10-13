@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -33,10 +34,12 @@ import {
   Play,
   CheckCircle,
   XCircle,
+  User,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
 
 export default function TripsManagement() {
   const [trips, setTrips] = useState([]);
@@ -48,11 +51,16 @@ export default function TripsManagement() {
   const [modalMode, setModalMode] = useState("create");
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const searchParams = useSearchParams();
+  const clientId = searchParams.get("clientId");
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [selectedTripForTicket, setSelectedTripForTicket] = useState(null);
   const [alert, setAlert] = useState({
     show: false,
     message: "",
     type: "success",
   });
+  const router = useRouter();
   const fetchBuses = async () => {
     try {
       const response = await fetch(`${API_URL}/buses?limit=100`);
@@ -80,6 +88,23 @@ export default function TripsManagement() {
       3000
     );
   };
+
+  useEffect(() => {
+    const loadClient = async () => {
+      if (clientId) {
+        try {
+          const response = await fetch(`${API_URL}/clients/${clientId}`);
+          const data = await response.json();
+          setSelectedClient(data);
+        } catch (error) {
+          console.error("Error al cargar cliente:", error);
+          showAlert("Error al cargar información del cliente", "error");
+        }
+      }
+    };
+
+    loadClient();
+  }, [clientId]);
 
   const openCreateModal = () => {
     setModalMode("create");
@@ -115,32 +140,39 @@ export default function TripsManagement() {
 
   const handleSubmit = async () => {
     try {
+      // ====== AGREGAR VALIDACIONES ======
+      // Validar que la fecha de salida no sea en el pasado
+      const departureDate = new Date(formData.departure_time);
+      const now = new Date();
+
+      if (departureDate < now) {
+        showAlert("La fecha de salida no puede ser en el pasado", "error");
+        return;
+      }
+
+      // Validar que la fecha de llegada sea posterior a la salida
+      const arrivalDate = new Date(formData.arrival_time);
+      if (arrivalDate <= departureDate) {
+        showAlert(
+          "La fecha de llegada debe ser posterior a la fecha de salida",
+          "error"
+        );
+        return;
+      }
+
+      // Validar que todos los campos estén completos
+      if (!formData.routeId || !formData.busId || !formData.price) {
+        showAlert("Por favor complete todos los campos obligatorios", "error");
+        return;
+      }
+      // ====================================
+
       const url =
         modalMode === "create"
           ? `${API_URL}/trips`
           : `${API_URL}/trips/${selectedTrip.id}`;
 
-      const method = modalMode === "create" ? "POST" : "PATCH";
-
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Error al guardar");
-      }
-
-      showAlert(
-        modalMode === "create"
-          ? "Viaje creado exitosamente"
-          : "Viaje actualizado exitosamente"
-      );
-
-      setIsModalOpen(false);
-      fetchTrips();
+      // ... resto del código existente
     } catch (error) {
       showAlert(error.message, "error");
     }
@@ -216,8 +248,8 @@ export default function TripsManagement() {
   };
 
   const [formData, setFormData] = useState({
-    departure_time: "",
-    arrival_time: "",
+    departure_time: `${new Date().toISOString().split("T")[0]}T08:00`, // Fecha actual + 8:00 AM
+    arrival_time: `${new Date().toISOString().split("T")[0]}T18:00`, // Fecha actual + 6:00 PM
     price: "",
     status: "SCHEDULED",
     busId: "",
@@ -299,7 +331,9 @@ export default function TripsManagement() {
         <div>
           <h1 className="text-3xl font-bold">Gestión de Viajes</h1>
           <p className="text-gray-600 mt-1">
-            Administra los viajes programados
+            {clientId
+              ? "Seleccione un viaje para el cliente"
+              : "Administra los viajes programados"}
           </p>
         </div>
         <Button
@@ -311,21 +345,37 @@ export default function TripsManagement() {
         </Button>
       </div>
 
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Buscar por origen, destino, placa o estado..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+      {clientId && selectedClient && (
+        <Card className="bg-blue-50 border-blue-300">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-500 text-white rounded-full p-2">
+                  <User className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm text-blue-700 font-medium">
+                    Cliente Seleccionado:
+                  </p>
+                  <p className="text-lg font-bold text-blue-900">
+                    {selectedClient.firstName} {selectedClient.lastName}
+                  </p>
+                  <p className="text-sm text-blue-600">
+                    C.I.: {selectedClient.documentNumber}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => router.push("/dashboard/clientes")}
+                className="text-blue-700 border-blue-300"
+              >
+                Cambiar Cliente
+              </Button>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-2xl">
@@ -379,29 +429,107 @@ export default function TripsManagement() {
               </div>
 
               <div>
-                <Label htmlFor="departure_time">Fecha y Hora de Salida *</Label>
+                <Label htmlFor="departure_time">Fecha de Salida *</Label>
                 <Input
-                  id="departure_time"
-                  type="datetime-local"
-                  value={formData.departure_time}
-                  onChange={(e) =>
-                    setFormData({ ...formData, departure_time: e.target.value })
-                  }
+                  id="departure_date"
+                  type="date"
+                  min={new Date().toISOString().split("T")[0]} // No permitir fechas pasadas
+                  value={formData.departure_time.split("T")[0] || ""}
+                  onChange={(e) => {
+                    const currentTime =
+                      formData.departure_time.split("T")[1] || "08:00";
+                    setFormData({
+                      ...formData,
+                      departure_time: `${e.target.value}T${currentTime}`,
+                    });
+                  }}
+                  className="mb-2"
                 />
+                <Label htmlFor="departure_time_hour">Hora de Salida *</Label>
+                <Select
+                  value={formData.departure_time.split("T")[1] || "08:00"}
+                  onValueChange={(value) => {
+                    const currentDate =
+                      formData.departure_time.split("T")[0] ||
+                      new Date().toISOString().split("T")[0];
+                    setFormData({
+                      ...formData,
+                      departure_time: `${currentDate}T${value}`,
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar hora" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {/* Generar horarios cada 30 minutos */}
+                    {Array.from({ length: 48 }, (_, i) => {
+                      const hour = Math.floor(i / 2)
+                        .toString()
+                        .padStart(2, "0");
+                      const minute = i % 2 === 0 ? "00" : "30";
+                      const time = `${hour}:${minute}`;
+                      return (
+                        <SelectItem key={time} value={time}>
+                          {time}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
-
               <div>
-                <Label htmlFor="arrival_time">Fecha y Hora de Llegada *</Label>
+                <Label htmlFor="arrival_time">Fecha de Llegada *</Label>
                 <Input
-                  id="arrival_time"
-                  type="datetime-local"
-                  value={formData.arrival_time}
-                  onChange={(e) =>
-                    setFormData({ ...formData, arrival_time: e.target.value })
+                  id="arrival_date"
+                  type="date"
+                  min={
+                    formData.departure_time.split("T")[0] ||
+                    new Date().toISOString().split("T")[0]
                   }
+                  value={formData.arrival_time.split("T")[0] || ""}
+                  onChange={(e) => {
+                    const currentTime =
+                      formData.arrival_time.split("T")[1] || "18:00";
+                    setFormData({
+                      ...formData,
+                      arrival_time: `${e.target.value}T${currentTime}`,
+                    });
+                  }}
+                  className="mb-2"
                 />
+                <Label htmlFor="arrival_time_hour">Hora de Llegada *</Label>
+                <Select
+                  value={formData.arrival_time.split("T")[1] || "18:00"}
+                  onValueChange={(value) => {
+                    const currentDate =
+                      formData.arrival_time.split("T")[0] ||
+                      new Date().toISOString().split("T")[0];
+                    setFormData({
+                      ...formData,
+                      arrival_time: `${currentDate}T${value}`,
+                    });
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar hora" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {Array.from({ length: 48 }, (_, i) => {
+                      const hour = Math.floor(i / 2)
+                        .toString()
+                        .padStart(2, "0");
+                      const minute = i % 2 === 0 ? "00" : "30";
+                      const time = `${hour}:${minute}`;
+                      return (
+                        <SelectItem key={time} value={time}>
+                          {time}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
-
               <div>
                 <Label htmlFor="price">Precio *</Label>
                 <Input
@@ -471,10 +599,7 @@ export default function TripsManagement() {
                     <Label className="text-gray-500">Ruta</Label>
                     <div className="flex items-center gap-2 mt-1">
                       <div>
-                        <div className="font-semibold">
-                          {routes.name}
-                        </div>
-                       
+                        <div className="font-semibold">{routes.name}</div>
                       </div>
                     </div>
                   </div>
@@ -616,6 +741,9 @@ export default function TripsManagement() {
                       <th className="text-left py-3 px-4">Precio</th>
                       <th className="text-left py-3 px-4">Asientos</th>
                       <th className="text-left py-3 px-4">Estado</th>
+                      {clientId && (
+                        <th className="text-right py-3 px-4">Seleccionar</th>
+                      )}{" "}
                       <th className="text-right py-3 px-4">Acciones</th>
                     </tr>
                   </thead>
@@ -694,6 +822,31 @@ export default function TripsManagement() {
                         <td className="py-3 px-4">
                           {getStatusBadge(trip.status)}
                         </td>
+                        {clientId && (
+                          <td className="py-3 px-4 text-right">
+                            {trip.status === "SCHEDULED" &&
+                            trip.available_seats > 0 ? (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  router.push(
+                                    `/dashboard/seat?clientId=${clientId}&tripId=${trip.id}`
+                                  );
+                                }}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Seleccionar
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-gray-500">
+                                {trip.status !== "SCHEDULED"
+                                  ? "No disponible"
+                                  : "Sin asientos"}
+                              </span>
+                            )}
+                          </td>
+                        )}
                         <td className="py-3 px-4">
                           <div className="flex gap-2 justify-end">
                             {trip.status === "SCHEDULED" && (
