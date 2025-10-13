@@ -33,15 +33,13 @@ async function bootstrap() {
   app.enableCors({
     origin: 'http://localhost:3000', // puerto de Next.js
     credentials: true,
-  }); // ← Permite peticiones desde Next.js (puerto 3001)
-  // Servir archivos estáticos
+  }); 
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/uploads',
   });
   const port = +configService.get<string>('PORT', '3001');
   await app.listen(port);
 
-  //Log de inicio
   logger.log(` Servidor iniciado en http://localhost:${port}/${apiPrefix}`);
 }
 bootstrap();

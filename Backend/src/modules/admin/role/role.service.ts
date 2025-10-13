@@ -30,7 +30,6 @@ export class RoleService {
   async create(createRoleDto: CreateRoleDto) {
     const { name } = createRoleDto;
 
-    // 🔎 Verificar nombre único
     const exists = await this.roleRepository.findOne({ where: { name } });
     if (exists) throw new ConflictException(`El rol "${name}" ya existe.`);
 
@@ -74,7 +73,9 @@ export class RoleService {
     if (name) {
       const exists = await this.roleRepository.findOne({ where: { name } });
       if (exists && exists.id !== id) {
-        throw new ConflictException(`Ya existe un rol con el nombre "${name}".`);
+        throw new ConflictException(
+          `Ya existe un rol con el nombre "${name}".`,
+        );
       }
     }
 
@@ -97,6 +98,12 @@ export class RoleService {
     if (role.name === 'user') {
       throw new BadRequestException('El rol "user" no puede ser desactivado.');
     }
+    if (role.name === 'admin') {
+      throw new BadRequestException('El rol "admin" no puede ser desactivado.');
+    }
+    if (role.name === 'empleado') {
+      throw new BadRequestException('El rol "empleado" no puede ser desactivado.');
+    }
 
     // Marcar como inactivo
     role.isActive = false;
@@ -116,21 +123,22 @@ export class RoleService {
   async remove(id: string) {
     const roleToDelete = await this.findOne(id);
 
-    // 🔒 Evitar eliminar roles críticos
-    if (roleToDelete.name === 'user' || roleToDelete.name === 'admin') {
+    if (
+      roleToDelete.name === 'user' ||
+      roleToDelete.name === 'admin' ||
+      roleToDelete.name === 'empleado'
+    ) {
       throw new BadRequestException(
-        'Los roles "user" y "admin" no pueden ser eliminados.',
+        'Los roles "user", "empleado" y "admin" no pueden ser eliminados.',
       );
     }
 
-    // ⚠️ Solo se puede eliminar si está desactivado
     if (roleToDelete.isActive) {
       throw new BadRequestException(
         'Debes desactivar el rol antes de eliminarlo.',
       );
     }
 
-    // 🔍 Buscar rol por defecto "user"
     const defaultRole = await this.roleRepository.findOne({
       where: { name: 'user', isActive: true },
     });
@@ -140,14 +148,13 @@ export class RoleService {
       );
     }
 
-    // 🔄 Buscar y reasignar usuarios que tengan este rol
     const usersWithRole = await this.userRepository.find({
-      where: { roles: { id } }, // Usa "roles" si tu relación es ManyToMany
-      relations: ['role'],
+      where: { roles: { id } },
+      relations: ['roles'],
     });
 
     for (const user of usersWithRole) {
-      user.roles = defaultRole; // ⚠️ Asegúrate de usar el nombre correcto en tu entidad User
+      user.roles = defaultRole;
       await this.userRepository.save(user);
     }
 

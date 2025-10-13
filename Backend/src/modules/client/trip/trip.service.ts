@@ -100,7 +100,7 @@ export class TripService {
       arrival_time: arrivalDate,
       available_seats: availableSeats,
       bus,
-      route:{},
+      route: route,
     });
 
     return this.tripRepository.save(trip);

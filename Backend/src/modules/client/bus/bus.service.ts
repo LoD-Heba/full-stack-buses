@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -14,6 +15,7 @@ import { SeatStack } from '../seat-stacks/entities/seat-stack.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
 import { TripStatus, TicketStatus } from 'src/common/enums/status.enum';
+import { Route } from '../route/entities/route.entity';
 
 @Injectable()
 export class BusService {
@@ -26,6 +28,9 @@ export class BusService {
 
     @InjectRepository(SeatStack)
     private readonly seatStackRepository: Repository<SeatStack>,
+
+    @InjectRepository(Route)
+    private readonly routeRepository: Repository<Route>,
   ) {}
 
   async create(createBusDto: CreateBusDto): Promise<Bus> {
@@ -33,9 +38,7 @@ export class BusService {
 
     // Validar que el usuario existe y está activo
     const user = await this.findUser(userId);
-    // Validar que el bus existe y está activo
 
-    // Validar que la ruta existe
     // Verificar placa única (case-insensitive)
     const existsPlate = await this.busRepository.findOne({
       where: { plate: createBusDto.plate.toUpperCase() },
@@ -65,7 +68,7 @@ export class BusService {
     // Crear el bus
     const newBus = this.busRepository.create({
       ...busData,
-      plate: busData.plate.toUpperCase(), 
+      plate: busData.plate.toUpperCase(),
       user,
       stacks,
     });
@@ -344,9 +347,52 @@ export class BusService {
     }
 
     // Soft delete
-    await this.busRepository.update(id, { is_active: false });
+    await this.busRepository.update(id, {
+      is_active: false,
+      status: BusStatus.FUERA_DE_SERVICIO,
+    });
 
     return { ...bus, is_active: false };
+  }
+
+  async hardDelete(id: string): Promise<void> {
+    const bus = await this.findOne(id);
+
+    // Verificar que NO tenga NINGÚN viaje (ni completados)
+    if (bus.trips && bus.trips.length > 0) {
+      throw new BadRequestException(
+        'No se puede eliminar permanentemente un bus con historial de viajes',
+      );
+    }
+
+    // Verificar que NO tenga tickets relacionados
+    const hasTickets = await this.busRepository
+      .createQueryBuilder('bus')
+      .leftJoin('bus.trips', 'trips')
+      .leftJoin('trips.tickets', 'tickets')
+      .where('bus.id = :id', { id })
+      .andWhere('tickets.ticket_id IS NOT NULL')
+      .getCount();
+
+    if (hasTickets > 0) {
+      throw new BadRequestException(
+        'No se puede eliminar un bus con historial de tickets',
+      );
+    }
+
+    // Desvincular de rutas (relación many-to-many)
+    const routes = await this.routeRepository.find({
+      where: { buses: { id } },
+      relations: ['buses'],
+    });
+
+    for (const route of routes) {
+      route.buses = route.buses.filter((b) => b.id !== id);
+      await this.routeRepository.save(route);
+    }
+
+    // Eliminar permanentemente
+    await this.busRepository.remove(bus);
   }
 
   async changeStatus(id: string, status: BusStatus): Promise<Bus> {
@@ -427,12 +473,18 @@ export class BusService {
   private async findUser(userId: string): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id: userId, isActive: true },
+      relations: ['roles', 'profile'], // traemos la relación Role
     });
 
     if (!user) {
       throw new NotFoundException(
-        `El usuario ${userId} no existe o no está activo`,
+        `El usuario no ha llenado su formulario`,
       );
+    }
+
+    // Validar rol
+    if (user.profile===null && user.roles.name !== 'empleado') {
+      throw new ForbiddenException(`El usuario no tiene permisos suficientes`);
     }
 
     return user;

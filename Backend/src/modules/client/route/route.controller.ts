@@ -33,7 +33,7 @@ export class RouteController {
   @Get('search')
   search(
     @Query() searchDto: SearchRoutesDto,
-    @Query() paginationDto: PaginationDto
+    @Query() paginationDto: PaginationDto,
   ) {
     return this.routeService.search(searchDto, paginationDto);
   }
@@ -46,11 +46,14 @@ export class RouteController {
   @Get('city/:cityId')
   findByCity(
     @Param('cityId', ParseUUIDPipe) cityId: string,
-    @Query('type') type?: 'origin' | 'destination' | 'both'
+    @Query('type') type?: 'origin' | 'destination' | 'both',
   ) {
     return this.routeService.findByCity(cityId, type);
   }
-
+  @Get(':id/buses')
+  getBusesForRoute(@Param('id', ParseUUIDPipe) id: string) {
+    return this.routeService.getBusesForRoute(id);
+  }
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.routeService.findOne(id);
@@ -64,7 +67,7 @@ export class RouteController {
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateRouteDto: UpdateRouteDto
+    @Body() updateRouteDto: UpdateRouteDto,
   ) {
     return this.routeService.update(id, updateRouteDto);
   }
@@ -72,7 +75,7 @@ export class RouteController {
   @Post(':routeId/buses/:busId')
   assignBus(
     @Param('routeId', ParseUUIDPipe) routeId: string,
-    @Param('busId', ParseUUIDPipe) busId: string
+    @Param('busId', ParseUUIDPipe) busId: string,
   ) {
     return this.routeService.assignBus(routeId, busId);
   }
@@ -80,7 +83,7 @@ export class RouteController {
   @Delete(':routeId/buses/:busId')
   removeBus(
     @Param('routeId', ParseUUIDPipe) routeId: string,
-    @Param('busId', ParseUUIDPipe) busId: string
+    @Param('busId', ParseUUIDPipe) busId: string,
   ) {
     return this.routeService.removeBus(routeId, busId);
   }

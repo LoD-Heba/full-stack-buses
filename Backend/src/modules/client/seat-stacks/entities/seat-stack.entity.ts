@@ -15,14 +15,19 @@ export class SeatStack {
   id: string;
 
   @Column()
-  name:string
+  name: string;
 
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @OneToMany(() => Seat, (seat) => seat.stacks)
+  // ✅ IMPORTANTE: cascade: ['remove'] permite eliminar seats automáticamente
+  @OneToMany(() => Seat, (seat) => seat.stacks, {
+    cascade: ['remove'], // Elimina seats cuando se elimina el stack
+  })
   seats: Seat[];
 
+  // ⚠️ CRÍTICO: Sin cascade en esta dirección
+  // El bus NO se elimina cuando se elimina el stack
   @OneToOne(() => Bus, (bus) => bus.stacks)
   bus: Bus;
 }

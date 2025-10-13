@@ -131,9 +131,7 @@ export class UserProfileService {
   async remove(id: string): Promise<void> {
     const userProfile = await this.findOne(id);
     
-    // Soft delete
-    userProfile.isActive = false;
-    await this.userProfileRepository.save(userProfile);
+    await this.userProfileRepository.remove(userProfile);
   }
 
   async toggleActive(id: string): Promise<UserProfile> {

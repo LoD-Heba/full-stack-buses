@@ -350,6 +350,9 @@ export class RouteService {
           trip.status === TripStatus.IN_PROGRESS,
       ) || [];
 
+    route.buses = [];
+    await this.routeRepository.save(route);
+
     if (activeTrips.length > 0) {
       throw new BadRequestException(
         'No se puede eliminar una ruta que tiene viajes programados o en progreso',
@@ -404,7 +407,32 @@ export class RouteService {
 
     return this.findOne(routeId);
   }
+  //////////////////////////////////////////////////////////
+  async getBusesForRoute(routeId: string): Promise<Bus[]> {
+    const route = await this.routeRepository.findOne({
+      where: { id: routeId, is_active: true },
+      relations: {
+        buses: {
+          stacks: {
+            seats: true,
+          },
+        },
+      },
+    });
 
+    if (!route) {
+      throw new NotFoundException(`La ruta ${routeId} no existe`);
+    }
+
+    // Filtrar solo buses que tengan stacks con asientos activos
+    return route.buses.filter((bus) => {
+      const hasStack = !!bus.stacks;
+      const hasActiveSeats =
+        bus.stacks?.seats?.filter((seat) => seat.is_active).length > 0;
+      return bus.is_active && hasStack && hasActiveSeats;
+    });
+  }
+  ///////////////////////////////////////////////////////////////
   async removeBus(routeId: string, busId: string): Promise<Route> {
     const route = await this.routeRepository.findOne({
       where: { id: routeId },
