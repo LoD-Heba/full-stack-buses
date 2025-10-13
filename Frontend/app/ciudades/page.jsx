@@ -21,7 +21,7 @@ export default function CiudadesPage() {
                 {ciudad.nombre}
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent>  
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-600">Departamento</span>

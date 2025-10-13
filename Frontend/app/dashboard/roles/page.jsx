@@ -59,11 +59,12 @@ export default function RolesPage() {
     try {
       const res = await deleteRole(item.id);
 
-      if (res && res.id) {
+      if (res) {
         toast.success(`Rol ${item.nombre} eliminado`);
         fetchRolesList();
       } else {
         toast.error("No se pudo eliminar el rol");
+        
       }
     } catch (error) {
       console.error(error);

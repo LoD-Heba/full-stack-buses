@@ -52,6 +52,20 @@ export default function BusSeatDesigner() {
 
   useEffect(() => {
     fetchBuses();
+
+    // 🆕 Verificar si hay un busId en localStorage
+    const savedBusId = localStorage.getItem("configureBusId");
+    if (savedBusId) {
+      // Pequeño delay para asegurar que los buses se cargaron
+      setTimeout(() => {
+        loadExistingConfig(savedBusId);
+        localStorage.removeItem("configureBusId");
+        showAlert(
+          "✓ Bus cargado automáticamente. Configura los asientos.",
+          "success"
+        );
+      }, 500);
+    }
   }, []);
 
   const showAlert = (message, type = "success") => {
@@ -181,54 +195,59 @@ export default function BusSeatDesigner() {
   };
 
   const generateSeats = () => {
-  const floor1Seats = [];
-  const floor2Seats = [];
-  
-  for (let row = 1; row <= config.rows; row++) {
-    for (let col = 1; col <= config.columns; col++) {
-      const middleCol = Math.ceil(config.columns / 2);
-      if (config.columns >= 4 && col === middleCol) continue;
-      
-      const seatNumber = floor1Seats.length + 1;
-      floor1Seats.push({
-        id: `F1-${row}-${col}`,
-        seat_number: seatNumber,
-        seat_code: `S${seatNumber.toString().padStart(2, '0')}`,
-        row,
-        col,
-        deck: 1, // ASEGURAR que siempre tenga deck
-        type: config.busType,
-        is_active: true,
-        status: 'available'
-      });
-    }
-  }
+    const floor1Seats = [];
+    const floor2Seats = [];
 
-  if (config.hasSecondFloor) {
-    for (let row = 1; row <= config.secondFloorRows; row++) {
+    for (let row = 1; row <= config.rows; row++) {
       for (let col = 1; col <= config.columns; col++) {
         const middleCol = Math.ceil(config.columns / 2);
         if (config.columns >= 4 && col === middleCol) continue;
-        
-        const seatNumber = floor2Seats.length + 1;
-        floor2Seats.push({
-          id: `F2-${row}-${col}`,
-          seat_number: seatNumber + floor1Seats.length,
-          seat_code: `S${(seatNumber + floor1Seats.length).toString().padStart(2, '0')}`,
+
+        const seatNumber = floor1Seats.length + 1;
+        floor1Seats.push({
+          id: `F1-${row}-${col}`,
+          seat_number: seatNumber,
+          seat_code: `S${seatNumber.toString().padStart(2, "0")}`,
           row,
           col,
-          deck: 2, // ASEGURAR que siempre tenga deck
+          deck: 1, // ASEGURAR que siempre tenga deck
           type: config.busType,
           is_active: true,
-          status: 'available'
+          status: "available",
         });
       }
     }
-  }
 
-  setSeats({ floor1: floor1Seats, floor2: floor2Seats });
-  showAlert(`✓ ${floor1Seats.length + floor2Seats.length} asientos generados`, 'success');
-};
+    if (config.hasSecondFloor) {
+      for (let row = 1; row <= config.secondFloorRows; row++) {
+        for (let col = 1; col <= config.columns; col++) {
+          const middleCol = Math.ceil(config.columns / 2);
+          if (config.columns >= 4 && col === middleCol) continue;
+
+          const seatNumber = floor2Seats.length + 1;
+          floor2Seats.push({
+            id: `F2-${row}-${col}`,
+            seat_number: seatNumber + floor1Seats.length,
+            seat_code: `S${(seatNumber + floor1Seats.length)
+              .toString()
+              .padStart(2, "0")}`,
+            row,
+            col,
+            deck: 2, // ASEGURAR que siempre tenga deck
+            type: config.busType,
+            is_active: true,
+            status: "available",
+          });
+        }
+      }
+    }
+
+    setSeats({ floor1: floor1Seats, floor2: floor2Seats });
+    showAlert(
+      `✓ ${floor1Seats.length + floor2Seats.length} asientos generados`,
+      "success"
+    );
+  };
 
   const saveSeatsToBackend = async () => {
     // Validaciones

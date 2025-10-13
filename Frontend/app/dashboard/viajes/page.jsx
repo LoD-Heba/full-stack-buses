@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useSearchParams, useRouter } from "next/navigation";
+
 import {
   Dialog,
   DialogContent,
@@ -44,6 +45,7 @@ const API_URL =
 export default function TripsManagement() {
   const [trips, setTrips] = useState([]);
   const [buses, setBuses] = useState([]);
+  const [filteredBuses, setFilteredBuses] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -55,11 +57,13 @@ export default function TripsManagement() {
   const clientId = searchParams.get("clientId");
   const [selectedClient, setSelectedClient] = useState(null);
   const [selectedTripForTicket, setSelectedTripForTicket] = useState(null);
+
   const [alert, setAlert] = useState({
     show: false,
     message: "",
     type: "success",
   });
+
   const router = useRouter();
   const fetchBuses = async () => {
     try {
@@ -140,7 +144,6 @@ export default function TripsManagement() {
 
   const handleSubmit = async () => {
     try {
-      // ====== AGREGAR VALIDACIONES ======
       // Validar que la fecha de salida no sea en el pasado
       const departureDate = new Date(formData.departure_time);
       const now = new Date();
@@ -172,7 +175,23 @@ export default function TripsManagement() {
           ? `${API_URL}/trips`
           : `${API_URL}/trips/${selectedTrip.id}`;
 
-      // ... resto del código existente
+      const method = modalMode === "create" ? "POST" : "PATCH";
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Error al guardar");
+      }
+      showAlert(
+        modalMode === "create"
+          ? "Viaje creado exitosamente"
+          : "Viaje actualizado exitosamente"
+      );
+      setIsModalOpen(false);
+      fetchTrips();
     } catch (error) {
       showAlert(error.message, "error");
     }
@@ -306,7 +325,34 @@ export default function TripsManagement() {
       setLoading(false);
     }
   };
+  ////////////////////////////////////////////////////
+  useEffect(() => {
+    const loadBusesForRoute = async () => {
+      if (formData.routeId) {
+        try {
+          const response = await fetch(
+            `${API_URL}/routes/${formData.routeId}/buses`
+          );
+          const data = await response.json();
+          setFilteredBuses(data || []);
 
+          // Limpiar bus seleccionado si ya no está disponible
+          if (formData.busId && !data.find((b) => b.id === formData.busId)) {
+            setFormData((prev) => ({ ...prev, busId: "" }));
+          }
+        } catch (error) {
+          console.error("Error al cargar buses de la ruta:", error);
+          setFilteredBuses([]);
+        }
+      } else {
+        setFilteredBuses([]);
+        setFormData((prev) => ({ ...prev, busId: "" }));
+      }
+    };
+
+    loadBusesForRoute();
+  }, [formData.routeId]);
+  /////////////////////////////////////////////////////////
   return (
     <div className="space-y-6">
       {alert.show && (
@@ -390,9 +436,9 @@ export default function TripsManagement() {
                 <Label htmlFor="routeId">Ruta *</Label>
                 <Select
                   value={formData.routeId}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, routeId: value })
-                  }
+                  onValueChange={(value) => {
+                    setFormData({ ...formData, routeId: value, busId: "" }); // Limpiar bus al cambiar ruta
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar ruta" />
@@ -400,7 +446,12 @@ export default function TripsManagement() {
                   <SelectContent>
                     {routes.map((route) => (
                       <SelectItem key={route.id} value={route.id}>
-                        {route.name}
+                        <div className="flex flex-col">
+                          <span>{route.name}</span>
+                          <span className="text-xs text-gray-500">
+                            {route.buses?.length || 0} bus(es) asignado(s)
+                          </span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -414,20 +465,47 @@ export default function TripsManagement() {
                   onValueChange={(value) =>
                     setFormData({ ...formData, busId: value })
                   }
+                  disabled={!formData.routeId} // Deshabilitar si no hay ruta
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar bus" />
+                    <SelectValue
+                      placeholder={
+                        !formData.routeId
+                          ? "Primero seleccione una ruta"
+                          : filteredBuses.length === 0
+                          ? "No hay buses disponibles"
+                          : "Seleccionar bus"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {buses.map((bus) => (
-                      <SelectItem key={bus.id} value={bus.id}>
-                        {bus.license_plate} - {bus.model}
-                      </SelectItem>
-                    ))}
+                    {filteredBuses.length === 0 && formData.routeId ? (
+                      <div className="p-2 text-center text-gray-500 text-sm">
+                        No hay buses asignados a esta ruta con asientos
+                        configurados
+                      </div>
+                    ) : (
+                      filteredBuses.map((bus) => (
+                        <SelectItem key={bus.id} value={bus.id}>
+                          {bus.plate} - {bus.model}
+                          <span className="text-xs text-gray-500 ml-2">
+                            (
+                            {bus.stacks?.seats?.filter((s) => s.is_active)
+                              .length || 0}{" "}
+                            asientos)
+                          </span>
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
+                {formData.routeId && filteredBuses.length === 0 && (
+                  <p className="text-yellow-600 text-xs mt-1">
+                    ⚠️ Esta ruta no tiene buses asignados con asientos
+                    configurados
+                  </p>
+                )}
               </div>
-
               <div>
                 <Label htmlFor="departure_time">Fecha de Salida *</Label>
                 <Input
@@ -830,7 +908,7 @@ export default function TripsManagement() {
                                 size="sm"
                                 onClick={() => {
                                   router.push(
-                                    `/dashboard/seat?clientId=${clientId}&tripId=${trip.id}`
+                                    `/dashboard/asientos?clientId=${clientId}&tripId=${trip.id}`
                                   );
                                 }}
                                 className="bg-green-600 hover:bg-green-700 text-white"

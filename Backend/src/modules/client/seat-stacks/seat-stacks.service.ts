@@ -77,7 +77,6 @@ export class SeatStacksService {
 
     let busId: string | null = null;
 
-    // 🔧 CRÍTICO: Desvincular el bus ANTES de eliminar
     if (seatStack.bus) {
       busId = seatStack.bus.id;
       

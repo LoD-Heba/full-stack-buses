@@ -25,7 +25,6 @@ export default function SeatStacksPage() {
       const stacksData = stacksArray.map((stack) => ({
         id: stack.id,
         nombre: stack.name,
-        capacidad: stack.capacity ?? "—",
         asientos: stack.seats?.length || 0,
       }));
 
@@ -79,7 +78,6 @@ export default function SeatStacksPage() {
       title="Gestión de Pilas de Asientos"
       columns={[
         { key: "nombre", label: "Nombre" },
-        { key: "capacidad", label: "Capacidad" },
         {
           key: "asientos",
           label: "Asientos",

@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createBus, updateBus } from "../api/api-buses";
-import { Loader2, Upload, X, Bus as BusIcon } from "lucide-react";
+import { Loader2, Upload, X, Bus as BusIcon, Settings } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
 
@@ -46,10 +46,12 @@ export function BusForm({ bus }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [imageFile, setImageFile] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [savedBusId, setSavedBusId] = useState(null);
   const router = useRouter();
 
   const isEditing = !!bus;
-
   const currentYear = new Date().getFullYear();
 
   const {
@@ -68,12 +70,34 @@ export function BusForm({ bus }) {
       amenities: "",
       status: BUS_STATUSES.DISPONIBLE,
       userId: "",
-      stackId: "",
     },
   });
 
   const selectedServiceType = watch("service_type");
   const selectedStatus = watch("status");
+  const selectedUserId = watch("userId");
+
+  // 🆕 Cargar usuarios disponibles
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoadingUsers(true);
+      const response = await fetch("http://localhost:3001/api/v1/users?limit=100");
+      const data = await response.json();
+      
+      // Filtrar solo usuarios activos
+      const activeUsers = (data.data || []).filter(user => user.isActive);
+      setUsers(activeUsers);
+    } catch (error) {
+      console.error("Error al cargar usuarios:", error);
+      toast.error("Error al cargar la lista de usuarios");
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   // Cargar datos del bus en modo edición
   useEffect(() => {
@@ -85,15 +109,16 @@ export function BusForm({ bus }) {
         service_type: bus.service_type || SERVICE_TYPES.NORMAL,
         amenities: bus.amenities || "",
         status: bus.status || BUS_STATUSES.DISPONIBLE,
-        userId: bus.user?.id || bus.userId || "",
-        stackId: bus.stacks?.id || bus.stackId || "",
+        userId: bus.user?.id || "",
       });
+
+      setSavedBusId(bus.id);
 
       // Cargar imagen existente
       if (bus.image_url) {
         const imageUrl = bus.image_url.startsWith("http")
           ? bus.image_url
-          : `http://localhost:3001/api/v1/${bus.image_url}`;
+          : `http://localhost:3001${bus.image_url}`;
         setImagePreview(imageUrl);
       }
     }
@@ -156,6 +181,17 @@ export function BusForm({ bus }) {
     }
   };
 
+  // 🆕 Redirigir al configurador de asientos
+  const handleConfigureSeats = () => {
+    if (savedBusId) {
+      // Guardar el ID en localStorage para usarlo en la página de asientos
+      localStorage.setItem("configureBusId", savedBusId);
+      router.push("/dashboard/asientos");
+    } else {
+      toast.error("Debes guardar el bus primero antes de configurar los asientos");
+    }
+  };
+
   const onSubmit = handleSubmit(async (data) => {
     try {
       setIsSubmitting(true);
@@ -178,7 +214,6 @@ export function BusForm({ bus }) {
         amenities: data.amenities?.trim() || undefined,
         status: data.status,
         userId: data.userId.trim(),
-        stackId: data.stackId?.trim() || undefined,
       };
 
       // Remover undefined
@@ -189,8 +224,10 @@ export function BusForm({ bus }) {
       let res;
       if (isEditing) {
         res = await updateBus(bus.id, formattedData);
+        setSavedBusId(bus.id);
       } else {
         res = await createBus(formattedData);
+        setSavedBusId(res.id);
       }
 
       // Subir imagen si existe
@@ -204,10 +241,16 @@ export function BusForm({ bus }) {
       }
 
       toast.success(
-        isEditing ? "Bus actualizado exitosamente" : "Bus creado exitosamente"
+        isEditing 
+          ? "Bus actualizado exitosamente" 
+          : "Bus creado exitosamente. Ahora puedes configurar los asientos."
       );
-      router.push("/dashboard/buses");
-      router.refresh();
+
+      // Si es creación, no redirigir inmediatamente para permitir configurar asientos
+      if (isEditing) {
+        router.push("/dashboard/buses");
+        router.refresh();
+      }
     } catch (err) {
       console.error("Error en onSubmit:", err);
 
@@ -221,7 +264,7 @@ export function BusForm({ bus }) {
         err.message.includes("usuario") ||
         err.message.includes("user")
       ) {
-        errorMessage = "El usuario no existe o no está activo";
+        errorMessage = "El usuario no ha llenado su formulario";
       } else if (err.message) {
         errorMessage = err.message;
       }
@@ -301,12 +344,14 @@ export function BusForm({ bus }) {
           {/* Información Básica */}
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Información Basica</CardTitle>
+              <CardTitle>Información Básica</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="plate">Placa</Label>
+                  <Label htmlFor="plate">
+                    Placa <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="plate"
                     {...register("plate", {
@@ -330,7 +375,9 @@ export function BusForm({ bus }) {
                 </div>
 
                 <div>
-                  <Label htmlFor="model">Modelo</Label>
+                  <Label htmlFor="model">
+                    Modelo <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     id="model"
                     {...register("model", {
@@ -355,7 +402,7 @@ export function BusForm({ bus }) {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="year">Año</Label>
+                  <Label htmlFor="year">Año (opcional)</Label>
                   <Input
                     id="year"
                     type="number"
@@ -377,7 +424,9 @@ export function BusForm({ bus }) {
                 </div>
 
                 <div>
-                  <Label htmlFor="service_type">Tipo de servicio</Label>
+                  <Label htmlFor="service_type">
+                    Tipo de servicio <span className="text-red-500">*</span>
+                  </Label>
                   <Select
                     value={selectedServiceType}
                     onValueChange={(val) => setValue("service_type", val)}
@@ -400,7 +449,7 @@ export function BusForm({ bus }) {
               </div>
 
               <div>
-                <Label htmlFor="amenities">Amenidades</Label>
+                <Label htmlFor="amenities">Amenidades (opcional)</Label>
                 <Textarea
                   id="amenities"
                   {...register("amenities", {
@@ -440,55 +489,92 @@ export function BusForm({ bus }) {
           </Card>
         </div>
 
-        {/* Asignación */}
+        {/* 🆕 Asignación mejorada */}
         <Card>
           <CardHeader>
-            <CardTitle>Asignación</CardTitle>
+            <CardTitle>Asignación y Configuración</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
+          <CardContent className="space-y-4">
             <div>
               <Label htmlFor="userId">
-                ID del Usuario <span className="text-red-500">*</span>
+                Usuario Responsable <span className="text-red-500">*</span>
               </Label>
-              <Input
-                id="userId"
-                {...register("userId", {
-                  required: "El usuario es obligatorio",
-                  pattern: {
-                    value:
-                      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-                    message: "ARREGLAR",
-                  },
-                })}
-                placeholder="ARRHLAR"
-                className={errors.userId ? "border-red-500" : ""}
-              />
+              {loadingUsers ? (
+                <div className="flex items-center gap-2 text-gray-500 text-sm py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Cargando usuarios...
+                </div>
+              ) : (
+                <Select
+                  value={selectedUserId}
+                  onValueChange={(val) => setValue("userId", val)}
+                >
+                  <SelectTrigger id="userId" className={errors.userId ? "border-red-500" : ""}>
+                    <SelectValue placeholder="Selecciona un usuario" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.length === 0 ? (
+                      <div className="p-2 text-center text-sm text-gray-500">
+                        No hay usuarios disponibles
+                      </div>
+                    ) : (
+                      users.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.email || user.username} 
+                          {user.profile?.firstName && ` - ${user.profile.firstName} ${user.profile.lastName || ''}`}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
               {errors.userId && (
                 <p className="text-red-500 text-sm mt-1">
-                  {errors.userId.message}
+                  Debes seleccionar un usuario responsable
                 </p>
               )}
+              <input
+                type="hidden"
+                {...register("userId", {
+                  required: "El usuario es obligatorio",
+                })}
+              />
             </div>
 
-            <div>
-              <Label htmlFor="stackId">ID del Stack (opcional)</Label>
-              <Input
-                id="stackId"
-                {...register("stackId", {
-                  pattern: {
-                    value:
-                      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-                    message: "UUID inválido",
-                  },
-                })}
-                placeholder="ARREGLAR"
-                className={errors.stackId ? "border-red-500" : ""}
-              />
-              {errors.stackId && (
-                <p className="text-red-500 text-sm mt-1">
-                  {errors.stackId.message}
-                </p>
-              )}
+            {/* 🆕 Configuración de Asientos */}
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-base font-semibold">
+                    Configuración de Asientos
+                  </Label>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {bus?.stacks?.id ? (
+                      <span className="text-green-600">
+                        ✓ Asientos configurados ({bus.capacity || 0} asientos)
+                      </span>
+                    ) : savedBusId ? (
+                      <span className="text-yellow-600">
+                        ⚠ Sin configurar. Configura los asientos ahora.
+                      </span>
+                    ) : (
+                      <span className="text-gray-500">
+                        Guarda el bus primero para configurar asientos
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleConfigureSeats}
+                  disabled={!savedBusId}
+                  className="gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  {bus?.stacks?.id ? "Editar Asientos" : "Configurar Asientos"}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -498,18 +584,17 @@ export function BusForm({ bus }) {
           <Card className="border-yellow-200 bg-yellow-50">
             <CardContent className="pt-6">
               <p className="text-sm text-yellow-800">
-                 El bus está en uso. No se pueden modificar datos básicos
+                ⚠ El bus está en uso. No se pueden modificar datos básicos (placa, modelo, tipo de servicio)
               </p>
             </CardContent>
           </Card>
         )}
 
-        {/* Advertencias */}
-        {isEditing && bus?.status === BUS_STATUSES.EN_USO && (
-          <Card className="border-yellow-200 bg-yellow-50">
+        {!isEditing && savedBusId && (
+          <Card className="border-blue-200 bg-blue-50">
             <CardContent className="pt-6">
-              <p className="text-sm text-yellow-800">
-                El bus está en uso. No se pueden modificar datos básicos
+              <p className="text-sm text-blue-800">
+                ✓ Bus guardado exitosamente. Ahora puedes configurar los asientos usando el botón "Configurar Asientos"
               </p>
             </CardContent>
           </Card>
@@ -527,7 +612,7 @@ export function BusForm({ bus }) {
         <div className="flex justify-between items-center">
           <Link href="/dashboard/buses">
             <Button type="button" variant="outline">
-              Cancelar
+              {savedBusId && !isEditing ? "Volver a Buses" : "Cancelar"}
             </Button>
           </Link>
           <Button type="submit" disabled={isSubmitting}>
@@ -538,8 +623,10 @@ export function BusForm({ bus }) {
               </>
             ) : isEditing ? (
               "Actualizar Bus"
+            ) : savedBusId ? (
+              "Bus Guardado ✓"
             ) : (
-              "Registrar Bus"
+              "Guardar Bus"
             )}
           </Button>
         </div>

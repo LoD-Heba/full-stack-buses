@@ -23,7 +23,7 @@ export default function DashboardSidebar() {
   const router = useRouter();
 
   return (
-    <aside className="w-52 bg-black min-h-screen">
+    <aside className="w-52 min-h-screen">
       <div className="p-6">
         <h2 className="text-xl font-bold mb-2">Dashboard</h2>
         <p className="text-xs text-gray-400">Panel de Administración</p>
@@ -37,7 +37,7 @@ export default function DashboardSidebar() {
         </Button>
       </div>
 
-      <nav className="px-3 bg-black ">
+      <nav className="px-3 ">
         {menuItems.map((item) => {
           const isActive = pathname === item.href;
 
