@@ -5,7 +5,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { News } from './entities/news.entity';
 import { Repository } from 'typeorm';
 import { User } from 'src/modules/admin/user/entities/user.entity';
-import { UserProfile } from 'src/modules/admin/user-profile/entities/user-profile.entity';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class NewsService {
@@ -17,24 +18,25 @@ export class NewsService {
     private readonly userRepository: Repository<User>,
   ) {}
 
-  async create(createNewsDto: CreateNewsDto) {
+  async create(createNewsDto: CreateNewsDto, file?: Express.Multer.File) {
     const { userIds, ...newsData } = createNewsDto;
     const user = await this.findUser(userIds);
 
     const newNews = this.newsRepository.create({
       ...newsData,
       user,
+      image_url: file ? `/uploads/news/${file.filename}` : undefined,
     });
+    
     return this.newsRepository.save(newNews);
   }
 
   findAll() {
-    const getNews = this.newsRepository.find({
+    return this.newsRepository.find({
       where: { user: { isActive: true } },
       relations: { user: true },
       order: { created_at: 'DESC' },
     });
-    return getNews;
   }
 
   async findOne(id: string): Promise<News> {
@@ -42,51 +44,65 @@ export class NewsService {
       where: { id },
       relations: { user: true },
     });
+    
     if (!findNew) {
       throw new NotFoundException('La id no existe');
     }
+    
     return findNew;
   }
 
-async update(id: string, updateNewsDto: UpdateNewsDto) {
-  const { userIds, ...newsData } = updateNewsDto;
+  async update(id: string, updateNewsDto: UpdateNewsDto, file?: Express.Multer.File) {
+    const { userIds, ...newsData } = updateNewsDto;
 
-  // 1. Buscar la noticia existente (y cargar su usuario actual si existe)
-  const existingNews = await this.newsRepository.findOne({
-    where: { id },
-    relations: { user: true }, // ← Carga la relación para mostrarla después
-  });
+    const existingNews = await this.newsRepository.findOne({
+      where: { id },
+      relations: { user: true },
+    });
 
-  if (!existingNews) {
-    throw new NotFoundException(`Noticia con ID ${id} no encontrada`);
-  }
-
-  // 2. Si se envía userIds, actualizar la relación
-  if (userIds !== undefined) {
-    const user = await this.userRepository.findOneBy({ id: userIds });
-    if (!user) {
-      throw new NotFoundException(`Usuario con ID ${userIds} no encontrado`);
+    if (!existingNews) {
+      throw new NotFoundException(`Noticia con ID ${id} no encontrada`);
     }
-    existingNews.user = user; 
+
+    // Si se envía un nuevo archivo, eliminar el anterior
+    if (file && existingNews.image_url) {
+      this.deleteImage(existingNews.image_url);
+    }
+
+    // Actualizar usuario si se proporciona
+    if (userIds !== undefined) {
+      const user = await this.userRepository.findOneBy({ id: userIds });
+      if (!user) {
+        throw new NotFoundException(`Usuario con ID ${userIds} no encontrado`);
+      }
+      existingNews.user = user;
+    }
+
+    // Actualizar campos
+    Object.assign(existingNews, newsData);
+    
+    // Actualizar imagen si se proporciona nueva
+    if (file) {
+      existingNews.image_url = `/uploads/news/${file.filename}`;
+    }
+
+    const updatedNews = await this.newsRepository.save(existingNews);
+
+    return await this.newsRepository.findOne({
+      where: { id: updatedNews.id },
+      relations: { user: true },
+    });
   }
-
-  // 3. Actualizar los demás campos
-  Object.assign(existingNews, newsData); 
-
-  // 4. Guardar y devolver con la relación cargada
-  const updatedNews = await this.newsRepository.save(existingNews);
-
-  // 5. Volver a cargar la relación para asegurar que se incluya en la respuesta
-  return await this.newsRepository.findOne({
-    where: { id: updatedNews.id },
-    relations: { user: true },
-  });
-}
 
   async remove(id: string) {
-    await this.findOne(id)
-    const deleteNew = await this.newsRepository.delete(id)
-    return deleteNew
+    const news = await this.findOne(id);
+    
+    // Eliminar imagen si existe
+    if (news.image_url) {
+      this.deleteImage(news.image_url);
+    }
+    
+    return await this.newsRepository.delete(id);
   }
 
   ////////////////////Metodos auxiliares
@@ -95,8 +111,21 @@ async update(id: string, updateNewsDto: UpdateNewsDto) {
       id: userIds,
       isActive: true,
     });
+    
     if (!findUser)
       throw new NotFoundException('El usuario no existe o está inactivo');
+      
     return findUser;
+  }
+
+  private deleteImage(imageUrl: string) {
+    try {
+      const imagePath = path.join(process.cwd(), imageUrl);
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    } catch (error) {
+      console.error('Error al eliminar imagen:', error);
+    }
   }
 }

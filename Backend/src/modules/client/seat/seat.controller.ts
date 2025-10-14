@@ -8,6 +8,7 @@ import {
   Delete,
   ParseIntPipe,
   Query,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { SeatService } from './seat.service';
 import { CreateSeatDto } from './dto/create-seat.dto';
@@ -28,21 +29,21 @@ export class SeatController {
     return this.seatService.findAll(paginationDto);
   }
 
-  @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: string) {
+ @Get(':id')
+  findOne(@Param('id', ParseUUIDPipe) id: string) { 
     return this.seatService.findOne(id);
   }
 
   @Patch(':id')
   update(
-    @Param('id', ParseIntPipe) id: string,
+    @Param('id', ParseUUIDPipe) id: string, 
     @Body() updateSeatDto: UpdateSeatDto,
   ) {
     return this.seatService.update(id, updateSeatDto);
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: string) {
+  remove(@Param('id', ParseUUIDPipe) id: string) { 
     return this.seatService.remove(id);
   }
 }

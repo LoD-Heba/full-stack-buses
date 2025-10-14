@@ -19,6 +19,9 @@ export class News {
   @Column({ type: 'text' })
   content: string;
 
+  @Column({ nullable: true })
+  image_url: string;
+
   @CreateDateColumn()
   created_at: Date;
 
