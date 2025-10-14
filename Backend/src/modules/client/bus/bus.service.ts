@@ -363,7 +363,6 @@ export class BusService {
           `El bus tiene ${busAge} años de antigüedad. Solo se permiten buses con menos de 15 años en servicio`,
         );
       }
-      
     }
 
     const activeSeatsCount = bus.stacks.reduce((total, stack) => {
@@ -407,7 +406,6 @@ export class BusService {
       .where('bus.id = :id', { id })
       .getRawOne();
 
-
     return {
       bus,
       statistics: {
@@ -417,6 +415,76 @@ export class BusService {
         totalRevenue: parseFloat(stats.total_revenue) || 0,
         assignedRoutes: bus.routes?.length || 0,
       },
+    };
+  }
+
+  async getBusLayout(id: string) {
+    const bus = await this.busRepository.findOne({
+      where: { id, is_active: true },
+      relations: {
+        stacks: {
+          seats: true,
+        },
+      },
+    });
+
+    if (!bus) {
+      throw new NotFoundException(`El bus con ID ${id} no existe`);
+    }
+
+    // Si el bus no tiene stacks, retornar estructura vacía
+    if (!bus.stacks || bus.stacks.length === 0) {
+      return {
+        bus_id: bus.id,
+        plate: bus.plate,
+        model: bus.model,
+        service_type: bus.service_type,
+        floors: bus.floors || 1,
+        decks: [],
+      };
+    }
+
+    // Agrupar asientos por deck (piso)
+    const deckLayouts = bus.stacks.map((stack) => {
+      const layout =
+        stack.seats
+          ?.filter((seat) => seat.is_active)
+          .map((seat) => ({
+            id: seat.id,
+            seat_code: seat.seat_code,
+            seat_number: seat.seat_number,
+            type: seat.type,
+            position_x: seat.position_x || 0,
+            position_y: seat.position_y || 0,
+            visual_type: seat.visual_type || 'seat',
+            rotation: seat.rotation || 0,
+            deck: seat.deck || stack.floor_number || 1,
+            meta: seat.meta || {},
+          })) || [];
+
+      return {
+        deck: stack.floor_number || 1,
+        stack_id: stack.id,
+        stack_name: stack.name,
+        layout: layout.sort((a, b) => {
+          // Ordenar por position_y primero, luego position_x
+          if (a.position_y !== b.position_y) {
+            return a.position_y - b.position_y;
+          }
+          return a.position_x - b.position_x;
+        }),
+      };
+    });
+
+    return {
+      bus_id: bus.id,
+      plate: bus.plate,
+      model: bus.model,
+      service_type: bus.service_type,
+      floors: bus.floors || 1,
+      image_url: bus.image_url,
+      amenities: bus.amenities,
+      decks: deckLayouts.sort((a, b) => a.deck - b.deck),
     };
   }
 

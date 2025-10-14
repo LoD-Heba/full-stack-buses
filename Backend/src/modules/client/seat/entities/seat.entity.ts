@@ -42,6 +42,9 @@ export class Seat {
   @Column({ type: 'int', default: 0, nullable: true })
   rotation?: number;
 
+  @Column({nullable: true})
+  deck: number;
+
   @Column({ type: 'jsonb', nullable: true })
   meta?: Record<string, any>;
 
