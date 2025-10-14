@@ -367,7 +367,15 @@ export default function BusSeatDesigner() {
       }
 
       // Paso 2: Guardar todos los asientos
-      const allSeats = [...seats.floor1, ...seats.floor2];
+      // 🔥 FILTRAR SOLO LOS ASIENTOS REALES
+      const allSeats = [...seats.floor1, ...seats.floor2].filter(
+        (seat) => seat.visual_type === "seat" || !seat.visual_type
+      );
+      console.log("🔍 Primeros 3 asientos a guardar:", allSeats.slice(0, 3));
+      console.log(
+        "📦 Estructura del primer asiento:",
+        JSON.stringify(allSeats[0], null, 2)
+      );
       let savedCount = 0;
       let errorCount = 0;
 
@@ -386,12 +394,22 @@ export default function BusSeatDesigner() {
                   deck: seat.deck || 1,
                   type: seat.type,
                   is_active: seat.is_active,
+                  // 🆕 Agregar campos de posición
+                  position_x: seat.position_x || seat.col,
+                  position_y: seat.position_y || seat.row,
+                  visual_type: "seat", // Siempre 'seat' para asientos reales
+                  rotation: seat.rotation || 0,
+                  meta: seat.meta || {},
                 }),
               }
             );
 
             if (!updateRes.ok) {
-              console.error(`Error al actualizar asiento ${seat.seat_number}`);
+              const error = await updateRes.json();
+              console.error(
+                `Error al actualizar asiento ${seat.seat_number}:`,
+                error
+              );
               errorCount++;
             } else {
               savedCount++;
@@ -410,7 +428,7 @@ export default function BusSeatDesigner() {
                 is_active: seat.is_active,
                 position_x: seat.position_x || seat.col,
                 position_y: seat.position_y || seat.row,
-                visual_type: seat.visual_type || "seat",
+                visual_type: "seat", // Siempre 'seat'
                 rotation: seat.rotation || 0,
                 meta: seat.meta || {},
               }),

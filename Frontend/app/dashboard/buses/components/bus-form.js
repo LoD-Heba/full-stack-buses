@@ -85,11 +85,13 @@ export function BusForm({ bus }) {
   const fetchUsers = async () => {
     try {
       setLoadingUsers(true);
-      const response = await fetch("http://localhost:3001/api/v1/users?limit=100");
+      const response = await fetch(
+        "http://localhost:3001/api/v1/users?limit=100"
+      );
       const data = await response.json();
-      
+
       // Filtrar solo usuarios activos
-      const activeUsers = (data.data || []).filter(user => user.isActive);
+      const activeUsers = (data.data || []).filter((user) => user.isActive);
       setUsers(activeUsers);
     } catch (error) {
       console.error("Error al cargar usuarios:", error);
@@ -188,7 +190,9 @@ export function BusForm({ bus }) {
       localStorage.setItem("configureBusId", savedBusId);
       router.push("/dashboard/asientos");
     } else {
-      toast.error("Debes guardar el bus primero antes de configurar los asientos");
+      toast.error(
+        "Debes guardar el bus primero antes de configurar los asientos"
+      );
     }
   };
 
@@ -197,6 +201,27 @@ export function BusForm({ bus }) {
       setIsSubmitting(true);
       setBackendError(null);
 
+      // Validación de año (frontend)
+      if (
+        data.year &&
+        (Number(data.year) < 1950 || Number(data.year) > currentYear + 2)
+      ) {
+        setBackendError(`El año debe estar entre 1950 y ${currentYear + 2}`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Validación de antigüedad para buses en uso
+      if (data.status === BUS_STATUSES.EN_USO && data.year) {
+        const busAge = currentYear - Number(data.year);
+        if (busAge > 15) {
+          setBackendError(
+            `El bus tiene ${busAge} años de antigüedad. Solo se permiten buses con menos de 15 años en servicio activo.`
+          );
+          setIsSubmitting(false);
+          return;
+        }
+      }
       if (
         data.year &&
         (Number(data.year) < 1950 || Number(data.year) > currentYear + 2)
@@ -241,8 +266,8 @@ export function BusForm({ bus }) {
       }
 
       toast.success(
-        isEditing 
-          ? "Bus actualizado exitosamente" 
+        isEditing
+          ? "Bus actualizado exitosamente"
           : "Bus creado exitosamente. Ahora puedes configurar los asientos."
       );
 
@@ -509,7 +534,10 @@ export function BusForm({ bus }) {
                   value={selectedUserId}
                   onValueChange={(val) => setValue("userId", val)}
                 >
-                  <SelectTrigger id="userId" className={errors.userId ? "border-red-500" : ""}>
+                  <SelectTrigger
+                    id="userId"
+                    className={errors.userId ? "border-red-500" : ""}
+                  >
                     <SelectValue placeholder="Selecciona un usuario" />
                   </SelectTrigger>
                   <SelectContent>
@@ -520,8 +548,11 @@ export function BusForm({ bus }) {
                     ) : (
                       users.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
-                          {user.email || user.username} 
-                          {user.profile?.firstName && ` - ${user.profile.firstName} ${user.profile.lastName || ''}`}
+                          {user.email || user.username}
+                          {user.profile?.firstName &&
+                            ` - ${user.profile.firstName} ${
+                              user.profile.lastName || ""
+                            }`}
                         </SelectItem>
                       ))
                     )}
@@ -584,7 +615,8 @@ export function BusForm({ bus }) {
           <Card className="border-yellow-200 bg-yellow-50">
             <CardContent className="pt-6">
               <p className="text-sm text-yellow-800">
-                ⚠ El bus está en uso. No se pueden modificar datos básicos (placa, modelo, tipo de servicio)
+                ⚠ El bus está en uso. No se pueden modificar datos básicos
+                (placa, modelo, tipo de servicio)
               </p>
             </CardContent>
           </Card>
@@ -594,7 +626,8 @@ export function BusForm({ bus }) {
           <Card className="border-blue-200 bg-blue-50">
             <CardContent className="pt-6">
               <p className="text-sm text-blue-800">
-                ✓ Bus guardado exitosamente. Ahora puedes configurar los asientos usando el botón "Configurar Asientos"
+                ✓ Bus guardado exitosamente. Ahora puedes configurar los
+                asientos usando el botón "Configurar Asientos"
               </p>
             </CardContent>
           </Card>

@@ -166,7 +166,7 @@ export default function RouteForm({ initialData, onSubmit, onCancel }) {
       if (formData.description) submitData.description = formData.description;
       if (formData.base_price)
         submitData.base_price = parseFloat(formData.base_price);
-      if (selectedBuses.length > 0) submitData.busIds = selectedBuses;
+      submitData.busIds = selectedBuses;
 
       await onSubmit(submitData);
     } catch (error) {

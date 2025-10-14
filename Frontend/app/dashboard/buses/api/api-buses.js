@@ -243,3 +243,28 @@ export async function deleteBus(id) {
     throw error;
   }
 }
+
+export async function hardDeleteBus(id) {
+  try {
+    if (!id) {
+      throw new Error("ID de bus requerido");
+    }
+
+    const response = await fetch(`${BASE_URL}/${id}/hard-delete`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Error al eliminar permanentemente');
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error(`Error al eliminar permanentemente el bus ${id}:`, error);
+    throw error;
+  }
+}
