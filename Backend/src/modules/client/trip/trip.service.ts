@@ -620,31 +620,31 @@ export class TripService {
     return this.findOne(id);
   }
 
-  async completeTrip(id: string): Promise<Trip> {
-    const trip = await this.findOne(id);
+async completeTrip(id: string): Promise<Trip> {
+  const trip = await this.findOne(id);
 
-    if (trip.status !== TripStatus.IN_PROGRESS) {
-      throw new BadRequestException(
-        'Solo se pueden completar viajes en progreso',
-      );
-    }
-
-    // AGREGAR: Desactivar todos los tickets del viaje
-    if (trip.tickets && trip.tickets.length > 0) {
-      const ticketIds = trip.tickets.map((t) => t.ticket_id);
-      await this.ticketRepository.update(
-        { ticket_id: In(ticketIds) },
-        { is_active: false },
-      );
-    }
-
-    await this.tripRepository.update(id, {
-      status: TripStatus.COMPLETED,
-      is_active: false, // AGREGAR: También desactivar el viaje
-    });
-
-    return this.findOne(id);
+  if (trip.status !== TripStatus.IN_PROGRESS) {
+    throw new BadRequestException(
+      'Solo se pueden completar viajes en progreso',
+    );
   }
+
+  // Desactivar todos los tickets del viaje
+  if (trip.tickets && trip.tickets.length > 0) {
+    const ticketIds = trip.tickets.map((t) => t.ticket_id);
+    await this.ticketRepository.update(
+      { ticket_id: In(ticketIds) },
+      { is_active: false },
+    );
+  }
+
+  await this.tripRepository.update(id, {
+    status: TripStatus.COMPLETED,
+    is_active: false,
+  });
+
+  return this.findTripById(id); // ← Usar el método sin filtro is_active
+}
 
   async getTripStatistics(id: string) {
     const trip = await this.findOne(id);
@@ -755,4 +755,29 @@ export class TripService {
       available_seats: Math.max(0, available),
     });
   }
+  //////////////////////////////////
+  // Método auxiliar privado para buscar viajes sin filtro is_active
+private async findTripById(id: string): Promise<Trip> {
+  const trip = await this.tripRepository.findOne({
+    where: { id },
+    relations: {
+      bus: {
+        user: true,
+        stacks: true,
+      },
+      route: true,
+      tickets: {
+        seat: true,
+        payment: true,
+        user: true,
+      },
+    },
+  });
+
+  if (!trip) {
+    throw new NotFoundException(`El viaje con ID ${id} no existe`);
+  }
+
+  return trip;
+}
 }

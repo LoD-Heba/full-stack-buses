@@ -9,19 +9,23 @@ import {
   Max,
   MaxLength,
   Min,
+  IsObject,
 } from 'class-validator';
+
 import { Transform } from 'class-transformer';
 
 export enum SeatType {
   NORMAL = 'normal',
   SEMI_CAMA = 'semi_cama',
-  CAMA = 'cama'
+  CAMA = 'cama',
 }
 
 export class CreateSeatDto {
   @IsNotEmpty()
   @IsString()
-  @MaxLength(10, { message: 'El código de asiento no puede exceder 10 caracteres' })
+  @MaxLength(10, {
+    message: 'El código de asiento no puede exceder 10 caracteres',
+  })
   @Transform(({ value }) => value?.trim().toUpperCase())
   seat_code: string;
 
@@ -29,15 +33,37 @@ export class CreateSeatDto {
   @Min(1, { message: 'El número de asiento debe ser mayor que 0' })
   @Max(100, { message: 'El número de asiento no puede exceder 100' })
   seat_number: number;
+  @IsOptional()
+  @IsInt({ message: 'La posición X debe ser un número entero' })
+  @Min(1)
+  position_x?: number;
 
+  @IsOptional()
+  @IsInt({ message: 'La posición Y debe ser un número entero' })
+  @Min(1)
+  position_y?: number;
+
+  @IsOptional()
+  @IsString()
+  visual_type?: string; // 'seat' | 'aisle' | 'bathroom' | 'tv' | 'door'
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(360)
+  rotation?: number;
+
+  @IsOptional()
+  @IsObject()
+  meta?: Record<string, any>;
   @IsOptional()
   @IsInt({ message: 'El deck debe ser un número entero' })
   @Min(1, { message: 'El deck debe ser al menos 1' })
   @Max(2, { message: 'El deck no puede exceder 2' })
   deck?: number;
 
-  @IsEnum(SeatType, { 
-    message: 'El tipo debe ser: normal, semi_cama o cama' 
+  @IsEnum(SeatType, {
+    message: 'El tipo debe ser: normal, semi_cama o cama',
   })
   type: SeatType;
 

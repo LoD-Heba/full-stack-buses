@@ -99,4 +99,9 @@ export class BusController {
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.busService.remove(id);
   }
+
+  @Delete(':id/hard-delete')
+  hardDelete(@Param('id', ParseUUIDPipe) id: string) {
+    return this.busService.hardDelete(id);
+  }
 }

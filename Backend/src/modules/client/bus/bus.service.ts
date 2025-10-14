@@ -89,16 +89,13 @@ export class BusService {
     const take = Math.min(Math.max(limit, 1), 100);
     const skip = (page - 1) * take;
 
-    const total = await this.busRepository.count({
-      where: { is_active: true },
-    });
+    const total = await this.busRepository.count();
 
     const lastPage = Math.ceil(total / take);
     const hasNextPage = page < lastPage;
     const hasPrevPage = page > 1;
 
     const data = await this.busRepository.find({
-      where: { is_active: true },
       relations: {
         user: true,
         stacks: {
@@ -352,11 +349,17 @@ export class BusService {
       status: BusStatus.FUERA_DE_SERVICIO,
     });
 
-    return { ...bus, is_active: false };
+    return { ...bus, is_active: true };
   }
 
   async hardDelete(id: string): Promise<void> {
-    const bus = await this.findOne(id);
+    const bus = await this.busRepository.findOne({
+          where: { id, is_active:false },
+        });
+
+    if (!bus) {
+      throw new NotFoundException(`El bus con ID ${id} no existe o ya ha sido eliminado`);
+    }
 
     // Verificar que NO tenga NINGÚN viaje (ni completados)
     if (bus.trips && bus.trips.length > 0) {
@@ -400,7 +403,6 @@ export class BusService {
 
     // Validaciones según el estado
     if (status === BusStatus.EN_USO) {
-
       // Validar antiguedad de bus
       const currentYear = new Date().getFullYear();
       const busAge = currentYear - (bus.year || currentYear);
@@ -409,7 +411,7 @@ export class BusService {
           `El bus tiene ${busAge} años de antigüedad. Solo se permiten buses con menos de 15 años en servicio`,
         );
       }
-      // 
+      //
       const activeSeatsCount =
         bus.stacks.seats?.filter((s) => s.is_active).length || 0;
 

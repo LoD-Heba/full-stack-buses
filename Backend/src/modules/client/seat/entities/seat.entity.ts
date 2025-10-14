@@ -26,12 +26,27 @@ export class Seat {
   @Column({ type: 'int', nullable: true })
   deck?: number; // piso (para buses de 2 pisos)
 
-  @Column({ 
-    type: 'enum', 
+  @Column({
+    type: 'enum',
     enum: ['normal', 'semi_cama', 'cama'],
-    default: 'normal'
+    default: 'normal',
   })
   type: string;
+  
+  @Column({ type: 'int', nullable: true })
+  position_x?: number;
+
+  @Column({ type: 'int', nullable: true })
+  position_y?: number;
+
+  @Column({ type: 'varchar', default: 'seat', nullable: true })
+  visual_type?: string;
+
+  @Column({ type: 'int', default: 0, nullable: true })
+  rotation?: number;
+
+  @Column({ type: 'jsonb', nullable: true })
+  meta?: Record<string, any>;
 
   @Column({ type: 'boolean', default: true })
   is_active: boolean;
@@ -45,7 +60,7 @@ export class Seat {
   // Muchos asientos pertenecen a un Stack
   @ManyToOne(() => SeatStack, (stack) => stack.seats, {
     nullable: false,
-    onDelete: 'CASCADE'
+    onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'stack_id' })
   stacks: SeatStack;
