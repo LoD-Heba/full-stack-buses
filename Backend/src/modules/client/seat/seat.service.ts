@@ -84,7 +84,6 @@ export class SeatService {
     const seat = manager.create(Seat, {
       seat_code: seatData.seat_code.toUpperCase(),
       seat_number: seatData.seat_number,
-      deck: seatData.deck,
       type: seatData.type,
       position_x: seatData.position_x,
       position_y: seatData.position_y,
@@ -561,13 +560,6 @@ export class SeatService {
       where: { id: stackId },
       relations: { bus: true },
     });
-
-    if (stack?.bus) {
-      // Actualizar la capacidad del bus
-      await this.busRepository.update(stack.bus.id, {
-        capacity: activeSeatsCount,
-      });
-    }
   }
 
   //Metodo auxiliar
@@ -587,10 +579,5 @@ export class SeatService {
       relations: { bus: true },
     });
 
-    if (stack?.bus) {
-      await manager.update(Bus, stack.bus.id, {
-        capacity: activeSeatsCount,
-      });
-    }
   }
 }

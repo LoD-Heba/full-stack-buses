@@ -21,14 +21,48 @@ export class SeatStacksService {
     private readonly busRepository: Repository<Bus>,
   ) {}
 
-  async create(createSeatStackDto: CreateSeatStackDto) {
-    const { ...stackData } = createSeatStackDto;
+async create(createSeatStackDto: CreateSeatStackDto) {
+  const { busId, ...stackData } = createSeatStackDto;
 
-    const seatStack = this.seatStackRepository.create({ ...stackData });
+  // Validar que el bus existe
+  const bus = await this.busRepository.findOne({
+    where: { id: busId, is_active: true },
+    relations: { stacks: true }
+  });
 
-    const newStack = await this.seatStackRepository.save(seatStack);
-    return this.findOne(newStack.id);
+  if (!bus) {
+    throw new NotFoundException(`El bus ${busId} no existe`);
   }
+
+  // Validar que el floor_number no exceda el número de pisos del bus
+  if (stackData.floor_number > bus.floors) {
+    throw new BadRequestException(
+      `El piso ${stackData.floor_number} excede el número de pisos del bus (${bus.floors})`
+    );
+  }
+
+  // Validar que no exista ya un stack para ese piso
+  const existingStack = await this.seatStackRepository.findOne({
+    where: {
+      bus: { id: busId },
+      floor_number: stackData.floor_number
+    }
+  });
+
+  if (existingStack) {
+    throw new BadRequestException(
+      `Ya existe un stack para el piso ${stackData.floor_number} en este bus`
+    );
+  }
+
+  const seatStack = this.seatStackRepository.create({
+    ...stackData,
+    bus
+  });
+
+  const newStack = await this.seatStackRepository.save(seatStack);
+  return this.findOne(newStack.id);
+}
 
   async findAll() {
     const data = await this.seatStackRepository.find({
@@ -54,78 +88,54 @@ export class SeatStacksService {
     return this.seatStackRepository.save(seatStack);
   }
 
-  async remove(id: string) {
-    const seatStack = await this.seatStackRepository.findOne({
-      where: { id },
-      relations: {
-        seats: { tickets: true },
-        bus: true,
-      },
-    });
+ async remove(id: string) {
+  const seatStack = await this.seatStackRepository.findOne({
+    where: { id },
+    relations: {
+      seats: { tickets: true },
+      bus: { trips: true },
+    },
+  });
 
-    //Evita eliminar buses con viajes activos
-    const deleteStack = await this.findOne(id);
-    if (deleteStack.bus) {
-      const bus = await this.busRepository.findOne({
-        where: { id: deleteStack.bus.id },
-        relations: { trips: true },
-      });
+  if (!seatStack) {
+    throw new NotFoundException(`El stack ${id} no ha sido encontrado`);
+  }
 
-      const activeTrips =
-        bus?.trips?.filter(
-          (trip) =>
-            trip.status === TripStatus.SCHEDULED ||
-            trip.status === TripStatus.IN_PROGRESS,
-        ) || [];
+  // Validar viajes activos
+  if (seatStack.bus) {
+    const activeTrips = seatStack.bus.trips?.filter(
+      (trip) =>
+        trip.status === TripStatus.SCHEDULED ||
+        trip.status === TripStatus.IN_PROGRESS,
+    ) || [];
 
-      if (activeTrips.length > 0) {
-        throw new BadRequestException(
-          `No se puede eliminar el stack porque el bus tiene ${activeTrips.length} viajes activos`,
-        );
-      }
-    }
-
-    if (!seatStack) {
-      throw new NotFoundException(`El stack ${id} no ha sido encontrado`);
-    }
-
-    // Verificar si tiene asientos con tickets activos
-    const hasActiveTickets = seatStack.seats?.some((seat) =>
-      seat.tickets?.some(
-        (ticket) =>
-          ticket.status === 'CONFIRMADO' || ticket.status === 'PENDIENTE',
-      ),
-    );
-
-    if (hasActiveTickets) {
+    if (activeTrips.length > 0) {
       throw new BadRequestException(
-        'No se puede eliminar el stack porque tiene asientos con tickets activos',
+        `No se puede eliminar el stack porque el bus tiene ${activeTrips.length} viajes activos`,
       );
     }
-
-    let busId: string | null = null;
-
-    if (seatStack.bus) {
-      busId = seatStack.bus.id;
-
-      // Método 1: Actualizar directamente en la base de datos
-      await this.busRepository
-        .createQueryBuilder()
-        .update(Bus)
-        .set({
-          stacks: null as any, // Forzar null
-          capacity: 0,
-        })
-        .where('id = :busId', { busId })
-        .execute();
-    }
-
-    // Ahora sí eliminar el stack (esto eliminará los asientos en cascada)
-    await this.seatStackRepository.remove(seatStack);
-
-    return {
-      message: 'El stack fue eliminado correctamente',
-      busUpdated: busId,
-    };
   }
+
+  // Verificar tickets activos
+  const hasActiveTickets = seatStack.seats?.some((seat) =>
+    seat.tickets?.some(
+      (ticket) =>
+        ticket.status === 'CONFIRMADO' || ticket.status === 'PENDIENTE',
+    ),
+  );
+
+  if (hasActiveTickets) {
+    throw new BadRequestException(
+      'No se puede eliminar el stack porque tiene asientos con tickets activos',
+    );
+  }
+
+  // Eliminar el stack (los asientos se eliminan en cascada)
+  await this.seatStackRepository.remove(seatStack);
+
+  return {
+    message: 'El stack fue eliminado correctamente',
+    busId: seatStack.bus?.id,
+  };
+}
 }

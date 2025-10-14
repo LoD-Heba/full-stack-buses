@@ -30,9 +30,6 @@ export class Bus {
   @Column({ nullable: true })
   year: number;
 
-  @Column({ nullable: true })
-  capacity: number;
-
   @Column({
     type: 'enum',
     enum: ['normal', 'semi_cama', 'cama'],
@@ -44,16 +41,19 @@ export class Bus {
   @Column({ type: 'text', default: 'Asientos cómodos' })
   amenities: string;
 
-  @Column({ 
+  @Column({
     type: 'enum',
     enum: ['disponible', 'en_uso', 'mantenimiento', 'fuera_de_servicio'],
-    default: 'disponible'
+    default: 'disponible',
   })
   status: string;
 
   // Nuevo campo para la imagen
   @Column({ type: 'text', nullable: true, name: 'image_url' })
   image_url: string;
+
+  @Column({ type: 'int', default: 1 })
+  floors: number;
 
   @Column({ default: true, name: 'is_active' })
   is_active: boolean;
@@ -64,12 +64,10 @@ export class Bus {
   @UpdateDateColumn({ name: 'updated_at' })
   updated_at: Date;
 
-  @OneToOne(() => SeatStack, (stacks) => stacks.bus, { 
+  @OneToMany(() => SeatStack, (stack) => stack.bus, {
     cascade: true,
-    nullable: true 
   })
-  @JoinColumn({ name: 'seat_stack_id' })
-  stacks: SeatStack;
+  stacks: SeatStack[];
 
   @OneToMany(() => Trip, (trip) => trip.bus)
   trips: Trip[];

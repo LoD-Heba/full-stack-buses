@@ -23,9 +23,6 @@ export class Seat {
   @Column({ type: 'int' })
   seat_number: number; // número de asiento
 
-  @Column({ type: 'int', nullable: true })
-  deck?: number; // piso (para buses de 2 pisos)
-
   @Column({
     type: 'enum',
     enum: ['normal', 'semi_cama', 'cama'],
@@ -40,7 +37,7 @@ export class Seat {
   position_y?: number;
 
   @Column({ type: 'varchar', default: 'seat', nullable: true })
-  visual_type?: string;
+  visual_type?: string; 
 
   @Column({ type: 'int', default: 0, nullable: true })
   rotation?: number;

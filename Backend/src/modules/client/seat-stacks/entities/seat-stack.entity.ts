@@ -1,7 +1,9 @@
 import {
   Column,
   Entity,
+  JoinColumn,
   ManyToMany,
+  ManyToOne,
   OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
@@ -20,14 +22,19 @@ export class SeatStack {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
+  @Column({ type: 'int', default: 1 })
+  floor_number: number;
+
   // ✅ IMPORTANTE: cascade: ['remove'] permite eliminar seats automáticamente
   @OneToMany(() => Seat, (seat) => seat.stacks, {
     cascade: ['remove'], // Elimina seats cuando se elimina el stack
   })
   seats: Seat[];
 
-  // ⚠️ CRÍTICO: Sin cascade en esta dirección
-  // El bus NO se elimina cuando se elimina el stack
-  @OneToOne(() => Bus, (bus) => bus.stacks)
+  @ManyToOne(() => Bus, (bus) => bus.stacks, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'bus_id' })
   bus: Bus;
 }

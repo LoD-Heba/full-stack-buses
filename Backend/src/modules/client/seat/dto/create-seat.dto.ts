@@ -56,11 +56,6 @@ export class CreateSeatDto {
   @IsOptional()
   @IsObject()
   meta?: Record<string, any>;
-  @IsOptional()
-  @IsInt({ message: 'El deck debe ser un número entero' })
-  @Min(1, { message: 'El deck debe ser al menos 1' })
-  @Max(2, { message: 'El deck no puede exceder 2' })
-  deck?: number;
 
   @IsEnum(SeatType, {
     message: 'El tipo debe ser: normal, semi_cama o cama',
