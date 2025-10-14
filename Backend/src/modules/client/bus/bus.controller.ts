@@ -78,6 +78,11 @@ export class BusController {
   getStatistics(@Param('id', ParseUUIDPipe) id: string) {
     return this.busService.getBusStatistics(id);
   }
+  
+  @Get(':id/layout')
+  getBusLayout(@Param('id', ParseUUIDPipe) id: string) {
+    return this.busService.getBusLayout(id);
+  }
 
   @Patch(':id')
   update(

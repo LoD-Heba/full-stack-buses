@@ -1,8 +1,16 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseUUIDPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { SeatStacksService } from './seat-stacks.service';
 import { CreateSeatStackDto } from './dto/create-seat-stack.dto';
 import { UpdateSeatStackDto } from './dto/update-seat-stack.dto';
-
 
 @Controller('seat-stacks')
 export class SeatStacksController {
@@ -24,10 +32,18 @@ export class SeatStacksController {
   }
 
   @Patch(':id')
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() updateSeatStackDto: UpdateSeatStackDto) {
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateSeatStackDto: UpdateSeatStackDto,
+  ) {
     return this.seatStacksService.update(id, updateSeatStackDto);
   }
 
+  @Get(':id/layout')
+  getStackLayout(@Param('id', ParseUUIDPipe) id: string) {
+    return this.seatStacksService.getStackLayout(id);
+  }
+  
   @Delete(':id')
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.seatStacksService.remove(id);

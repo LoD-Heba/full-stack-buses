@@ -22,9 +22,43 @@ export class SeatStacksService {
   ) {}
 
   async create(createSeatStackDto: CreateSeatStackDto) {
-    const { ...stackData } = createSeatStackDto;
+    const { busId, ...stackData } = createSeatStackDto;
 
-    const seatStack = this.seatStackRepository.create({ ...stackData });
+    // Validar que el bus existe
+    const bus = await this.busRepository.findOne({
+      where: { id: busId, is_active: true },
+      relations: { stacks: true },
+    });
+
+    if (!bus) {
+      throw new NotFoundException(`El bus ${busId} no existe`);
+    }
+
+    // Validar que el floor_number no exceda el número de pisos del bus
+    if (stackData.floor_number > bus.floors) {
+      throw new BadRequestException(
+        `El piso ${stackData.floor_number} excede el número de pisos del bus (${bus.floors})`,
+      );
+    }
+
+    // Validar que no exista ya un stack para ese piso
+    const existingStack = await this.seatStackRepository.findOne({
+      where: {
+        bus: { id: busId },
+        floor_number: stackData.floor_number,
+      },
+    });
+
+    if (existingStack) {
+      throw new BadRequestException(
+        `Ya existe un stack para el piso ${stackData.floor_number} en este bus`,
+      );
+    }
+
+    const seatStack = this.seatStackRepository.create({
+      ...stackData,
+      bus,
+    });
 
     const newStack = await this.seatStackRepository.save(seatStack);
     return this.findOne(newStack.id);
@@ -59,20 +93,18 @@ export class SeatStacksService {
       where: { id },
       relations: {
         seats: { tickets: true },
-        bus: true,
+        bus: { trips: true },
       },
     });
 
-    //Evita eliminar buses con viajes activos
-    const deleteStack = await this.findOne(id);
-    if (deleteStack.bus) {
-      const bus = await this.busRepository.findOne({
-        where: { id: deleteStack.bus.id },
-        relations: { trips: true },
-      });
+    if (!seatStack) {
+      throw new NotFoundException(`El stack ${id} no ha sido encontrado`);
+    }
 
+    // Validar viajes activos
+    if (seatStack.bus) {
       const activeTrips =
-        bus?.trips?.filter(
+        seatStack.bus.trips?.filter(
           (trip) =>
             trip.status === TripStatus.SCHEDULED ||
             trip.status === TripStatus.IN_PROGRESS,
@@ -85,11 +117,7 @@ export class SeatStacksService {
       }
     }
 
-    if (!seatStack) {
-      throw new NotFoundException(`El stack ${id} no ha sido encontrado`);
-    }
-
-    // Verificar si tiene asientos con tickets activos
+    // Verificar tickets activos
     const hasActiveTickets = seatStack.seats?.some((seat) =>
       seat.tickets?.some(
         (ticket) =>
@@ -103,29 +131,63 @@ export class SeatStacksService {
       );
     }
 
-    let busId: string | null = null;
-
-    if (seatStack.bus) {
-      busId = seatStack.bus.id;
-
-      // Método 1: Actualizar directamente en la base de datos
-      await this.busRepository
-        .createQueryBuilder()
-        .update(Bus)
-        .set({
-          stacks: null as any, // Forzar null
-          capacity: 0,
-        })
-        .where('id = :busId', { busId })
-        .execute();
-    }
-
-    // Ahora sí eliminar el stack (esto eliminará los asientos en cascada)
+    // Eliminar el stack (los asientos se eliminan en cascada)
     await this.seatStackRepository.remove(seatStack);
 
     return {
       message: 'El stack fue eliminado correctamente',
-      busUpdated: busId,
+      busId: seatStack.bus?.id,
+    };
+  }
+
+  // En Backend/src/modules/client/seat-stacks/seat-stacks.service.ts
+  // Añadir al final, antes del método remove
+
+  async getStackLayout(id: string) {
+    const stack = await this.seatStackRepository.findOne({
+      where: { id },
+      relations: { seats: true, bus: true },
+    });
+
+    if (!stack) {
+      throw new NotFoundException(`El stack ${id} no ha sido encontrado`);
+    }
+
+    const layout =
+      stack.seats
+        ?.filter((seat) => seat.is_active)
+        .map((seat) => ({
+          id: seat.id,
+          seat_code: seat.seat_code,
+          seat_number: seat.seat_number,
+          type: seat.type,
+          position_x: seat.position_x || 0,
+          position_y: seat.position_y || 0,
+          visual_type: seat.visual_type || 'seat',
+          rotation: seat.rotation || 0,
+          deck: seat.deck || stack.floor_number || 1,
+          meta: seat.meta || {},
+        }))
+        .sort((a, b) => {
+          if (a.position_y !== b.position_y) {
+            return a.position_y - b.position_y;
+          }
+          return a.position_x - b.position_x;
+        }) || [];
+
+    return {
+      stack_id: stack.id,
+      stack_name: stack.name,
+      floor_number: stack.floor_number || 1,
+      bus: stack.bus
+        ? {
+            id: stack.bus.id,
+            plate: stack.bus.plate,
+            model: stack.bus.model,
+            service_type: stack.bus.service_type,
+          }
+        : null,
+      layout,
     };
   }
 }

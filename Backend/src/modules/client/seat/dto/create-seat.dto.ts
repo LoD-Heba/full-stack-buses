@@ -33,6 +33,7 @@ export class CreateSeatDto {
   @Min(1, { message: 'El número de asiento debe ser mayor que 0' })
   @Max(100, { message: 'El número de asiento no puede exceder 100' })
   seat_number: number;
+  
   @IsOptional()
   @IsInt({ message: 'La posición X debe ser un número entero' })
   @Min(1)
@@ -56,16 +57,18 @@ export class CreateSeatDto {
   @IsOptional()
   @IsObject()
   meta?: Record<string, any>;
-  @IsOptional()
-  @IsInt({ message: 'El deck debe ser un número entero' })
-  @Min(1, { message: 'El deck debe ser al menos 1' })
-  @Max(2, { message: 'El deck no puede exceder 2' })
-  deck?: number;
 
   @IsEnum(SeatType, {
     message: 'El tipo debe ser: normal, semi_cama o cama',
   })
   type: SeatType;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(2)
+  @Transform(({ value }) => parseInt(value))
+  deck?: number;
 
   @IsNotEmpty()
   @IsUUID('4', { message: 'stackId debe ser un UUID válido' })

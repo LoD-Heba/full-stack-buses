@@ -415,7 +415,10 @@ export class RouteService {
     }
 
     const activeSeats =
-      busWithSeats.stacks.seats?.filter((s) => s.is_active).length || 0;
+      busWithSeats.stacks?.reduce((total, stack) => {
+        return total + (stack.seats?.filter((s) => s.is_active).length || 0);
+      }, 0) || 0;
+
     if (activeSeats === 0) {
       throw new BadRequestException(
         `El bus ${bus.plate} no tiene asientos activos`,
@@ -452,10 +455,20 @@ export class RouteService {
 
     // Filtrar solo buses que tengan stacks con asientos activos
     return route.buses.filter((bus) => {
-      const hasStack = !!bus.stacks;
-      const hasActiveSeats =
-        bus.stacks?.seats?.filter((seat) => seat.is_active).length > 0;
-      return bus.is_active && hasStack && hasActiveSeats;
+      // El bus debe estar activo
+      if (!bus.is_active) return false;
+
+      // Debe tener al menos un stack
+      if (!bus.stacks || bus.stacks.length === 0) return false;
+
+      // Debe tener al menos un asiento activo en cualquier stack
+      const totalActiveSeats = bus.stacks.reduce((total, stack) => {
+        return (
+          total + (stack.seats?.filter((seat) => seat.is_active).length || 0)
+        );
+      }, 0);
+
+      return totalActiveSeats > 0;
     });
   }
   ///////////////////////////////////////////////////////////////

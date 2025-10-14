@@ -620,31 +620,31 @@ export class TripService {
     return this.findOne(id);
   }
 
-async completeTrip(id: string): Promise<Trip> {
-  const trip = await this.findOne(id);
+  async completeTrip(id: string): Promise<Trip> {
+    const trip = await this.findOne(id);
 
-  if (trip.status !== TripStatus.IN_PROGRESS) {
-    throw new BadRequestException(
-      'Solo se pueden completar viajes en progreso',
-    );
+    if (trip.status !== TripStatus.IN_PROGRESS) {
+      throw new BadRequestException(
+        'Solo se pueden completar viajes en progreso',
+      );
+    }
+
+    // Desactivar todos los tickets del viaje
+    if (trip.tickets && trip.tickets.length > 0) {
+      const ticketIds = trip.tickets.map((t) => t.ticket_id);
+      await this.ticketRepository.update(
+        { ticket_id: In(ticketIds) },
+        { is_active: false },
+      );
+    }
+
+    await this.tripRepository.update(id, {
+      status: TripStatus.COMPLETED,
+      is_active: false,
+    });
+
+    return this.findTripById(id); // ← Usar el método sin filtro is_active
   }
-
-  // Desactivar todos los tickets del viaje
-  if (trip.tickets && trip.tickets.length > 0) {
-    const ticketIds = trip.tickets.map((t) => t.ticket_id);
-    await this.ticketRepository.update(
-      { ticket_id: In(ticketIds) },
-      { is_active: false },
-    );
-  }
-
-  await this.tripRepository.update(id, {
-    status: TripStatus.COMPLETED,
-    is_active: false,
-  });
-
-  return this.findTripById(id); // ← Usar el método sin filtro is_active
-}
 
   async getTripStatistics(id: string) {
     const trip = await this.findOne(id);
@@ -717,12 +717,16 @@ async completeTrip(id: string): Promise<Trip> {
       relations: { stacks: { seats: true } },
     });
 
-    if (!bus || !bus.stacks) {
+    if (!bus || !bus.stacks || bus.stacks.length === 0) {
       return 0;
     }
 
-    // Contar todos los asientos activos del bus
-    return bus.stacks.seats?.filter((seat) => seat.is_active).length || 0;
+    // Contar todos los asientos activos de TODOS los stacks del bus
+    return bus.stacks.reduce((total, stack) => {
+      return (
+        total + (stack.seats?.filter((seat) => seat.is_active).length || 0)
+      );
+    }, 0);
   }
 
   // Después del método privado calculateAvailableSeats
@@ -741,7 +745,11 @@ async completeTrip(id: string): Promise<Trip> {
 
     // Contar asientos totales del bus
     const totalSeats =
-      trip.bus.stacks?.seats?.filter((seat) => seat.is_active).length || 0;
+      trip.bus.stacks?.reduce((total, stack) => {
+        return (
+          total + (stack.seats?.filter((seat) => seat.is_active).length || 0)
+        );
+      }, 0) || 0;
 
     // Contar tickets confirmados
     const confirmedTickets =
@@ -757,27 +765,27 @@ async completeTrip(id: string): Promise<Trip> {
   }
   //////////////////////////////////
   // Método auxiliar privado para buscar viajes sin filtro is_active
-private async findTripById(id: string): Promise<Trip> {
-  const trip = await this.tripRepository.findOne({
-    where: { id },
-    relations: {
-      bus: {
-        user: true,
-        stacks: true,
+  private async findTripById(id: string): Promise<Trip> {
+    const trip = await this.tripRepository.findOne({
+      where: { id },
+      relations: {
+        bus: {
+          user: true,
+          stacks: true,
+        },
+        route: true,
+        tickets: {
+          seat: true,
+          payment: true,
+          user: true,
+        },
       },
-      route: true,
-      tickets: {
-        seat: true,
-        payment: true,
-        user: true,
-      },
-    },
-  });
+    });
 
-  if (!trip) {
-    throw new NotFoundException(`El viaje con ID ${id} no existe`);
+    if (!trip) {
+      throw new NotFoundException(`El viaje con ID ${id} no existe`);
+    }
+
+    return trip;
   }
-
-  return trip;
-}
 }

@@ -34,7 +34,7 @@ export class BusService {
   ) {}
 
   async create(createBusDto: CreateBusDto): Promise<Bus> {
-    const { userId, stackId, ...busData } = createBusDto;
+    const { userId, ...busData } = createBusDto;
 
     // Validar que el usuario existe y está activo
     const user = await this.findUser(userId);
@@ -49,36 +49,15 @@ export class BusService {
       );
     }
 
-    // Validar stack si se proporciona
-    let stacks: SeatStack | undefined;
-    if (stackId) {
-      stacks = await this.findSeatStack(stackId);
-
-      // Verificar que el stack no esté ya asignado
-      const stackAlreadyUsed = await this.busRepository.findOne({
-        where: { stacks: { id: stackId } },
-      });
-      if (stackAlreadyUsed) {
-        throw new BadRequestException(
-          'El stack de asientos ya está asignado a otro bus',
-        );
-      }
-    }
-
     // Crear el bus
     const newBus = this.busRepository.create({
       ...busData,
       plate: busData.plate.toUpperCase(),
+      floors: busData.floors || 1,
       user,
-      stacks,
     });
 
     const savedBus = await this.busRepository.save(newBus);
-
-    // Actualizar la capacidad basada en el stack si existe
-    if (stacks) {
-      await this.updateBusCapacity(savedBus.id);
-    }
 
     return this.findOne(savedBus.id);
   }
@@ -239,7 +218,7 @@ export class BusService {
   }
 
   async update(id: string, updateBusDto: UpdateBusDto): Promise<Bus> {
-    const { userId, stackId, ...busData } = updateBusDto;
+    const { userId, ...busData } = updateBusDto;
 
     // Verificar que el bus existe
     const existingBus = await this.findOne(id);
@@ -283,30 +262,6 @@ export class BusService {
       updateData.user = user;
     }
 
-    // Actualizar stack si se proporciona
-    if (stackId !== undefined) {
-      if (stackId) {
-        const stacks = await this.findSeatStack(stackId);
-
-        // Verificar que el stack no esté ya asignado a otro bus
-        const stackAlreadyUsed = await this.busRepository.findOne({
-          where: {
-            stacks: { id: stackId },
-            id: Not(id),
-          },
-        });
-        if (stackAlreadyUsed) {
-          throw new BadRequestException(
-            'El stack de asientos ya está asignado a otro bus',
-          );
-        }
-
-        updateData.stacks = stacks;
-      } else {
-        updateData.stacks = null;
-      }
-    }
-
     // Verificar que hay algo para actualizar
     if (Object.keys(updateData).length === 0) {
       throw new BadRequestException('No hay datos para actualizar');
@@ -317,11 +272,6 @@ export class BusService {
       id,
       ...updateData,
     });
-
-    // Actualizar capacidad si se cambió el stack
-    if (stackId !== undefined) {
-      await this.updateBusCapacity(id);
-    }
 
     return this.findOne(id);
   }
@@ -354,11 +304,13 @@ export class BusService {
 
   async hardDelete(id: string): Promise<void> {
     const bus = await this.busRepository.findOne({
-          where: { id, is_active:false },
-        });
+      where: { id, is_active: false },
+    });
 
     if (!bus) {
-      throw new NotFoundException(`El bus con ID ${id} no existe o ya ha sido eliminado`);
+      throw new NotFoundException(
+        `El bus con ID ${id} no existe o ya ha sido eliminado`,
+      );
     }
 
     // Verificar que NO tenga NINGÚN viaje (ni completados)
@@ -411,19 +363,11 @@ export class BusService {
           `El bus tiene ${busAge} años de antigüedad. Solo se permiten buses con menos de 15 años en servicio`,
         );
       }
-      //
-      const activeSeatsCount =
-        bus.stacks.seats?.filter((s) => s.is_active).length || 0;
-
-      // Validación de capacidad mínima
-      if (activeSeatsCount < 15) {
-        throw new BadRequestException(
-          `El bus debe tener al menos 15 asientos activos (actual: ${activeSeatsCount})`,
-        );
-      }
     }
-    const activeSeatsCount =
-      bus.stacks.seats?.filter((s) => s.is_active).length || 0;
+
+    const activeSeatsCount = bus.stacks.reduce((total, stack) => {
+      return total + (stack.seats?.filter((s) => s.is_active).length || 0);
+    }, 0);
     if (activeSeatsCount === 0) {
       throw new BadRequestException(
         'El bus debe tener al menos un asiento activo antes de ponerse en uso',
@@ -462,9 +406,6 @@ export class BusService {
       .where('bus.id = :id', { id })
       .getRawOne();
 
-    const seatCount =
-      bus.stacks?.seats?.filter((seat) => seat.is_active).length || 0;
-
     return {
       bus,
       statistics: {
@@ -472,16 +413,78 @@ export class BusService {
         completedTrips: parseInt(stats.completed_trips) || 0,
         totalTickets: parseInt(stats.total_tickets) || 0,
         totalRevenue: parseFloat(stats.total_revenue) || 0,
-        seatCount,
         assignedRoutes: bus.routes?.length || 0,
-        utilizationRate:
-          bus.capacity > 0
-            ? (
-                ((parseInt(stats.total_tickets) || 0) / bus.capacity) *
-                100
-              ).toFixed(2)
-            : '0',
       },
+    };
+  }
+
+  async getBusLayout(id: string) {
+    const bus = await this.busRepository.findOne({
+      where: { id, is_active: true },
+      relations: {
+        stacks: {
+          seats: true,
+        },
+      },
+    });
+
+    if (!bus) {
+      throw new NotFoundException(`El bus con ID ${id} no existe`);
+    }
+
+    // Si el bus no tiene stacks, retornar estructura vacía
+    if (!bus.stacks || bus.stacks.length === 0) {
+      return {
+        bus_id: bus.id,
+        plate: bus.plate,
+        model: bus.model,
+        service_type: bus.service_type,
+        floors: bus.floors || 1,
+        decks: [],
+      };
+    }
+
+    // Agrupar asientos por deck (piso)
+    const deckLayouts = bus.stacks.map((stack) => {
+      const layout =
+        stack.seats
+          ?.filter((seat) => seat.is_active)
+          .map((seat) => ({
+            id: seat.id,
+            seat_code: seat.seat_code,
+            seat_number: seat.seat_number,
+            type: seat.type,
+            position_x: seat.position_x || 0,
+            position_y: seat.position_y || 0,
+            visual_type: seat.visual_type || 'seat',
+            rotation: seat.rotation || 0,
+            deck: seat.deck || stack.floor_number || 1,
+            meta: seat.meta || {},
+          })) || [];
+
+      return {
+        deck: stack.floor_number || 1,
+        stack_id: stack.id,
+        stack_name: stack.name,
+        layout: layout.sort((a, b) => {
+          // Ordenar por position_y primero, luego position_x
+          if (a.position_y !== b.position_y) {
+            return a.position_y - b.position_y;
+          }
+          return a.position_x - b.position_x;
+        }),
+      };
+    });
+
+    return {
+      bus_id: bus.id,
+      plate: bus.plate,
+      model: bus.model,
+      service_type: bus.service_type,
+      floors: bus.floors || 1,
+      image_url: bus.image_url,
+      amenities: bus.amenities,
+      decks: deckLayouts.sort((a, b) => a.deck - b.deck),
     };
   }
 
@@ -504,37 +507,9 @@ export class BusService {
     return user;
   }
 
-  private async findSeatStack(stackId: string): Promise<SeatStack> {
-    const seatStack = await this.seatStackRepository.findOne({
-      where: { id: stackId },
-      relations: { seats: true },
-    });
-
-    if (!seatStack) {
-      throw new NotFoundException(`El stack de asientos ${stackId} no existe`);
-    }
-
-    return seatStack;
-  }
-
-  private async updateBusCapacity(busId: string): Promise<void> {
-    const bus = await this.busRepository.findOne({
-      where: { id: busId },
-      relations: { stacks: { seats: true } },
-    });
-
-    if (bus && bus.stacks) {
-      const activeSeats =
-        bus.stacks.seats?.filter((seat) => seat.is_active).length || 0;
-      await this.busRepository.update(busId, { capacity: activeSeats });
-    }
-  }
-
   async updateImageUrl(id: string, imageUrl: string): Promise<Bus> {
     const bus = await this.findOne(id);
-
     await this.busRepository.update(id, { image_url: imageUrl });
-
     return this.findOne(id);
   }
 }
