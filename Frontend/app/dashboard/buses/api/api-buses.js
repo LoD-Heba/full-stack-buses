@@ -123,7 +123,7 @@ export async function getBusesByUser(userId) {
       throw new Error("ID de usuario requerido");
     }
 
-    const res = await fetch(`${BASE_URL}/user/${userId}`, { 
+    const res = await fetch(`${BASE_URL}/users/${userId}`, { 
       cache: "no-store",
       headers: {
         "Content-Type": "application/json",

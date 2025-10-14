@@ -5,17 +5,18 @@ import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 const menuItems = [
-  { href: "/dashboard", label: "Panel Principal"},
-  { href: "/dashboard/usuarios", label: "Usuarios"},
-  { href: "/dashboard/roles", label: "Roles"},
-  { href: "/dashboard/rutas", label: "Rutas"},
-  { href: "/dashboard/ciudades", label: "Ciudades"},
-  { href: "/dashboard/tickets", label: "Tickeds"},
-  { href: "/dashboard/buses", label: "Buses"},
-  { href: "/dashboard/stack-asientos", label: "Stack Asientos"},
-  { href: "/dashboard/asientos", label: "Asientos"},
-  { href: "/dashboard/clientes", label: "Clientes"},
+  { href: "/dashboard", label: "Panel Principal" },
+  { href: "/dashboard/usuarios", label: "Usuarios" },
+  { href: "/dashboard/roles", label: "Roles" },
+  { href: "/dashboard/rutas", label: "Rutas" },
+  { href: "/dashboard/ciudades", label: "Ciudades" },
+  { href: "/dashboard/tickets", label: "Tickeds" },
+  { href: "/dashboard/buses", label: "Buses" },
+  { href: "/dashboard/stack-asientos", label: "Stack Asientos" },
+  { href: "/dashboard/asientos", label: "Asientos" },
+  { href: "/dashboard/clientes", label: "Clientes" },
   { href: "/dashboard/viajes", label: "Viajes" },
+  { href: "/dashboard/noticias", label: "Noticias" },
 ];
 
 export default function DashboardSidebar() {

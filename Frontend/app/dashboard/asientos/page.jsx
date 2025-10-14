@@ -120,58 +120,65 @@ export default function BusSeatDesigner() {
 
         // Cargar asientos existentes
         if (bus.stacks.seats && bus.stacks.seats.length > 0) {
-          // Determinar el número de columnas basado en el patrón de asientos
-          const estimatedColumns = 4; // Valor por defecto
+          const estimatedColumns = 4;
 
+          // 🔥 MAPEAR CORRECTAMENTE CON EL ID EXISTENTE
           const floor1Seats = bus.stacks.seats
             .filter((s) => s.deck === 1 || !s.deck)
-            .sort((a, b) => a.seat_number - b.seat_number) // Ordenar por número
-            .map((s, idx) => {
-              const effectiveCols = estimatedColumns - 1; // Restar pasillo
-              return {
-                id: `F1-${s.seat_number}`,
-                seat_number: s.seat_number,
-                seat_code: s.seat_code,
-                row: Math.floor(idx / effectiveCols) + 1,
-                col: (idx % effectiveCols) + 1,
-                deck: 1,
-                type: s.type,
-                is_active: s.is_active,
-                status: "available", // CORREGIDO: usar 'available' consistentemente
-                existingId: s.id, // Guardar ID para actualización
-              };
-            });
+            .sort((a, b) => a.seat_number - b.seat_number)
+            .map((s) => ({
+              id: s.id, // 🔥 USAR EL ID REAL DEL BACKEND
+              seat_number: s.seat_number,
+              seat_code: s.seat_code,
+              row: s.position_y || s.row || 1,
+              col: s.position_x || s.col || 1,
+              position_x: s.position_x || s.col || 1,
+              position_y: s.position_y || s.row || 1,
+              deck: s.deck || 1,
+              type: s.type,
+              is_active: s.is_active,
+              visual_type: s.visual_type || "seat",
+              rotation: s.rotation || 0,
+              meta: s.meta || {},
+              status: "available",
+              existingId: s.id, // 🔥 GUARDAR TAMBIÉN COMO existingId
+            }));
 
           const floor2Seats = bus.stacks.seats
             .filter((s) => s.deck === 2)
             .sort((a, b) => a.seat_number - b.seat_number)
-            .map((s, idx) => {
-              const effectiveCols = estimatedColumns - 1;
-              return {
-                id: `F2-${s.seat_number}`,
-                seat_number: s.seat_number,
-                seat_code: s.seat_code,
-                row: Math.floor(idx / effectiveCols) + 1,
-                col: (idx % effectiveCols) + 1,
-                deck: 2,
-                type: s.type,
-                is_active: s.is_active,
-                status: "available", // CORREGIDO: usar 'available' consistentemente
-                existingId: s.id,
-              };
-            });
+            .map((s) => ({
+              id: s.id, // 🔥 USAR EL ID REAL DEL BACKEND
+              seat_number: s.seat_number,
+              seat_code: s.seat_code,
+              row: s.position_y || s.row || 1,
+              col: s.position_x || s.col || 1,
+              position_x: s.position_x || s.col || 1,
+              position_y: s.position_y || s.row || 1,
+              deck: 2,
+              type: s.type,
+              is_active: s.is_active,
+              visual_type: s.visual_type || "seat",
+              rotation: s.rotation || 0,
+              meta: s.meta || {},
+              status: "available",
+              existingId: s.id, // 🔥 GUARDAR TAMBIÉN COMO existingId
+            }));
 
           setSeats({ floor1: floor1Seats, floor2: floor2Seats });
 
-          const effectiveCols = estimatedColumns - 1;
+          // Calcular filas basado en las posiciones
+          const maxRow1 = Math.max(...floor1Seats.map((s) => s.row), 1);
+          const maxRow2 =
+            floor2Seats.length > 0
+              ? Math.max(...floor2Seats.map((s) => s.row), 1)
+              : 0;
+
           setConfig((prev) => ({
             ...prev,
-            rows: Math.max(Math.ceil(floor1Seats.length / effectiveCols), 1),
+            rows: maxRow1,
             hasSecondFloor: floor2Seats.length > 0,
-            secondFloorRows: Math.max(
-              Math.ceil(floor2Seats.length / effectiveCols),
-              1
-            ),
+            secondFloorRows: maxRow2,
           }));
 
           showAlert("✓ Configuración cargada. Puedes editarla.", "success");
@@ -366,23 +373,29 @@ export default function BusSeatDesigner() {
         }
       }
 
-      // Paso 2: Guardar todos los asientos
-      // 🔥 FILTRAR SOLO LOS ASIENTOS REALES
       const allSeats = [...seats.floor1, ...seats.floor2].filter(
         (seat) => seat.visual_type === "seat" || !seat.visual_type
       );
-      console.log("🔍 Primeros 3 asientos a guardar:", allSeats.slice(0, 3));
-      console.log(
-        "📦 Estructura del primer asiento:",
-        JSON.stringify(allSeats[0], null, 2)
-      );
+
+      console.log("🔍 Total asientos a procesar:", allSeats.length);
+      console.log("📊 Primer asiento:", allSeats[0]);
+      console.log("✏️ Modo edición:", config.isEditMode);
+
       let savedCount = 0;
+      let updatedCount = 0;
       let errorCount = 0;
 
       for (const seat of allSeats) {
         try {
-          if (config.isEditMode && seat.existingId) {
-            // Actualizar asiento existente
+          // 🔥 DETERMINAR SI ES ACTUALIZACIÓN O CREACIÓN
+          const isExisting = seat.existingId && config.isEditMode;
+
+          if (isExisting) {
+            // 🟡 ACTUALIZAR ASIENTO EXISTENTE
+            console.log(
+              `🔄 Actualizando asiento ${seat.seat_number} (ID: ${seat.existingId})`
+            );
+
             const updateRes = await fetch(
               `${API_URL}/seat/${seat.existingId}`,
               {
@@ -393,11 +406,11 @@ export default function BusSeatDesigner() {
                   seat_number: seat.seat_number,
                   deck: seat.deck || 1,
                   type: seat.type,
-                  is_active: seat.is_active,
-                  // 🆕 Agregar campos de posición
+                  is_active:
+                    seat.is_active !== undefined ? seat.is_active : true,
                   position_x: seat.position_x || seat.col,
                   position_y: seat.position_y || seat.row,
-                  visual_type: "seat", // Siempre 'seat' para asientos reales
+                  visual_type: seat.visual_type || "seat",
                   rotation: seat.rotation || 0,
                   meta: seat.meta || {},
                 }),
@@ -407,15 +420,17 @@ export default function BusSeatDesigner() {
             if (!updateRes.ok) {
               const error = await updateRes.json();
               console.error(
-                `Error al actualizar asiento ${seat.seat_number}:`,
+                `❌ Error actualizando asiento ${seat.seat_number}:`,
                 error
               );
               errorCount++;
             } else {
-              savedCount++;
+              updatedCount++;
             }
           } else {
-            // Crear nuevo asiento
+            // 🟢 CREAR NUEVO ASIENTO
+            console.log(`➕ Creando asiento ${seat.seat_number}`);
+
             const createRes = await fetch(`${API_URL}/seat`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -425,10 +440,10 @@ export default function BusSeatDesigner() {
                 deck: seat.deck || 1,
                 type: seat.type,
                 stackId: stackId,
-                is_active: seat.is_active,
+                is_active: seat.is_active !== undefined ? seat.is_active : true,
                 position_x: seat.position_x || seat.col,
                 position_y: seat.position_y || seat.row,
-                visual_type: "seat", // Siempre 'seat'
+                visual_type: seat.visual_type || "seat",
                 rotation: seat.rotation || 0,
                 meta: seat.meta || {},
               }),
@@ -437,8 +452,8 @@ export default function BusSeatDesigner() {
             if (!createRes.ok) {
               const error = await createRes.json();
               console.error(
-                `Error al crear asiento ${seat.seat_number}:`,
-                error.message
+                `❌ Error creando asiento ${seat.seat_number}:`,
+                error
               );
               errorCount++;
             } else {
@@ -456,14 +471,12 @@ export default function BusSeatDesigner() {
 
       if (errorCount > 0) {
         showAlert(
-          `⚠️ Guardado con advertencias: ${savedCount} asientos guardados, ${errorCount} con errores`,
+          `⚠️ Guardado con advertencias: ${savedCount} creados, ${updatedCount} actualizados, ${errorCount} errores`,
           "error"
         );
       } else {
         showAlert(
-          `✓ Configuración guardada exitosamente: ${savedCount} asientos ${
-            config.isEditMode ? "actualizados" : "creados"
-          }`,
+          `✓ Configuración guardada: ${savedCount} asientos creados, ${updatedCount} actualizados`,
           "success"
         );
       }

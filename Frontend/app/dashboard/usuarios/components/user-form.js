@@ -22,10 +22,10 @@ export function UserForm({ user }) {
 
   const router = useRouter();
   const params = useParams();
-  
+
   // ✅ Validar que params.id sea un UUID válido
   const isEditing = params?.id && params.id !== "undefined";
-  
+
   // ✅ Log para debug
   // console.log("Params:", params);
   // console.log("User:", user);
@@ -115,16 +115,17 @@ export function UserForm({ user }) {
         if (data.password && data.password.trim() !== "") {
           dataToSend.password = data.password;
         }
-        
+
         // ✅ Validación adicional del UUID
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const uuidRegex =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(params.id)) {
           setBackendError("ID de usuario inválido");
           return;
         }
-        
+
         const res = await updateUser(params.id, dataToSend);
-        
+
         if (res?.message) {
           if (Array.isArray(res.message)) {
             setBackendError(res.message[0]);
@@ -137,7 +138,7 @@ export function UserForm({ user }) {
       } else {
         dataToSend.password = data.password;
         const res = await createUser(dataToSend);
-        
+
         if (res?.message) {
           if (Array.isArray(res.message)) {
             setBackendError(res.message[0]);
@@ -153,7 +154,7 @@ export function UserForm({ user }) {
       router.refresh();
     } catch (err) {
       console.error("Error en onSubmit:", err);
-      
+
       if (err.message) {
         setBackendError(err.message);
       } else {
@@ -254,8 +255,8 @@ export function UserForm({ user }) {
             control={control}
             rules={{ required: "El rol es obligatorio" }}
             render={({ field }) => (
-              <Select 
-                onValueChange={field.onChange} 
+              <Select
+                onValueChange={field.onChange}
                 value={field.value}
                 disabled={roles.length === 0}
               >
