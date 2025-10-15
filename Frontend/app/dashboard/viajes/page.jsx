@@ -951,7 +951,7 @@ export default function TripsManagement() {
                                 size="sm"
                                 onClick={() => {
                                   router.push(
-                                    `/dashboard/asientos?clientId=${clientId}&tripId=${trip.id}`
+                                    `/dashboard/viajes/${trip.id}/asientos?clientId=${clientId}`
                                   );
                                 }}
                                 className="bg-green-600 hover:bg-green-700 text-white"
