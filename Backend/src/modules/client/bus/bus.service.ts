@@ -16,6 +16,7 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
 import { TripStatus, TicketStatus } from 'src/common/enums/status.enum';
 import { Route } from '../route/entities/route.entity';
+import { Trip } from '../trip/entities/trip.entity';
 
 @Injectable()
 export class BusService {
@@ -31,6 +32,9 @@ export class BusService {
 
     @InjectRepository(Route)
     private readonly routeRepository: Repository<Route>,
+
+    @InjectRepository(Trip)
+    private readonly tripRepository: Repository<Trip>,
   ) {}
 
   async create(createBusDto: CreateBusDto): Promise<Bus> {
@@ -487,7 +491,32 @@ export class BusService {
       decks: deckLayouts.sort((a, b) => a.deck - b.deck),
     };
   }
+  async getBusLayoutForTrip(busId: string, tripId: string) {
+    const layout = await this.getBusLayout(busId);
 
+    // Obtener tickets confirmados del viaje
+    const trip = await this.tripRepository.findOne({
+      where: { id: tripId },
+      relations: { tickets: { seat: true } },
+    });
+
+    if (!trip) {
+      throw new NotFoundException(`El viaje ${tripId} no existe`);
+    }
+
+    // Mapear asientos ocupados
+    const occupiedSeats =
+      trip.tickets
+        ?.filter((ticket) => ticket.status === 'CONFIRMADO' && ticket.seat)
+        .map((ticket) => ticket.seat.seat_code) || [];
+
+    return {
+      ...layout,
+      trip_id: tripId,
+      occupied_seats: occupiedSeats,
+      available_seats: trip.available_seats,
+    };
+  }
   // Métodos auxiliares privados
   private async findUser(userId: string): Promise<User> {
     const user = await this.userRepository.findOne({

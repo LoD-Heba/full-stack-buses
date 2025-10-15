@@ -709,6 +709,7 @@ export class TripService {
 
     return route;
   }
+  
   private async calculateAvailableSeats(busId: string): Promise<number> {
     // Esto depende de cómo tengas estructurado el conteo de asientos en el bus
     // Por ahora asumo que tienes una relación con seats o un campo capacity

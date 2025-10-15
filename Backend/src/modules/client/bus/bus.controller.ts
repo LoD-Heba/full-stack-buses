@@ -109,4 +109,12 @@ export class BusController {
   hardDelete(@Param('id', ParseUUIDPipe) id: string) {
     return this.busService.hardDelete(id);
   }
+
+  @Get(':id/layout/trip/:tripId')
+getBusLayoutForTrip(
+  @Param('id', ParseUUIDPipe) id: string,
+  @Param('tripId', ParseUUIDPipe) tripId: string,
+) {
+  return this.busService.getBusLayoutForTrip(id, tripId);
+}
 }
