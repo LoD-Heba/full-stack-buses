@@ -6,7 +6,7 @@ import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import Navbar from "@/src/components/Navbar";
 import Footer from "@/src/components/Footer";
-import { clsx } from 'clsx'
+import { clsx } from "clsx";
 import { usePathname } from "next/navigation";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -25,10 +25,9 @@ export default function RootLayout({
       <head>
         <title>Trans Sacaba - Transporte Interdepartamental Bolivia</title>
         <link rel="icon" href="/favicon.ico" />
-       
       </head>
-     <body className={clsx(inter.className, 'bg-gray-100 w-[90%] h-[800px] mx-auto')}>
-        <div className="flex flex-col min-h-screen">
+      <body className={clsx(inter.className, "w-[90%] h-[800px] mx-auto z-0 bg-green-950")}>
+        <div className="flex flex-col min-h-screen z-40">
           {/* {!isDashboard && !isLogin && <Navbar />} */}
           <Navbar></Navbar>
           <main className="flex-1">{children}</main>

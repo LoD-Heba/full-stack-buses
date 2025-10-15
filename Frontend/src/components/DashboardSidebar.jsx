@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { ArrowBigLeft } from "lucide-react";
 
 const menuItems = [
   { href: "/dashboard", label: "Panel Principal" },
@@ -28,32 +29,30 @@ export default function DashboardSidebar() {
       <div className="p-6">
         <h2 className="text-xl font-bold mb-2">Dashboard</h2>
         <p className="text-xs text-gray-400">Panel de Administración</p>
-        <Button
-          className="mt-2 bg-green-500"
-          onClick={() => {
-            router.push(`/`);
-          }}
-        >
-          Inicio
-        </Button>
       </div>
 
       <nav className="px-3 ">
-        {menuItems.map((item) => {
-          const isActive = pathname === item.href;
+        <div className="flex-col justify-between">
+          {menuItems.map((item) => {
+            const isActive = pathname === item.href;
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${
-                isActive ? "bg-orange-500" : " hover:bg-slate-800"
-              }`}
-            >
-              <span className="text-sm">{item.label}</span>
-            </Link>
-          );
-        })}
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${
+                  isActive ? "bg-green-600" : " hover:bg-green-50"
+                }`}
+              >
+                <span className="text-sm">{item.label}</span>
+              </Link>
+            );
+          })}
+          <Button className="mt-10 bg-green-950" onClick={() => router.push('/')}>
+            <ArrowBigLeft />
+            Salir
+          </Button>
+        </div>
       </nav>
     </aside>
   );

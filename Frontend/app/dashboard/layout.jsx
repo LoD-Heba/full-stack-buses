@@ -38,9 +38,9 @@ export default function DashboardLayout({ children }) {
   // }
 
   return (
-    <div className="flex">
+    <div className="flex bg-green-50">
       <DashboardSidebar />
-      <main className="flex-1 ">
+      <main className="flex-1">
         <div className="p-8">
           {children}
         </div>

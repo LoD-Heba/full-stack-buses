@@ -11,7 +11,6 @@ export default function DashboardPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Panel Principal</h1>
-       
       </div>
     </div>
      </ProtectedRoute>

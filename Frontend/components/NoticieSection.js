@@ -39,7 +39,13 @@ export default function NoticiasSection() {
 
   if (loading) {
     return (
-      <section className="py-16 bg-gray-50">
+      <section className="py-16 bg-gray-50" style={{
+          backgroundImage: `
+      url('/img/img7.jpg')
+    `,
+          backgroundPosition: "center, top right, bottom left",
+          backgroundRepeat: "repeat",
+        }} >
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-12">
             Noticias Recientes
@@ -53,9 +59,9 @@ export default function NoticiasSection() {
   }
 
   return (
-    <section className="py-16 bg-gray-50">
+    <section className="py-16" >
       <div className="container mx-auto px-4">
-        <h2 className="text-3xl font-bold text-center mb-12">
+        <h2 className="text-3xl font-bold text-center mb-12 demotext">
           Noticias Recientes
         </h2>
         
@@ -68,9 +74,9 @@ export default function NoticiasSection() {
             {noticias.map((noticia) => (
               <div
                 key={noticia.id}
-                className="bg-white rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                className="bg-green-100 rounded-lg overflow-hidden hover:shadow-lg transition-shadow hover:border-l-2 border-green-950"
               >
-                <div className="h-40 bg-gradient-to-br from-orange-400 to-orange-600 relative">
+                <div className="h-40 bg-gradient-to-br from-green-400 to-green-600 relative ">
                   {noticia.image_url ? (
                     <img
                       src={`http://localhost:3001${noticia.image_url}`}

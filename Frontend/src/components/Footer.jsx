@@ -11,15 +11,15 @@ import Link from "next/link";
 
 export default function Footer() {
   return (
-    <footer className="bg-slate-900  mt-auto">
+    <footer className="mt-auto bg-verde-300">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div>
             <div className="flex items-center space-x-2 mb-4">
-              <Bus className="w-8 h-8 text-orange-400" />
+              <Bus className="w-8 h-8 text-black" />
               <div>
                 <h3 className="font-bold text-white text-lg">Trans Sacaba</h3>
-                <p className="text-xs text-orange-400">Viajamos por Bolivia</p>
+                <p className="text-xs text-black-400">Viajamos por Bolivia</p>
               </div>
             </div>
             <p className="text-sm">
@@ -34,7 +34,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/rutas"
-                  className="hover:text-orange-400 transition-colors"
+                  className="hover:text-slate-950 transition-colors hover:bg-green-100 rounded bg-opacity-40"
                 >
                   Rutas
                 </Link>
@@ -42,7 +42,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/ciudades"
-                  className="hover:text-orange-400 transition-colors"
+                  className="hover:text-slate-950 transition-colors hover:bg-green-100 rounded bg-opacity-40"
                 >
                   Ciudades
                 </Link>
@@ -50,7 +50,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/salidas"
-                  className="hover:text-orange-400 transition-colors"
+                  className="hover:text-slate-950 transition-colors hover:bg-green-100 rounded bg-opacity-40"
                 >
                   Salidas Hoy
                 </Link>
@@ -58,7 +58,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/comprar"
-                  className="hover:text-orange-400 transition-colors"
+                  className="hover:text-slate-950 transition-colors hover:bg-green-100 rounded bg-opacity-40"
                 >
                   Comprar Pasaje
                 </Link>
@@ -66,7 +66,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/reglas"
-                  className="hover:text-orange-400 transition-colors"
+                  className="hover:text-slate-950 transition-colors hover:bg-green-100 rounded bg-opacity-40"
                 >
                   Reglas y Políticas
                 </Link>
@@ -78,15 +78,15 @@ export default function Footer() {
             <h4 className="font-semibold text-white mb-4">Contacto</h4>
             <ul className="space-y-3 text-sm">
               <li className="flex items-center space-x-2">
-                <Phone className="w-4 h-4 text-orange-400" />
+                <Phone className="w-7 h-7 text-black" />
                 <span>+591 4 123-4567</span>
               </li>
               <li className="flex items-center space-x-2">
-                <Mail className="w-4 h-4 text-orange-400" />
+                <Mail className="w-7 h-7 text-black" />
                 <span>info@transsacaba.com</span>
               </li>
               <li className="flex items-start space-x-2">
-                <MapPin className="w-4 h-4 text-orange-400 mt-1" />
+                <MapPin className="w-7 h-7 text-black mt-1" />
                 <span>
                   Av. Principal Km 5<br />
                   Sacaba, Cochabamba

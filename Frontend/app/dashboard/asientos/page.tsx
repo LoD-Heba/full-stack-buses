@@ -141,30 +141,7 @@ export default function BusLayoutPage() {
           maxSelection={4}
         />
 
-        {/* Botón de acción */}
-        {selectedSeats.length > 0 && (
-          <div className="mt-6 bg-white p-6 rounded-lg shadow-md">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-lg font-semibold text-gray-900">
-                  Total: {selectedSeats.length} asiento{selectedSeats.length > 1 ? 's' : ''}
-                </p>
-                <p className="text-gray-600 mt-1">
-                  Precio por asiento: Bs. 150.00
-                </p>
-                <p className="text-2xl font-bold text-blue-600 mt-2">
-                  Total: Bs. {(selectedSeats.length * 150).toFixed(2)}
-                </p>
-              </div>
-              <button
-                onClick={handleReserve}
-                className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg"
-              >
-                Continuar con la reserva
-              </button>
-            </div>
-          </div>
-        )}
+        
       </div>
     </div>
   );

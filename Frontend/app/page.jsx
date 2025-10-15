@@ -2,13 +2,10 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Bus, MapPin, Clock, Shield, Star, ArrowRight } from "lucide-react";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import NoticiasSection from "../components/NoticieSection"
+import NoticiasSection from "../components/NoticieSection";
 
 export default function Home() {
   const [ciudades, setCiudades] = useState([]);
@@ -43,22 +40,21 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen">
-      <section className="relative py-20">
-        <Image
-          src="/buses.webp"
-          alt="Buses"
-          fill
-          className="object-cover z-0 opacity-60"
-          priority
-        />
-
-        <div className="inset-0 bg-black/50 z-10">
+    <div className="flex-row ">
+      <section className="relative py-40 mx-auto">
+        <div className="inset-0 bg-black/50 z-10 ">
+          <Image
+            src="/buses.webp"
+            alt="Buses"
+            fill
+            className="object-cover z-0 opacity-60 absolute"
+            priority
+          />
           <div className="relative z-20 flex flex-col items-start justify-center h-full px-10 text-white">
             <h1 className="text-5xl font-bold mb-4">
               Bienvenido a Trans Sacaba
             </h1>
-            <p className="text-xl mb-8 text-gray-200 text-shadow-sm">
+            <p className="text-xl mb-8 text-gray-200 font-semibold text-shadow-lg">
               Conectando los 9 departamentos de Bolivia con seguridad, comodidad
               y puntualidad. Tu viaje comienza aquí.
             </p>
@@ -92,14 +88,14 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <Card className="text-center">
               <CardContent className="pt-6">
-                <Bus className="w-12 h-12 mx-auto mb-4 text-orange-500" />
+                <Bus className="w-12 h-12 mx-auto mb-4 text-verde-500" />
                 <h3 className="font-semibold text-lg mb-2">Flota Moderna</h3>
                 <p className="text-sm text-gray-600">Buses nuevos y cómodos</p>
               </CardContent>
             </Card>
             <Card className="text-center">
               <CardContent className="pt-6">
-                <Shield className="w-12 h-12 mx-auto mb-4 text-orange-500" />
+                <Shield className="w-12 h-12 mx-auto mb-4 text-verde-500" />
                 <h3 className="font-semibold text-lg mb-2">Viaje Seguro</h3>
                 <p className="text-sm text-gray-600">
                   Conductores certificados
@@ -108,14 +104,14 @@ export default function Home() {
             </Card>
             <Card className="text-center">
               <CardContent className="pt-6">
-                <Clock className="w-12 h-12 mx-auto mb-4 text-orange-500" />
+                <Clock className="w-12 h-12 mx-auto mb-4 text-verde-500" />
                 <h3 className="font-semibold text-lg mb-2">Puntualidad</h3>
                 <p className="text-sm text-gray-600">Salidas a tiempo</p>
               </CardContent>
             </Card>
             <Card className="text-center">
               <CardContent className="pt-6">
-                <Star className="w-12 h-12 mx-auto mb-4 text-orange-500" />
+                <Star className="w-12 h-12 mx-auto mb-4 text-verde-500" />
                 <h3 className="font-semibold text-lg mb-2">Mejor Servicio</h3>
                 <p className="text-sm text-gray-600">Atención de calidad</p>
               </CardContent>
@@ -124,9 +120,19 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-16">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">
+      <section
+        className="py-16 bg-green-200"
+        style={{
+          backgroundImage: `
+      url('/img/img7.jpg')
+    `,
+          backgroundPosition: "center",
+          backgroundRepeat: "repeat",
+          backgroundSize: "cover"
+        }}
+      >
+        <div className="container mx-auto px-4 ">
+          <h2 className="text-3xl font-bold text-center mb-12 z-10">
             Nuestros Destinos
           </h2>
 
@@ -140,9 +146,9 @@ export default function Home() {
             {ciudades.map((ciudad) => (
               <Card
                 key={ciudad.id}
-                className="overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+                className="overflow-hidden hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
               >
-                <div className="relative h-48 bg-gradient-to-br from-orange-400 to-orange-600">
+                <div className="relative h-48 bg-gradient-to-br from-verde-400 to-verde-600">
                   {ciudad.image_url ? (
                     <Image
                       src={`http://localhost:3001${ciudad.image_url}`}
@@ -173,14 +179,14 @@ export default function Home() {
                   <div className="flex gap-2">
                     <button
                       onClick={(e) => handleViewSchedule(ciudad, e)}
-                      className="flex-1 border border-orange-500 text-orange-500 hover:bg-orange-50 py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                      className="flex-1 border border-verde-500 text-green-500 hover:bg-green-50 py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-medium"
                     >
                       <Clock className="w-4 h-4" />
                       Ver Horarios
                     </button>
                     <Link href="/comprar" className="flex-1">
                       <Button
-                        className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                        className="w-full bg-verde-500 hover:bg-green-600 text-white"
                         size="sm"
                       >
                         <ArrowRight className="w-4 h-4 mr-1" />
@@ -202,8 +208,18 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="py-16 bg-gray-50">
-        <div className="container mx-auto px-4">
+      <section
+        className="py-16 bg-opacity-30 bg-green-300"
+        style={{
+          backgroundImage: ` linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+      url('/img/img8.avif')
+    `,
+          backgroundSize: "cover",
+          backgroundPosition: " center",
+          backgroundRepeat: "no-repeat",
+        }}
+      >
+        <div className="container mx-auto px-4 opacity-100">
           <NoticiasSection></NoticiasSection>
         </div>
       </section>
