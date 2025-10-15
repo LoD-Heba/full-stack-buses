@@ -183,18 +183,13 @@ export function BusForm({ bus }) {
     }
   };
 
-  // 🆕 Redirigir al configurador de asientos
-  const handleConfigureSeats = () => {
-    if (savedBusId) {
-      // Guardar el ID en localStorage para usarlo en la página de asientos
-      localStorage.setItem("configureBusId", savedBusId);
-      router.push("/dashboard/asientos");
-    } else {
-      toast.error(
-        "Debes guardar el bus primero antes de configurar los asientos"
-      );
-    }
-  };
+ const handleConfigureSeats = () => {
+  if (savedBusId) {
+    router.push(`/dashboard/asientos/configurador?busId=${savedBusId}`);
+  } else {
+    toast.error("Debes guardar el bus primero");
+  }
+};
 
   const onSubmit = handleSubmit(async (data) => {
     try {
