@@ -41,7 +41,7 @@ export default function DashboardSidebar() {
                 key={item.href}
                 href={item.href}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${
-                  isActive ? "bg-green-600" : " hover:bg-green-50"
+                  isActive ? "bg-gradient-to-br from-green-400 to-green-900" : " hover:bg-green-50"
                 }`}
               >
                 <span className="text-sm">{item.label}</span>

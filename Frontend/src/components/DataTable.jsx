@@ -61,11 +61,11 @@ export default function DataTable({
       <div className="border rounded-lg overflow-hidden bg-white">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-gradient-to-br from-emerald-500 to-emerald-600">
               {columns.map((column) => (
-                <TableHead key={column.key}>{column.label}</TableHead>
+                <TableHead key={column.key} className="text-white">{column.label}</TableHead>
               ))}
-              <TableHead className="text-right">Acciones</TableHead>
+              <TableHead className="text-right text-white">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
