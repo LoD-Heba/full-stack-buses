@@ -17,6 +17,8 @@ import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
 import { TripStatus, TicketStatus } from 'src/common/enums/status.enum';
 import { Route } from '../route/entities/route.entity';
 import { Trip } from '../trip/entities/trip.entity';
+import { ConfigureBusLayoutDto } from './dto/configure-layout.dto';
+import { Seat } from '../seat/entities/seat.entity';
 
 @Injectable()
 export class BusService {
@@ -35,6 +37,9 @@ export class BusService {
 
     @InjectRepository(Trip)
     private readonly tripRepository: Repository<Trip>,
+
+    @InjectRepository(Seat)
+    private readonly seatRepository: Repository<Seat>,
   ) {}
 
   async create(createBusDto: CreateBusDto): Promise<Bus> {
@@ -517,6 +522,84 @@ export class BusService {
       available_seats: trip.available_seats,
     };
   }
+
+  async configureLayout(busId: string, configDto: ConfigureBusLayoutDto) {
+    return await this.busRepository.manager.transaction(async (manager) => {
+      // Verificar que el bus existe
+      const bus = await manager.findOne(Bus, {
+        where: { id: busId, is_active: true },
+        relations: { stacks: { seats: true }, trips: true },
+      });
+
+      if (!bus) {
+        throw new NotFoundException(`El bus ${busId} no existe`);
+      }
+
+      // Validar que no tenga viajes activos
+      const activeTrips =
+        bus.trips?.filter(
+          (trip) =>
+            trip.status === TripStatus.SCHEDULED ||
+            trip.status === TripStatus.IN_PROGRESS,
+        ) || [];
+
+      if (activeTrips.length > 0) {
+        throw new BadRequestException(
+          `No se puede reconfigurar un bus con ${activeTrips.length} viajes activos`,
+        );
+      }
+
+      // Eliminar stacks y asientos existentes
+      if (bus.stacks && bus.stacks.length > 0) {
+        for (const stack of bus.stacks) {
+          if (stack.seats && stack.seats.length > 0) {
+            await manager.remove(Seat, stack.seats);
+          }
+          await manager.remove(SeatStack, stack);
+        }
+      }
+
+      // Crear nuevos stacks y asientos
+      const createdStacks: SeatStack[] = [];
+
+      for (const deckConfig of configDto.decks) {
+        // Crear stack
+        const newStack = manager.create(SeatStack, {
+          name: deckConfig.stack_name,
+          description: deckConfig.description,
+          floor_number: deckConfig.floor_number,
+          bus: bus,
+        });
+
+        const savedStack = await manager.save(SeatStack, newStack);
+
+        // Crear asientos del stack
+        const seats: Seat[] = [];
+        for (const seatData of deckConfig.seats) {
+          const seat = manager.create(Seat, {
+            seat_code: seatData.seat_code.toUpperCase(),
+            seat_number: seatData.seat_number,
+            deck: deckConfig.floor_number,
+            type: seatData.type,
+            position_x: seatData.position_x,
+            position_y: seatData.position_y,
+            visual_type: seatData.visual_type || 'seat',
+            rotation: seatData.rotation || 0,
+            meta: seatData.meta || {},
+            is_active: true,
+            stacks: savedStack,
+          });
+          seats.push(seat);
+        }
+
+        await manager.save(Seat, seats);
+        createdStacks.push(savedStack);
+      }
+
+      return this.findOne(busId);
+    });
+  }
+
   // Métodos auxiliares privados
   private async findUser(userId: string): Promise<User> {
     const user = await this.userRepository.findOne({

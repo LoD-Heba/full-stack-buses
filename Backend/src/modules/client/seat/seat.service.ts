@@ -15,6 +15,7 @@ import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
 import { Bus } from '../bus/entities/bus.entity';
 import { Trip } from '../trip/entities/trip.entity';
 import { TicketStatus, TripStatus } from 'src/common/enums/status.enum';
+import { CreateBulkSeatsDto } from './dto/create-bulk-seats.dto';
 
 @Injectable()
 export class SeatService {
@@ -531,6 +532,109 @@ export class SeatService {
       },
     };
   }
+
+  async createBulk(createBulkDto: CreateBulkSeatsDto): Promise<Seat[]> {
+  return await this.seatRepository.manager.transaction(async (manager) => {
+    const { stackId, seats: seatsData } = createBulkDto;
+
+    // Verificar que el stack existe
+    const stack = await manager.findOne(SeatStack, {
+      where: { id: stackId },
+      relations: { bus: true, seats: true },
+    });
+
+    if (!stack) {
+      throw new NotFoundException(`El stack ${stackId} no existe`);
+    }
+
+    // Validar que el bus esté activo
+    if (stack.bus && !stack.bus.is_active) {
+      throw new BadRequestException(
+        'No se pueden agregar asientos a un stack de un bus inactivo',
+      );
+    }
+
+    // Validar límites según tipo de bus
+    const existingSeatsCount = stack.seats?.filter(s => s.is_active).length || 0;
+    const maxSeats =
+      stack.bus.service_type === 'cama' ? 40 :
+      stack.bus.service_type === 'semi_cama' ? 48 : 60;
+
+    if (existingSeatsCount + seatsData.length > maxSeats) {
+      throw new BadRequestException(
+        `El bus tipo ${stack.bus.service_type} no puede tener más de ${maxSeats} asientos. Actual: ${existingSeatsCount}, intentando agregar: ${seatsData.length}`,
+      );
+    }
+
+    // Validar unicidad de seat_code y seat_number
+    const existingSeatCodes = stack.seats?.map(s => s.seat_code.toUpperCase()) || [];
+    const existingSeatNumbers = stack.seats?.map(s => s.seat_number) || [];
+
+    const newSeatCodes = seatsData.map(s => s.seat_code.toUpperCase());
+    const newSeatNumbers = seatsData.map(s => s.seat_number);
+
+    // Verificar duplicados en el lote nuevo
+    const duplicateCodes = newSeatCodes.filter((code, index) => 
+      newSeatCodes.indexOf(code) !== index
+    );
+    if (duplicateCodes.length > 0) {
+      throw new BadRequestException(
+        `Códigos duplicados en el lote: ${duplicateCodes.join(', ')}`
+      );
+    }
+
+    const duplicateNumbers = newSeatNumbers.filter((num, index) => 
+      newSeatNumbers.indexOf(num) !== index
+    );
+    if (duplicateNumbers.length > 0) {
+      throw new BadRequestException(
+        `Números duplicados en el lote: ${duplicateNumbers.join(', ')}`
+      );
+    }
+
+    // Verificar conflictos con asientos existentes
+    const conflictingCodes = newSeatCodes.filter(code => 
+      existingSeatCodes.includes(code)
+    );
+    if (conflictingCodes.length > 0) {
+      throw new BadRequestException(
+        `Códigos ya existentes: ${conflictingCodes.join(', ')}`
+      );
+    }
+
+    const conflictingNumbers = newSeatNumbers.filter(num => 
+      existingSeatNumbers.includes(num)
+    );
+    if (conflictingNumbers.length > 0) {
+      throw new BadRequestException(
+        `Números de asiento ya existentes: ${conflictingNumbers.join(', ')}`
+      );
+    }
+
+    // Crear todos los asientos
+    const seats: Seat[] = [];
+    for (const seatData of seatsData) {
+      const seat = manager.create(Seat, {
+        seat_code: seatData.seat_code.toUpperCase(),
+        seat_number: seatData.seat_number,
+        deck: seatData.deck || stack.floor_number || 1,
+        type: seatData.type,
+        position_x: seatData.position_x,
+        position_y: seatData.position_y,
+        visual_type: seatData.visual_type || 'seat',
+        rotation: seatData.rotation || 0,
+        meta: seatData.meta || {},
+        is_active: true,
+        stacks: stack,
+      });
+      seats.push(seat);
+    }
+
+    const savedSeats = await manager.save(Seat, seats);
+
+    return savedSeats;
+  });
+}
 
   // Métodos auxiliares privados
   private async findSeatStack(stackId: string): Promise<SeatStack> {

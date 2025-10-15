@@ -23,6 +23,7 @@ import { UpdateBusDto } from './dto/update-bus.dto';
 import { SearchBusDto } from './dto/search-bus.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { createMulterOptions } from 'src/config/upload.config';
+import { ConfigureBusLayoutDto } from './dto/configure-layout.dto';
 
 @Controller('buses')
 export class BusController {
@@ -78,7 +79,7 @@ export class BusController {
   getStatistics(@Param('id', ParseUUIDPipe) id: string) {
     return this.busService.getBusStatistics(id);
   }
-  
+
   @Get(':id/layout')
   getBusLayout(@Param('id', ParseUUIDPipe) id: string) {
     return this.busService.getBusLayout(id);
@@ -111,10 +112,18 @@ export class BusController {
   }
 
   @Get(':id/layout/trip/:tripId')
-getBusLayoutForTrip(
-  @Param('id', ParseUUIDPipe) id: string,
-  @Param('tripId', ParseUUIDPipe) tripId: string,
-) {
-  return this.busService.getBusLayoutForTrip(id, tripId);
-}
+  getBusLayoutForTrip(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('tripId', ParseUUIDPipe) tripId: string,
+  ) {
+    return this.busService.getBusLayoutForTrip(id, tripId);
+  }
+
+  @Post(':id/configure-layout')
+  configureLayout(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() configureLayoutDto: ConfigureBusLayoutDto,
+  ) {
+    return this.busService.configureLayout(id, configureLayoutDto);
+  }
 }

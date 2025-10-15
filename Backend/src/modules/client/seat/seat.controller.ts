@@ -14,6 +14,7 @@ import { SeatService } from './seat.service';
 import { CreateSeatDto } from './dto/create-seat.dto';
 import { UpdateSeatDto } from './dto/update-seat.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { CreateBulkSeatsDto } from './dto/create-bulk-seats.dto';
 
 @Controller('seat')
 export class SeatController {
@@ -24,26 +25,31 @@ export class SeatController {
     return this.seatService.create(createSeatDto);
   }
 
+  @Post('bulk')
+  createBulk(@Body() createBulkDto: CreateBulkSeatsDto) {
+    return this.seatService.createBulk(createBulkDto);
+  }
+
   @Get()
   findAll(@Query() paginationDto: PaginationDto) {
     return this.seatService.findAll(paginationDto);
   }
 
- @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string) { 
+  @Get(':id')
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.seatService.findOne(id);
   }
 
   @Patch(':id')
   update(
-    @Param('id', ParseUUIDPipe) id: string, 
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateSeatDto: UpdateSeatDto,
   ) {
     return this.seatService.update(id, updateSeatDto);
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseUUIDPipe) id: string) { 
+  remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.seatService.remove(id);
   }
 }
