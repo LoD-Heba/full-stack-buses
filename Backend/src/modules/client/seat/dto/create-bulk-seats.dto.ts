@@ -16,18 +16,18 @@ class BulkSeatItem {
   @IsNotEmpty()
   seat_code: string;
 
-  @IsInt()
-  @Min(1)
-  @Max(100)
+  @IsInt({ message: 'El número de asiento debe ser un número entero' })
+  @Min(1, { message: 'El número de asiento debe ser mayor que 0' })
+  @Max(100, { message: 'El número de asiento no puede exceder 100' })
   seat_number: number;
 
   @IsOptional()
-  @IsInt()
+  @IsInt({ message: 'La posición X debe ser un número entero' })
   @Min(1)
   position_x?: number;
 
   @IsOptional()
-  @IsInt()
+  @IsInt({ message: 'La posición Y debe ser un número entero' })
   @Min(1)
   position_y?: number;
 
@@ -42,7 +42,7 @@ class BulkSeatItem {
 
   @IsOptional()
   @IsInt()
-  @Min(1)
+  @Min(0)
   @Max(2)
   deck?: number;
 

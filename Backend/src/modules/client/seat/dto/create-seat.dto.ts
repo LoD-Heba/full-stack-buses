@@ -65,7 +65,7 @@ export class CreateSeatDto {
 
   @IsOptional()
   @IsInt()
-  @Min(1)
+  @Min(0)
   @Max(2)
   @Transform(({ value }) => parseInt(value))
   deck?: number;
