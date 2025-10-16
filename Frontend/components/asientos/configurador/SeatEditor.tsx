@@ -158,7 +158,7 @@ export default function SeatEditor({ busId, initialLayout, onSave }: SeatEditorP
           description: `Configuración del piso ${deckNumber}`,
           seats: cells.map(cell => ({
             seat_code: cell.seat_code || `ELEM-${cell.position_x}-${cell.position_y}`,
-            seat_number: cell.seat_number || + 1,
+            seat_number: cell.visual_type === 'seat' ? cell.seat_number : undefined,
             position_x: cell.position_x,
             position_y: cell.position_y,
             visual_type: cell.visual_type,
