@@ -1,82 +1,208 @@
 import React, { useState, useEffect } from "react";
 import { AlertCircle } from "lucide-react";
+import { FaChair, FaTv, FaToilet, FaDoorOpen } from "react-icons/fa";
+import { MdAirlineSeatReclineExtra } from "react-icons/md";
 
 const AsientoItem = ({ data, selected, disabled, onSelect }) => {
   const handleClick = () => {
-    if (!disabled) {
+    if (data.visual_type === 'seat' && !disabled && onSelect) {
       onSelect(data.seat_code?.toUpperCase() || data.seat_code);
     }
   };
 
-  const getStatusColor = () => {
-    if (disabled) {
-      return "bg-red-300 border-red-500 cursor-not-allowed";
+  // ✅ Obtener icono según tipo
+  const getIcon = () => {
+    switch (data.visual_type) {
+      case 'seat':
+        return data.type === 'cama' ? (
+          <MdAirlineSeatReclineExtra className="text-white" />
+        ) : (
+          <FaChair className="text-white" />
+        );
+      case 'tv':
+        return <FaTv className="text-blue-500 text-2xl" />;
+      case 'bathroom':
+        return <FaToilet className="text-indigo-400 text-2xl" />;
+      case 'door':
+        return <FaDoorOpen className="text-amber-500 text-2xl" />;
+      case 'aisle':
+        return null;
+      default:
+        return null;
     }
+  };
+
+  // ✅ Obtener color según status
+  const getStatusColor = () => {
+    if (data.visual_type !== 'seat') return 'bg-transparent';
+
+    if (disabled) {
+      return "bg-red-400 border-red-600 cursor-not-allowed";
+    }
+    
     if (selected) {
-      return "bg-blue-500 border-blue-700";
+      return "bg-blue-500 border-blue-700 shadow-lg scale-105";
     }
 
-    // Usar el campo status si existe
+    // ✅ Usar el campo status si existe
     if (data.status) {
       switch (data.status) {
-        case "disponible":
-          return "bg-green-400 border-green-600 hover:bg-green-500";
-        case "reservado":
+        case 'disponible':
+          // Color según tipo de asiento
+          switch (data.type) {
+            case 'cama':
+              return "bg-green-600 border-green-700 hover:bg-green-700";
+            case 'semi_cama':
+              return "bg-blue-600 border-blue-700 hover:bg-blue-700";
+            case 'normal':
+            default:
+              return "bg-gray-500 border-gray-600 hover:bg-gray-600";
+          }
+        case 'reservado':
           return "bg-yellow-400 border-yellow-600 cursor-not-allowed";
-        case "ocupado":
-          return "bg-red-300 border-red-500 cursor-not-allowed";
-        case "bloqueado":
+        case 'ocupado':
+          return "bg-red-400 border-red-600 cursor-not-allowed";
+        case 'bloqueado':
           return "bg-gray-400 border-gray-600 cursor-not-allowed";
         default:
-          return "bg-green-400 border-green-600 hover:bg-green-500";
+          return "bg-gray-500 border-gray-600 hover:bg-gray-600";
       }
     }
 
-    // Fallback para compatibilidad
-    return "bg-green-400 border-green-600 hover:bg-green-500";
+    // Fallback: color por tipo de asiento
+    switch (data.type) {
+      case 'cama':
+        return "bg-green-600 border-green-700 hover:bg-green-700";
+      case 'semi_cama':
+        return "bg-blue-600 border-blue-700 hover:bg-blue-700";
+      case 'normal':
+      default:
+        return "bg-gray-500 border-gray-600 hover:bg-gray-600";
+    }
   };
 
-  const baseClasses = "rounded-md border-2 cursor-pointer transition-all";
+  const baseClasses = "rounded-lg border-2 transition-all duration-200";
   const statusClasses = getStatusColor();
+  const isDisabled = disabled || 
+    data.status === 'reservado' || 
+    data.status === 'ocupado' || 
+    data.status === 'bloqueado';
 
   return (
     <button
       onClick={handleClick}
-      disabled={
-        disabled ||
-        data.status === "reservado" ||
-        data.status === "ocupado" ||
-        data.status === "bloqueado"
-      }
-      className={`${baseClasses} ${statusClasses} w-full h-full text-xs font-bold text-white`}
-      title={`${data.seat_code} - ${data.status || "disponible"}`}
+      disabled={isDisabled}
+      className={`${baseClasses} ${statusClasses} w-full h-full flex items-center justify-center ${
+        data.visual_type === 'seat' && !isDisabled ? 'cursor-pointer' : ''
+      }`}
+      title={`${data.seat_code} - ${data.status || 'disponible'}`}
+      style={{
+        transform: `rotate(${data.rotation || 0}deg)`,
+      }}
     >
-      {data.visual_type === "seat"
-        ? data.seat_number || data.seat_code
-        : data.visual_type?.[0]}
+      {data.visual_type === 'seat' ? (
+        <div className="flex flex-col items-center">
+          {getIcon()}
+          <span className="text-white text-xs font-bold mt-1">
+            {data.seat_number || data.seat_code}
+          </span>
+        </div>
+      ) : (
+        getIcon()
+      )}
     </button>
   );
 };
 
-const AsientoLegend = () => (
-  <div className="flex gap-6 justify-center p-4 bg-white rounded-lg shadow-md">
+// ✅ Leyenda de estados (simplificada - solo estados)
+const StatusLegend = () => (
+  <div className="bg-white rounded-lg shadow-md p-4 space-y-3">
+    <h3 className="font-bold text-gray-800 mb-2">Estado de Asientos</h3>
+    
     <div className="flex items-center gap-2">
-      <div className="w-6 h-6 bg-green-400 rounded border-2 border-green-600"></div>
-      <span className="text-sm">Disponible</span>
+      <div className="w-8 h-8 bg-gray-500 rounded border-2 border-gray-600 flex items-center justify-center">
+        <FaChair className="text-white text-xs" />
+      </div>
+      <span className="text-sm text-gray-700">Disponible</span>
     </div>
+
     <div className="flex items-center gap-2">
-      <div className="w-6 h-6 bg-blue-500 rounded border-2 border-blue-700"></div>
-      <span className="text-sm">Seleccionado</span>
+      <div className="w-8 h-8 bg-blue-500 rounded border-2 border-blue-700 flex items-center justify-center shadow-lg">
+        <FaChair className="text-white text-xs" />
+      </div>
+      <span className="text-sm text-gray-700">Seleccionado</span>
     </div>
+
     <div className="flex items-center gap-2">
-      <div className="w-6 h-6 bg-red-300 rounded border-2 border-red-500"></div>
-      <span className="text-sm">Ocupado</span>
+      <div className="w-8 h-8 bg-yellow-400 rounded border-2 border-yellow-600 flex items-center justify-center">
+        <FaChair className="text-white text-xs" />
+      </div>
+      <span className="text-sm text-gray-700">Reservado</span>
+    </div>
+
+    <div className="flex items-center gap-2">
+      <div className="w-8 h-8 bg-red-400 rounded border-2 border-red-600 flex items-center justify-center">
+        <FaChair className="text-white text-xs" />
+      </div>
+      <span className="text-sm text-gray-700">Ocupado</span>
+    </div>
+
+    <div className="flex items-center gap-2">
+      <div className="w-8 h-8 bg-gray-400 rounded border-2 border-gray-600 flex items-center justify-center">
+        <FaChair className="text-white text-xs" />
+      </div>
+      <span className="text-sm text-gray-700">Bloqueado</span>
+    </div>
+  </div>
+);
+
+// ✅ Leyenda de tipos de asiento
+const SeatTypeLegend = () => (
+  <div className="bg-white rounded-lg shadow-md p-4 space-y-3">
+    <h3 className="font-bold text-gray-800 mb-2">Tipos de Asiento</h3>
+
+    <div className="flex items-center gap-2">
+      <div className="w-8 h-8 bg-gray-500 rounded border-2 border-gray-600 flex items-center justify-center">
+        <FaChair className="text-white text-xs" />
+      </div>
+      <span className="text-sm text-gray-700">Normal</span>
+    </div>
+
+    <div className="flex items-center gap-2">
+      <div className="w-8 h-8 bg-blue-600 rounded border-2 border-blue-700 flex items-center justify-center">
+        <FaChair className="text-white text-xs" />
+      </div>
+      <span className="text-sm text-gray-700">Semi Cama</span>
+    </div>
+
+    <div className="flex items-center gap-2">
+      <div className="w-8 h-8 bg-green-600 rounded border-2 border-green-700 flex items-center justify-center">
+        <MdAirlineSeatReclineExtra className="text-white text-xs" />
+      </div>
+      <span className="text-sm text-gray-700">Cama</span>
+    </div>
+
+    <div className="pt-3 border-t space-y-2">
+      <p className="text-xs text-gray-600 font-semibold">Elementos:</p>
+      <div className="flex items-center gap-2">
+        <FaTv className="text-blue-500 text-lg" />
+        <span className="text-xs text-gray-600">TV</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <FaToilet className="text-indigo-400 text-lg" />
+        <span className="text-xs text-gray-600">Baño</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <FaDoorOpen className="text-amber-500 text-lg" />
+        <span className="text-xs text-gray-600">Puerta</span>
+      </div>
     </div>
   </div>
 );
 
 export default function AsientoMapa({
   busLayout,
+  tripInfo,
   occupiedSeats = [],
   onSeatSelect,
   maxSelection = 5,
@@ -138,7 +264,6 @@ export default function AsientoMapa({
     );
   }
 
-  // ✅ MODIFICADO: Manejar selección de asientos normalizando a mayúsculas
   const toggleSeat = (seatCode) => {
     const normalizedCode = seatCode.toUpperCase();
 
@@ -155,7 +280,6 @@ export default function AsientoMapa({
         newSelection = [...prev, normalizedCode];
       }
 
-      // ✅ Notificar cambio al padre
       if (onSeatSelect) {
         console.log("🎯 Asientos seleccionados:", newSelection);
         onSeatSelect(newSelection);
@@ -187,18 +311,14 @@ export default function AsientoMapa({
 
     const maxX = Math.max(...layout.map((s) => s.position_x), 0);
     const maxY = Math.max(...layout.map((s) => s.position_y), 0);
-    
 
     return (
-      <div className="flex-1 min-w-0">
-        <h3 className="text-center font-bold text-gray-700 mb-3 bg-white/90 py-2 px-4 rounded-lg">
-          {deckData.stack_name}
-        </h3>
+      <div className="flex-1">
         <div
           className="grid gap-2 mx-auto"
           style={{
-            gridTemplateColumns: `repeat(${Math.max(maxX, 1)}, 50px)`,
-            gridTemplateRows: `repeat(${Math.max(maxY, 1)}, 50px)`,
+            gridTemplateColumns: `repeat(${Math.max(maxX, 1)}, 60px)`,
+            gridTemplateRows: `repeat(${Math.max(maxY, 1)}, 60px)`,
             width: "fit-content",
           }}
         >
@@ -211,6 +331,7 @@ export default function AsientoMapa({
                   gridColumn: seat.position_x || 1,
                   gridRow: seat.position_y || 1,
                 }}
+                className="w-[60px] h-[60px]"
               >
                 <AsientoItem
                   data={seat}
@@ -227,96 +348,81 @@ export default function AsientoMapa({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Información del bus */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">
-              {busLayout.model || "Bus"}
-            </h2>
-            <p className="text-gray-600 mt-1">
-              Placa:{" "}
-              <span className="font-semibold">{busLayout.plate || "N/A"}</span>
+    <div className="grid grid-cols-12 gap-6">
+      {/* ✅ Leyendas a la izquierda */}
+      <div className="col-span-2 space-y-4">
+        <StatusLegend />
+        <SeatTypeLegend />
+        
+        {/* Resumen de selección */}
+        {selectedSeats.length > 0 && (
+          <div className="bg-blue-50 rounded-lg border-2 border-blue-300 p-4 shadow-md">
+            <p className="font-bold text-blue-900 mb-2 text-sm">
+              Seleccionados ({selectedSeats.length}/{maxSelection})
             </p>
-            <p className="text-gray-600">
-              Tipo:{" "}
-              <span className="font-semibold capitalize">
-                {(busLayout.service_type || "normal").replace(/_/g, " ")}
-              </span>
+            <p className="text-blue-700 text-xs mb-3 font-semibold">
+              {selectedSeats.join(", ")}
             </p>
-            {busLayout.amenities && (
-              <p className="text-gray-600 mt-2 text-sm">
-                <span className="font-semibold">Comodidades:</span>{" "}
-                {busLayout.amenities}
-              </p>
-            )}
+            <button
+              onClick={clearSelection}
+              className="w-full px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+            >
+              Limpiar
+            </button>
           </div>
-          {busLayout.image_url && (
-            <img
-              src={busLayout.image_url}
-              alt={busLayout.model}
-              className="w-32 h-24 object-cover rounded-lg"
-              onError={(e) => {
-                e.target.style.display = "none";
-              }}
-            />
-          )}
-        </div>
+        )}
       </div>
 
-      {/* Leyenda */}
-      <AsientoLegend />
-
-      {/* Selector de pisos */}
-      {busLayout.floors > 1 && busLayout.decks.length > 1 && (
-        <div className="bg-white p-4 rounded-lg shadow-md">
-          <p className="text-sm font-semibold text-gray-700 mb-3">
-            Seleccionar Piso:
-          </p>
-          <div className="flex gap-3">
-            {busLayout.decks.map((deck) => (
-              <button
-                key={deck.deck}
-                onClick={() => {
-                  setSelectedDeck(deck.deck);
-                  setSelectedSeats([]);
-                }}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  selectedDeck === deck.deck
-                    ? "bg-blue-600 text-white shadow-lg"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                Piso {deck.deck}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Mapa de asientos */}
-      <div
-        className="relative p-8 rounded-lg shadow-lg overflow-hidden"
-        style={{
-          backgroundImage:
-            "url(https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&q=80)",
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          backgroundBlendMode: "overlay",
-          backgroundColor: "rgba(243, 244, 246, 0.95)",
-        }}
-      >
-        <div className="absolute inset-0 bg-gray-100/80 backdrop-blur-sm"></div>
-
-        <div className="relative z-10">
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 px-6 rounded-lg mb-6 text-center shadow-md">
-            <p className="font-bold text-lg">
-              🚌 {busLayout.plate} - {busLayout.model}
+      {/* ✅ Mapa de asientos al centro */}
+      <div className="col-span-10 space-y-4">
+        {/* Header con ruta */}
+        {tripInfo && (
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 px-6 rounded-lg shadow-md">
+            <p className="font-bold text-lg text-center">
+              🚌 {tripInfo.route?.originCity?.name || '?'} → {tripInfo.route?.destinationCity?.name || '?'}
+            </p>
+            <p className="text-sm text-center text-blue-100 mt-1">
+              {busLayout.plate} - {busLayout.model}
             </p>
           </div>
+        )}
 
-          <div className="flex gap-8 justify-center items-start flex-wrap">
+        {/* Selector de pisos */}
+        {busLayout.floors > 1 && busLayout.decks.length > 1 && (
+          <div className="bg-white p-4 rounded-lg shadow-md">
+            <p className="text-sm font-semibold text-gray-700 mb-3">
+              Seleccionar Piso:
+            </p>
+            <div className="flex gap-3">
+              {busLayout.decks.map((deck) => (
+                <button
+                  key={deck.deck}
+                  onClick={() => {
+                    setSelectedDeck(deck.deck);
+                    setSelectedSeats([]);
+                  }}
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                    selectedDeck === deck.deck
+                      ? "bg-blue-600 text-white shadow-lg"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  }`}
+                >
+                  Piso {deck.deck}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Layout del bus */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          {/* Frente del bus */}
+          <div className="bg-gray-800 text-white py-2 px-4 rounded-t-lg mb-6 text-center">
+            <p className="font-semibold">🚌 Frente del Bus - Conductor</p>
+          </div>
+
+          {/* Grid de asientos */}
+          <div className="flex justify-center">
             {busLayout.floors > 1
               ? busLayout.decks.map((deckData) => (
                   <React.Fragment key={deckData.deck}>
@@ -326,7 +432,8 @@ export default function AsientoMapa({
               : renderDeckLayout(currentDeckData)}
           </div>
 
-          <div className="bg-gradient-to-r from-gray-700 to-gray-800 text-white py-2 px-4 rounded-lg mt-6 text-center shadow-md">
+          {/* Parte trasera */}
+          <div className="bg-gray-800 text-white py-2 px-4 rounded-b-lg mt-6 text-center">
             <p className="font-semibold">Parte Trasera del Bus</p>
           </div>
         </div>
