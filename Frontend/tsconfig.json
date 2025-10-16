@@ -22,6 +22,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "app/dashboard/usuarios/components/user-form.js", "app/dashboard/usuarios/api/api-users.js", "app/dashboard/asientos/[busId]/page.js"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "app/dashboard/usuarios/components/user-form.js", "app/dashboard/usuarios/api/api-users.js", "app/dashboard/asientos/[busId]/page.js", "components/asientos/AsientoMapa.jsx", "app/dashboard/asientos/page.jsx"],
   "exclude": ["node_modules"]
 }

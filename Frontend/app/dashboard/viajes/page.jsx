@@ -124,10 +124,13 @@ export default function TripsManagement() {
   };
 
   const openEditModal = (trip) => {
-    if (trip.status === 'IN_PROGRESS' || trip.status === 'COMPLETED') {
-    showAlert("No se puede editar un viaje en progreso o completado", "error");
-    return;
-  }
+    if (trip.status === "IN_PROGRESS" || trip.status === "COMPLETED") {
+      showAlert(
+        "No se puede editar un viaje en progreso o completado",
+        "error"
+      );
+      return;
+    }
     setModalMode("edit");
     setSelectedTrip(trip);
     setFormData({
@@ -377,6 +380,22 @@ export default function TripsManagement() {
 
     loadBusesForRoute();
   }, [formData.routeId]);
+  ////////////////////////////////////////////////////////
+  const handleSelectTrip = (trip) => {
+    // Validar que el viaje sea válido
+    if (!trip.status === "SCHEDULED") {
+      showAlert("Este viaje no está disponible para compra", "error");
+      return;
+    }
+
+    if (!trip.available_seats || trip.available_seats === 0) {
+      showAlert("No hay asientos disponibles en este viaje", "error");
+      return;
+    }
+
+    // ✅ REDIRECCIÓN CORREGIDA: Ir a dashboard/asientos
+    router.push(`/dashboard/asientos?tripId=${trip.id}&clientId=${clientId}`);
+  };
   /////////////////////////////////////////////////////////
   return (
     <div className="space-y-6">
@@ -561,7 +580,7 @@ export default function TripsManagement() {
                 />
                 <Label htmlFor="departure_time_hour">Hora de Salida *</Label>
                 <p className="text-xs text-gray-500 mt-1">
-                Anticipación 2 horas | Horarios 5AM - 11PM
+                  Anticipación 2 horas | Horarios 5AM - 11PM
                 </p>
                 <Select
                   value={formData.departure_time.split("T")[1] || "08:00"}
@@ -618,7 +637,7 @@ export default function TripsManagement() {
                 />
                 <Label htmlFor="arrival_time_hour">Hora de Llegada *</Label>
                 <p className="text-xs text-gray-500 mt-1">
-                   Duración: Entre 30 minutos y 24 horas
+                  Duración: Entre 30 minutos y 24 horas
                 </p>
                 <Select
                   value={formData.arrival_time.split("T")[1] || "18:00"}
@@ -949,11 +968,7 @@ export default function TripsManagement() {
                             trip.available_seats > 0 ? (
                               <Button
                                 size="sm"
-                                onClick={() => {
-                                  router.push(
-                                    `/dashboard/viajes/${trip.id}/asientos?clientId=${clientId}`
-                                  );
-                                }}
+                                onClick={() => handleSelectTrip(trip)}
                                 className="bg-green-600 hover:bg-green-700 text-white"
                               >
                                 <CheckCircle className="w-4 h-4 mr-1" />
