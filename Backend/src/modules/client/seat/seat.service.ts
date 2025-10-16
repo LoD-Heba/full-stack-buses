@@ -568,11 +568,23 @@ export class SeatService {
     }
 
     // Validar unicidad de seat_code y seat_number
-    const existingSeatCodes = stack.seats?.map(s => s.seat_code.toUpperCase()) || [];
-    const existingSeatNumbers = stack.seats?.map(s => s.seat_number) || [];
+    // ✅ CAMBIO 1: Filtrar solo asientos (visual_type === 'seat')
+    const existingSeatCodes = stack.seats
+      ?.filter(s => s.visual_type === 'seat')
+      ?.map(s => s.seat_code.toUpperCase()) || [];
+    
+    const existingSeatNumbers = stack.seats
+      ?.filter(s => s.visual_type === 'seat' && s.seat_number !== null && s.seat_number !== undefined)
+      ?.map(s => s.seat_number as number) || [];
 
-    const newSeatCodes = seatsData.map(s => s.seat_code.toUpperCase());
-    const newSeatNumbers = seatsData.map(s => s.seat_number);
+    // ✅ CAMBIO 2: Filtrar solo asientos en el lote nuevo
+    const newSeatCodes = seatsData
+      .filter(s => s.visual_type === 'seat')
+      .map(s => s.seat_code.toUpperCase());
+    
+    const newSeatNumbers = seatsData
+      .filter(s => s.visual_type === 'seat' && s.seat_number !== null && s.seat_number !== undefined)
+      .map(s => s.seat_number as number);
 
     // Verificar duplicados en el lote nuevo
     const duplicateCodes = newSeatCodes.filter((code, index) => 
@@ -584,13 +596,16 @@ export class SeatService {
       );
     }
 
-    const duplicateNumbers = newSeatNumbers.filter((num, index) => 
-      newSeatNumbers.indexOf(num) !== index
-    );
-    if (duplicateNumbers.length > 0) {
-      throw new BadRequestException(
-        `Números duplicados en el lote: ${duplicateNumbers.join(', ')}`
+    // ✅ CAMBIO 3: Solo validar números duplicados si existen
+    if (newSeatNumbers.length > 0) {
+      const duplicateNumbers = newSeatNumbers.filter((num, index) => 
+        newSeatNumbers.indexOf(num) !== index
       );
+      if (duplicateNumbers.length > 0) {
+        throw new BadRequestException(
+          `Números duplicados en el lote: ${duplicateNumbers.join(', ')}`
+        );
+      }
     }
 
     // Verificar conflictos con asientos existentes
@@ -603,13 +618,16 @@ export class SeatService {
       );
     }
 
-    const conflictingNumbers = newSeatNumbers.filter(num => 
-      existingSeatNumbers.includes(num)
-    );
-    if (conflictingNumbers.length > 0) {
-      throw new BadRequestException(
-        `Números de asiento ya existentes: ${conflictingNumbers.join(', ')}`
+    // ✅ CAMBIO 4: Validar números solo si existen ambos lados
+    if (newSeatNumbers.length > 0 && existingSeatNumbers.length > 0) {
+      const conflictingNumbers = newSeatNumbers.filter(num => 
+        existingSeatNumbers.includes(num)
       );
+      if (conflictingNumbers.length > 0) {
+        throw new BadRequestException(
+          `Números de asiento ya existentes: ${conflictingNumbers.join(', ')}`
+        );
+      }
     }
 
     // Crear todos los asientos
@@ -617,7 +635,8 @@ export class SeatService {
     for (const seatData of seatsData) {
       const seat = manager.create(Seat, {
         seat_code: seatData.seat_code.toUpperCase(),
-        seat_number: seatData.seat_number,
+        // ✅ CAMBIO 5: Asignar seat_number solo si es asiento
+        seat_number: seatData.visual_type === 'seat' ? seatData.seat_number : undefined,
         deck: seatData.deck || stack.floor_number || 1,
         type: seatData.type,
         position_x: seatData.position_x,

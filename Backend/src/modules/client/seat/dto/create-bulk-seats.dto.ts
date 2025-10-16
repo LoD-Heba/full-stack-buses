@@ -16,10 +16,10 @@ class BulkSeatItem {
   @IsNotEmpty()
   seat_code: string;
 
+  @IsOptional()  // ← Hacer opcional
   @IsInt({ message: 'El número de asiento debe ser un número entero' })
   @Min(1, { message: 'El número de asiento debe ser mayor que 0' })
-  @Max(100, { message: 'El número de asiento no puede exceder 100' })
-  seat_number: number;
+  seat_number?: number;
 
   @IsOptional()
   @IsInt({ message: 'La posición X debe ser un número entero' })

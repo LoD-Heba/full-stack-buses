@@ -578,7 +578,10 @@ export class BusService {
         for (const seatData of deckConfig.seats) {
           const seat = manager.create(Seat, {
             seat_code: seatData.seat_code.toUpperCase(),
-            seat_number: seatData.seat_number,
+            seat_number:
+              seatData.visual_type === 'seat'
+                ? seatData.seat_number
+                : undefined,
             deck: deckConfig.floor_number,
             type: seatData.type,
             position_x: seatData.position_x,
