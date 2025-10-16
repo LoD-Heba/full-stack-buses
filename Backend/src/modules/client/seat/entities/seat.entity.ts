@@ -20,7 +20,7 @@ export class Seat {
   @Column({ unique: false }) // Único por stack, no globalmente
   seat_code: string;
 
-  @Column({ type: 'int' })
+  @Column({ type: 'int' , nullable: true})
   seat_number: number; // número de asiento
 
   @Column({

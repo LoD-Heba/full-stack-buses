@@ -17,9 +17,10 @@ class SeatConfigItem {
   @IsString()
   seat_code: string;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
-  seat_number: number;
+  seat_number?: number | null;
 
   @IsInt()
   @Min(1)

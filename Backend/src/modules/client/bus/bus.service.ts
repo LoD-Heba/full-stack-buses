@@ -19,9 +19,11 @@ import { Route } from '../route/entities/route.entity';
 import { Trip } from '../trip/entities/trip.entity';
 import { ConfigureBusLayoutDto } from './dto/configure-layout.dto';
 import { Seat } from '../seat/entities/seat.entity';
+import { BusCapacityHelper } from './bus-capacity.helper';
 
 @Injectable()
 export class BusService {
+  private readonly capacityHelper: BusCapacityHelper;
   constructor(
     @InjectRepository(Bus)
     private readonly busRepository: Repository<Bus>,
@@ -40,7 +42,12 @@ export class BusService {
 
     @InjectRepository(Seat)
     private readonly seatRepository: Repository<Seat>,
-  ) {}
+  ) {
+    this.capacityHelper = new BusCapacityHelper(
+      this.busRepository,
+      this.seatRepository,
+    );
+  }
 
   async create(createBusDto: CreateBusDto): Promise<Bus> {
     const { userId, ...busData } = createBusDto;
@@ -73,17 +80,13 @@ export class BusService {
 
   async findAll(paginationDto: PaginationDto): Promise<PaginatedResponse<Bus>> {
     const { page = 1, limit = 10 } = paginationDto;
-
     const take = Math.min(Math.max(limit, 1), 100);
     const skip = (page - 1) * take;
 
     const total = await this.busRepository.count();
-
     const lastPage = Math.ceil(total / take);
-    const hasNextPage = page < lastPage;
-    const hasPrevPage = page > 1;
 
-    const data = await this.busRepository.find({
+    let buses = await this.busRepository.find({
       relations: {
         user: true,
         stacks: {
@@ -97,15 +100,18 @@ export class BusService {
       take,
     });
 
+    // ✨ Enriquecer con capacidad
+    const busesWithCapacity = await this.capacityHelper.enrichBusesWithCapacity(buses);
+
     return {
-      data,
+      data: busesWithCapacity as any[],
       meta: {
         total,
         page,
         lastPage,
         limit: take,
-        hasNextPage,
-        hasPrevPage,
+        hasNextPage: page < lastPage,
+        hasPrevPage: page > 1,
       },
     };
   }
@@ -129,8 +135,8 @@ export class BusService {
     if (!bus) {
       throw new NotFoundException(`El bus con ID ${id} no existe`);
     }
-
-    return bus;
+    const capacity = await this.capacityHelper.calculateBusCapacity(id);
+    return { ...bus, capacity } as any;
   }
 
   async search(searchDto: SearchBusDto, paginationDto: PaginationDto) {
@@ -171,11 +177,13 @@ export class BusService {
 
     const total = await queryBuilder.getCount();
 
-    const data = await queryBuilder
+    let data = await queryBuilder
       .orderBy('bus.created_at', 'DESC')
       .skip(skip)
       .take(take)
       .getMany();
+
+    data = await this.capacityHelper.enrichBusesWithCapacity(data);
 
     const lastPage = Math.ceil(total / take);
     const hasNextPage = page < lastPage;
@@ -194,8 +202,8 @@ export class BusService {
     };
   }
 
-  async findByUser(userId: string): Promise<Bus[]> {
-    return this.busRepository.find({
+  async findByUser(userId: string): Promise<any[]> {
+    let buses = await this.busRepository.find({
       where: {
         user: { id: userId },
         is_active: true,
@@ -208,10 +216,13 @@ export class BusService {
       },
       order: { created_at: 'DESC' },
     });
+
+    // ✨ Enriquecer con capacidad
+    return await this.capacityHelper.enrichBusesWithCapacity(buses);
   }
 
-  async findAvailable(): Promise<Bus[]> {
-    return this.busRepository.find({
+  async findAvailable(): Promise<any[]> {
+    let buses = await this.busRepository.find({
       where: {
         is_active: true,
         status: BusStatus.DISPONIBLE,
@@ -224,6 +235,11 @@ export class BusService {
       },
       order: { model: 'ASC' },
     });
+
+    // ✨ Solo retornar buses con al menos 1 asiento
+    const busesWithCapacity =
+      await this.capacityHelper.enrichBusesWithCapacity(buses);
+    return busesWithCapacity.filter((bus) => bus.capacity > 0);
   }
 
   async update(id: string, updateBusDto: UpdateBusDto): Promise<Bus> {
@@ -578,10 +594,10 @@ export class BusService {
         for (const seatData of deckConfig.seats) {
           const seat = manager.create(Seat, {
             seat_code: seatData.seat_code.toUpperCase(),
-            seat_number:
-              seatData.visual_type === 'seat'
-                ? seatData.seat_number
-                : undefined,
+            ...(seatData.visual_type === 'seat' &&
+              seatData.seat_number && {
+                seat_number: seatData.seat_number,
+              }),
             deck: deckConfig.floor_number,
             type: seatData.type,
             position_x: seatData.position_x,

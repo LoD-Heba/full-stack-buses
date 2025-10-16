@@ -81,4 +81,6 @@ export class Bus {
   })
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+  
 }
