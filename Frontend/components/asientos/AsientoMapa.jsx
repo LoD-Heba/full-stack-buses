@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { AlertCircle, Loader } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
-// Mock component para AsientoItem
 const AsientoItem = ({ data, selected, disabled, onSelect }) => {
   const handleClick = () => {
     if (!disabled) {
-      onSelect(data.seat_code);
+      // ✅ IMPORTANTE: Enviar seat_code en mayúsculas
+      onSelect(data.seat_code?.toUpperCase() || data.seat_code);
     }
   };
 
@@ -23,12 +23,11 @@ const AsientoItem = ({ data, selected, disabled, onSelect }) => {
       className={`${baseClasses} ${statusClasses} w-full h-full text-xs font-bold text-white`}
       title={data.seat_code}
     >
-      {data.visual_type === "seat" ? data.seat_number : data.visual_type[0]}
+      {data.visual_type === "seat" ? data.seat_number || data.seat_code : data.visual_type?.[0]}
     </button>
   );
 };
 
-// Mock component para AsientoLegend
 const AsientoLegend = () => (
   <div className="flex gap-6 justify-center p-4 bg-white rounded-lg shadow-md">
     <div className="flex items-center gap-2">
@@ -54,37 +53,22 @@ export default function AsientoMapa({
 }) {
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [selectedDeck, setSelectedDeck] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // ✨ Validar que busLayout es válido
   useEffect(() => {
     if (!busLayout) {
       setError("No se encontraron datos del bus");
-      setIsLoading(false);
       return;
     }
 
     if (!Array.isArray(busLayout.decks) || busLayout.decks.length === 0) {
       setError("El bus no tiene pisos configurados");
-      setIsLoading(false);
       return;
     }
 
-    // Establecer el primer piso disponible
     setSelectedDeck(busLayout.decks[0]?.deck || 1);
-    setIsLoading(false);
   }, [busLayout]);
 
-  const handleReserve = () => {
-    if (selectedSeats.length === 0) {
-      alert("Por favor selecciona al menos un asiento");
-      return;
-    }
-    alert(`Reservando asientos: ${selectedSeats.join(", ")}`);
-  };
-
-  // ✨ Manejo de estado null
   if (!busLayout) {
     return (
       <div className="bg-white p-8 rounded-lg shadow-md text-center">
@@ -94,7 +78,6 @@ export default function AsientoMapa({
     );
   }
 
-  // ✨ Manejo de errores
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 p-6 rounded-lg shadow-md text-center">
@@ -104,7 +87,6 @@ export default function AsientoMapa({
     );
   }
 
-  // ✨ Validar que decks existe y no está vacío
   if (!Array.isArray(busLayout.decks) || busLayout.decks.length === 0) {
     return (
       <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-lg shadow-md text-center">
@@ -126,23 +108,26 @@ export default function AsientoMapa({
     );
   }
 
-  const layout = currentDeckData.layout;
-
+  // ✅ MODIFICADO: Manejar selección de asientos normalizando a mayúsculas
   const toggleSeat = (seatCode) => {
+    const normalizedCode = seatCode.toUpperCase();
+    
     setSelectedSeats((prev) => {
       let newSelection;
 
-      if (prev.includes(seatCode)) {
-        newSelection = prev.filter((s) => s !== seatCode);
+      if (prev.includes(normalizedCode)) {
+        newSelection = prev.filter((s) => s !== normalizedCode);
       } else {
         if (prev.length >= maxSelection) {
           alert(`Solo puedes seleccionar hasta ${maxSelection} asientos`);
           return prev;
         }
-        newSelection = [...prev, seatCode];
+        newSelection = [...prev, normalizedCode];
       }
 
+      // ✅ Notificar cambio al padre
       if (onSeatSelect) {
+        console.log("🎯 Asientos seleccionados:", newSelection);
         onSeatSelect(newSelection);
       }
 
@@ -184,22 +169,25 @@ export default function AsientoMapa({
             width: "fit-content",
           }}
         >
-          {layout.map((seat, index) => (
-            <div
-              key={seat.id || `seat-${index}`}
-              style={{
-                gridColumn: seat.position_x || 1,
-                gridRow: seat.position_y || 1,
-              }}
-            >
-              <AsientoItem
-                data={seat}
-                selected={selectedSeats.includes(seat.seat_code)}
-                disabled={occupiedSeats.includes(seat.seat_code)}
-                onSelect={toggleSeat}
-              />
-            </div>
-          ))}
+          {layout.map((seat, index) => {
+            const seatCode = seat.seat_code?.toUpperCase();
+            return (
+              <div
+                key={seat.id || `seat-${index}`}
+                style={{
+                  gridColumn: seat.position_x || 1,
+                  gridRow: seat.position_y || 1,
+                }}
+              >
+                <AsientoItem
+                  data={seat}
+                  selected={selectedSeats.includes(seatCode)}
+                  disabled={occupiedSeats.includes(seatCode)}
+                  onSelect={toggleSeat}
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -247,7 +235,7 @@ export default function AsientoMapa({
       {/* Leyenda */}
       <AsientoLegend />
 
-      {/* Selector de pisos (si hay múltiples) */}
+      {/* Selector de pisos */}
       {busLayout.floors > 1 && busLayout.decks.length > 1 && (
         <div className="bg-white p-4 rounded-lg shadow-md">
           <p className="text-sm font-semibold text-gray-700 mb-3">
@@ -274,47 +262,21 @@ export default function AsientoMapa({
         </div>
       )}
 
-      {/* Información y acciones */}
-      <div className="flex flex-col md:flex-row gap-4 items-stretch">
-        {/* Selección actual */}
-        {selectedSeats.length > 0 && (
-          <div className="bg-blue-50 rounded-lg border border-blue-200 p-4 flex-1">
-            <p className="font-semibold text-blue-900 mb-3">
-              Asientos seleccionados ({selectedSeats.length}/{maxSelection}):
-            </p>
-            <p className="text-blue-700 mb-4">{selectedSeats.join(", ")}</p>
-            <button
-              onClick={clearSelection}
-              className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-            >
-              Limpiar Selección
-            </button>
-          </div>
-        )}
-
-        {/* Resumen de pago */}
-        {selectedSeats.length > 0 && (
-          <div className="bg-white p-6 rounded-lg shadow-md flex-1 flex flex-col justify-between">
-            <div>
-              <p className="text-lg font-semibold text-gray-900">
-                Total: {selectedSeats.length} asiento{selectedSeats.length > 1 ? "s" : ""}
-              </p>
-              <p className="text-gray-600 mt-2">
-                Precio por asiento: Bs. 150.00
-              </p>
-              <p className="text-3xl font-bold text-blue-600 mt-4">
-                Bs. {(selectedSeats.length * 150).toFixed(2)}
-              </p>
-            </div>
-            <button
-              onClick={handleReserve}
-              className="px-8 py-3 mt-4 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-lg w-full"
-            >
-              Continuar con la reserva
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Selección actual */}
+      {selectedSeats.length > 0 && (
+        <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
+          <p className="font-semibold text-blue-900 mb-3">
+            Asientos seleccionados ({selectedSeats.length}/{maxSelection}):
+          </p>
+          <p className="text-blue-700 mb-4">{selectedSeats.join(", ")}</p>
+          <button
+            onClick={clearSelection}
+            className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+          >
+            Limpiar Selección
+          </button>
+        </div>
+      )}
 
       {/* Mapa de asientos */}
       <div
@@ -331,12 +293,12 @@ export default function AsientoMapa({
         <div className="absolute inset-0 bg-gray-100/80 backdrop-blur-sm"></div>
 
         <div className="relative z-10">
-          {/* Ruta del viaje */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 px-6 rounded-lg mb-6 text-center shadow-md">
-            <p className="font-bold text-lg">🚌 Rumbo a Cochabamba</p>
+            <p className="font-bold text-lg">
+              🚌 {busLayout.plate} - {busLayout.model}
+            </p>
           </div>
 
-          {/* Contenedor de pisos */}
           <div className="flex gap-8 justify-center items-start flex-wrap">
             {busLayout.floors > 1
               ? busLayout.decks.map((deckData) => (

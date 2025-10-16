@@ -1,8 +1,3 @@
-// ============================================================================
-// UBICACIÓN: Frontend/app/dashboard/tickets/components/ticket-form.js
-// CAMBIOS: Agregar soporte para parámetros tripId y seats
-// ============================================================================
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -35,7 +30,6 @@ export function NewTicketForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  // ✅ Obtener parámetros del flujo de compra
   const clientId = searchParams.get("clientId");
   const tripId = searchParams.get("tripId");
   const seatsParam = searchParams.get("seats"); // "1A,2A,3A"
@@ -44,6 +38,7 @@ export function NewTicketForm() {
   const [clientInfo, setClientInfo] = useState(null);
   const [trip, setTrip] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
+  const [availableSeats, setAvailableSeats] = useState([]); // ✅ NUEVO
   const [backendError, setBackendError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -53,13 +48,13 @@ export function NewTicketForm() {
     formState: { errors },
   } = useForm({
     defaultValues: {
-      userId: clientId || "",
+      userProfileId: clientId || "", // ✅ CAMBIO: userId → userProfileId
       tripId: tripId || "",
       price: "",
     },
   });
 
-  // ✅ Validar parámetros requeridos
+  // Validar parámetros requeridos
   useEffect(() => {
     if (!clientId || !tripId || !seatsParam) {
       setBackendError(
@@ -70,7 +65,7 @@ export function NewTicketForm() {
     }
   }, [clientId, tripId, seatsParam]);
 
-  // ✅ Cargar información del cliente
+  // Cargar información del cliente
   useEffect(() => {
     const fetchClientInfo = async () => {
       if (!clientId) {
@@ -96,7 +91,7 @@ export function NewTicketForm() {
         }
 
         setClientInfo(data);
-        setValue("userId", clientId);
+        setValue("userProfileId", clientId); // ✅ CAMBIO
       } catch (error) {
         console.error("Error al cargar cliente:", error);
         toast.error("Error al cargar información del cliente");
@@ -115,55 +110,79 @@ export function NewTicketForm() {
       if (!tripId || !seatsParam) return;
 
       try {
-        // Obtener información del viaje
-        const tripRes = await fetch(
-          `http://localhost:3001/api/v1/trips/${tripId}`
-        );
+        console.log("🔄 Iniciando carga de datos...");
+        console.log("📝 Parámetros:", { tripId, seatsParam });
 
-        if (!tripRes.ok) {
-          throw new Error("Viaje no encontrado");
-        }
+        // ✅ Obtener viaje y asientos disponibles con la función corregida
+        const { trip: tripData, availableSeats: seats } = await getAvailableSeatsForTrip(tripId);
+        
+        console.log("✅ Datos obtenidos:", {
+          tripId: tripData.id,
+          availableSeatsCount: seats.length,
+          seatsParam
+        });
 
-        const tripData = await tripRes.json();
         setTrip(tripData);
+        setAvailableSeats(seats);
         setValue("tripId", tripId);
         setValue("price", tripData.price);
 
         // ✅ Procesar asientos seleccionados
-        const seatCodes = seatsParam.split(",").map(s => s.trim());
+        const seatCodes = seatsParam.split(",").map(s => s.trim().toUpperCase());
+        console.log("🔍 Buscando códigos:", seatCodes);
 
-        try {
-          // Obtener información de los asientos disponibles
-          const { availableSeats } = await getAvailableSeatsForTrip(tripId);
+        // Mostrar todos los códigos disponibles para debug
+        console.log("📋 Códigos disponibles en el bus:", seats.map(s => s.seat_code));
 
-          // Mapear códigos de asientos a objetos completos
-          const mappedSeats = seatCodes
-            .map(code => {
-              const seat = availableSeats.find(
-                s => s.seat_code === code || s.seat_number?.toString() === code
-              );
-              return seat;
-            })
-            .filter(Boolean); // Filtrar nulos
+        // Buscar los asientos por código (comparación case-insensitive)
+        const mappedSeats = seatCodes
+          .map(code => {
+            const seat = seats.find(
+              s => s.seat_code?.toUpperCase() === code || 
+                   s.seat_number?.toString() === code
+            );
+            
+            if (!seat) {
+              console.warn(`⚠️ Asiento no encontrado: ${code}`);
+              console.log("🔍 Asientos disponibles:", seats.slice(0, 5).map(s => ({
+                id: s.id,
+                code: s.seat_code,
+                number: s.seat_number
+              })));
+            } else {
+              console.log(`✅ Asiento encontrado: ${code} → ID: ${seat.id}`);
+            }
+            
+            return seat;
+          })
+          .filter(Boolean);
 
-          if (mappedSeats.length === 0) {
-            throw new Error("No se encontraron los asientos seleccionados");
-          }
-
-          setSelectedSeats(mappedSeats);
-        } catch (error) {
-          console.error("Error al cargar asientos:", error);
-          // Crear objetos asiento básicos si no se pueden obtener del API
-          const basicSeats = seatCodes.map((code, index) => ({
-            id: `seat-${index}`,
-            seat_code: code,
-            seat_number: index + 1,
-          }));
-          setSelectedSeats(basicSeats);
+        if (mappedSeats.length === 0) {
+          throw new Error(
+            `No se encontraron los asientos seleccionados: ${seatCodes.join(", ")}. ` +
+            `Asientos disponibles: ${seats.map(s => s.seat_code).slice(0, 10).join(", ")}...`
+          );
         }
+
+        if (mappedSeats.length < seatCodes.length) {
+          const found = mappedSeats.map(s => s.seat_code);
+          const notFound = seatCodes.filter(code => !found.includes(code));
+          console.warn(`⚠️ Algunos asientos no se encontraron: ${notFound.join(", ")}`);
+          toast.warning(`Algunos asientos no están disponibles: ${notFound.join(", ")}`);
+        }
+
+        console.log("✅ Asientos mapeados correctamente:", mappedSeats.map(s => ({
+          id: s.id,
+          code: s.seat_code,
+          number: s.seat_number
+        })));
+        
+        setSelectedSeats(mappedSeats);
+
       } catch (error) {
-        console.error("Error al cargar viaje:", error);
-        toast.error("Error al cargar información del viaje");
+        console.error("❌ Error al cargar viaje:", error);
+        toast.error(error.message || "Error al cargar información del viaje");
+        setBackendError(error.message);
       }
     };
 
@@ -191,19 +210,41 @@ export function NewTicketForm() {
         return;
       }
 
-      // Crear un ticket por cada asiento seleccionado
+      // ✅ Validar que todos los asientos tienen ID UUID válido
+      const invalidSeats = selectedSeats.filter(
+        seat => !seat.id || typeof seat.id !== 'string' || seat.id.length < 30
+      );
+
+      if (invalidSeats.length > 0) {
+        console.error("❌ Asientos con ID inválido:", invalidSeats);
+        toast.error("Error: Algunos asientos no tienen ID válido");
+        setBackendError("Algunos asientos seleccionados no son válidos");
+        return;
+      }
+
+      console.log("📤 Creando tickets para:", {
+        userProfileId: clientId,
+        tripId: tripId,
+        seats: selectedSeats.map(s => ({ id: s.id, code: s.seat_code }))
+      });
+
       const ticketsCreated = [];
       const ticketErrors = [];
 
+      // Crear un ticket por cada asiento seleccionado
       for (const seat of selectedSeats) {
         try {
+          // ✅ Construir payload correcto según CreateTicketDto
           const ticketData = {
-            clientId: clientId,
+            userProfileId: clientId,  // ✅ REQUERIDO
+            userId: undefined,        // ✅ Opcional (usuario registrado)
             tripId: tripId,
-            seatId: seat.id,
-            price: trip ? parseFloat(trip.price) : 0,
+            seatId: seat.id,          // ✅ UUID del asiento
+            price: parseFloat(trip.price),
             status: "PENDIENTE",
           };
+
+          console.log("📤 Enviando ticket:", ticketData);
 
           const response = await fetch(
             "http://localhost:3001/api/v1/tickets",
@@ -214,16 +255,19 @@ export function NewTicketForm() {
             }
           );
 
+          const responseData = await response.json();
+
           if (!response.ok) {
-            const errorData = await response.json();
+            console.error(`❌ Error en asiento ${seat.seat_code}:`, responseData);
             ticketErrors.push(
-              `Asiento ${seat.seat_code}: ${errorData.message || "Error desconocido"}`
+              `Asiento ${seat.seat_code}: ${responseData.message || "Error desconocido"}`
             );
           } else {
-            const createdTicket = await response.json();
-            ticketsCreated.push(createdTicket);
+            console.log(`✅ Ticket creado para ${seat.seat_code}`);
+            ticketsCreated.push(responseData);
           }
         } catch (error) {
+          console.error(`❌ Error en asiento ${seat.seat_code}:`, error);
           ticketErrors.push(
             `Asiento ${seat.seat_code}: ${error instanceof Error ? error.message : "Error"}`
           );
@@ -236,7 +280,6 @@ export function NewTicketForm() {
           `${ticketsCreated.length} ticket${ticketsCreated.length > 1 ? "s" : ""} creado${ticketsCreated.length > 1 ? "s" : ""} exitosamente`
         );
 
-        // Redirigir al perfil del cliente
         setTimeout(() => {
           router.push(`/dashboard/clientes/${clientId}/perfil`);
         }, 1500);
@@ -269,7 +312,6 @@ export function NewTicketForm() {
     );
   }
 
-  // Validar que tenemos todos los datos
   if (backendError && !clientInfo) {
     return (
       <div className="max-w-4xl mx-auto p-6">
@@ -424,7 +466,6 @@ export function NewTicketForm() {
                 ))}
               </div>
 
-              {/* Resumen de precio */}
               <Card className="bg-white border">
                 <CardContent className="pt-4 space-y-3">
                   <div className="space-y-2">
@@ -489,7 +530,6 @@ export function NewTicketForm() {
           </Button>
         </div>
 
-        {/* Información adicional */}
         <Alert className="bg-blue-50 border-blue-200">
           <AlertCircle className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-800 text-sm">

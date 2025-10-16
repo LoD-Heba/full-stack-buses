@@ -1,8 +1,5 @@
 const BASE_URL = "http://localhost:3001/api/v1/tickets";
 
-/**
- * Manejo centralizado de errores
- */
 async function handleApiResponse(response) {
   const data = await response.json();
 
@@ -17,9 +14,6 @@ async function handleApiResponse(response) {
   return data;
 }
 
-/**
- * Crear un nuevo ticket
- */
 export async function createTicket(ticketData) {
   try {
     const res = await fetch(`${BASE_URL}`, {
@@ -35,9 +29,6 @@ export async function createTicket(ticketData) {
   }
 }
 
-/**
- * Obtener todos los tickets con paginación
- */
 export async function getTickets(page = 1, limit = 10) {
   try {
     const res = await fetch(`${BASE_URL}?page=${page}&limit=${limit}`, {
@@ -52,9 +43,6 @@ export async function getTickets(page = 1, limit = 10) {
   }
 }
 
-/**
- * Obtener un ticket por ID
- */
 export async function getTicket(id) {
   try {
     if (!id || id === "undefined") {
@@ -73,9 +61,6 @@ export async function getTicket(id) {
   }
 }
 
-/**
- * Obtener tickets por usuario
- */
 export async function getTicketsByUser(userId) {
   try {
     if (!userId) {
@@ -94,9 +79,6 @@ export async function getTicketsByUser(userId) {
   }
 }
 
-/**
- * Obtener historial de tickets del usuario
- */
 export async function getUserTicketHistory(userId) {
   try {
     if (!userId) {
@@ -115,9 +97,6 @@ export async function getUserTicketHistory(userId) {
   }
 }
 
-/**
- * Obtener tickets por viaje
- */
 export async function getTicketsByTrip(tripId) {
   try {
     if (!tripId) {
@@ -136,9 +115,6 @@ export async function getTicketsByTrip(tripId) {
   }
 }
 
-/**
- * Actualizar un ticket
- */
 export async function updateTicket(id, ticketData) {
   try {
     if (!id) {
@@ -158,9 +134,6 @@ export async function updateTicket(id, ticketData) {
   }
 }
 
-/**
- * Cancelar un ticket
- */
 export async function cancelTicket(id) {
   try {
     if (!id) {
@@ -179,9 +152,6 @@ export async function cancelTicket(id) {
   }
 }
 
-/**
- * Confirmar un ticket
- */
 export async function confirmTicket(id) {
   try {
     if (!id) {
@@ -200,9 +170,6 @@ export async function confirmTicket(id) {
   }
 }
 
-/**
- * Eliminar un ticket (soft delete)
- */
 export async function deleteTicket(id) {
   try {
     if (!id) {
@@ -221,41 +188,118 @@ export async function deleteTicket(id) {
   }
 }
 
+// ✅ FUNCIÓN CORREGIDA: Obtener asientos disponibles con estructura correcta
 export async function getAvailableSeatsForTrip(tripId) {
   try {
     if (!tripId) {
       throw new Error("ID de viaje requerido");
     }
 
-    // Obtener el viaje completo con sus relaciones
-    const tripRes = await fetch(`http://localhost:3001/api/v1/trips/${tripId}`, {
-      cache: "no-store",
-      headers: { "Content-Type": "application/json" },
-    });
+    console.log("🔍 Obteniendo asientos para viaje:", tripId);
+
+    // 1. Obtener información del viaje
+    const tripRes = await fetch(
+      `http://localhost:3001/api/v1/trips/${tripId}`,
+      {
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+
+    if (!tripRes.ok) {
+      throw new Error("Error al obtener información del viaje");
+    }
+
     const trip = await handleApiResponse(tripRes);
-
-    // Obtener tickets del viaje para saber qué asientos están ocupados
-    const ticketsRes = await fetch(`${BASE_URL}/trip/${tripId}`, {
-      cache: "no-store",
-      headers: { "Content-Type": "application/json" },
+    console.log("✅ Viaje obtenido:", {
+      id: trip.id,
+      busId: trip.bus?.id,
+      route: `${trip.route?.originCity?.name} → ${trip.route?.destinationCity?.name}`
     });
-    const tickets = await handleApiResponse(ticketsRes);
-    
-    const occupiedSeatIds = tickets.map(t => t.seat?.id).filter(Boolean);
 
-    // Filtrar asientos disponibles del stack del bus
-    const availableSeats = trip.bus?.stacks?.seats?.filter(
+    if (!trip.bus?.id) {
+      throw new Error("El viaje no tiene un bus asignado");
+    }
+
+    // 2. Obtener layout del bus con todos los asientos
+    const layoutRes = await fetch(
+      `http://localhost:3001/api/v1/buses/${trip.bus.id}/layout`,
+      {
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+
+    if (!layoutRes.ok) {
+      throw new Error("Error al obtener layout del bus");
+    }
+
+    const layout = await handleApiResponse(layoutRes);
+    console.log("✅ Layout del bus obtenido:", {
+      busId: layout.bus_id,
+      decks: layout.decks?.length || 0
+    });
+
+    // 3. Extraer todos los asientos de todos los decks
+    const allSeats = [];
+    if (layout.decks && Array.isArray(layout.decks)) {
+      layout.decks.forEach((deck) => {
+        if (deck.layout && Array.isArray(deck.layout)) {
+          // Solo agregar asientos reales (visual_type === 'seat')
+          const deckSeats = deck.layout.filter(
+            seat => seat.visual_type === 'seat' && seat.id
+          );
+          allSeats.push(...deckSeats);
+        }
+      });
+    }
+
+    console.log("✅ Total de asientos en el bus:", allSeats.length);
+    console.log("📋 Primeros 3 asientos:", allSeats.slice(0, 3).map(s => ({
+      id: s.id,
+      seat_code: s.seat_code,
+      seat_number: s.seat_number
+    })));
+
+    if (allSeats.length === 0) {
+      throw new Error("El bus no tiene asientos configurados");
+    }
+
+    // 4. Obtener tickets del viaje para saber qué asientos están ocupados
+    const ticketsRes = await fetch(
+      `${BASE_URL}/trip/${tripId}`,
+      {
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+
+    let occupiedSeatIds = [];
+    if (ticketsRes.ok) {
+      const tickets = await handleApiResponse(ticketsRes);
+      occupiedSeatIds = tickets
+        .filter(t => t.status === 'CONFIRMADO' || t.status === 'PENDIENTE')
+        .map(t => t.seat?.id)
+        .filter(Boolean);
+      
+      console.log("🚫 Asientos ocupados:", occupiedSeatIds.length);
+    }
+
+    // 5. Filtrar asientos disponibles
+    const availableSeats = allSeats.filter(
       seat => seat.is_active && !occupiedSeatIds.includes(seat.id)
-    ) || [];
+    );
+
+    console.log("✅ Asientos disponibles:", availableSeats.length);
 
     return {
       trip,
       availableSeats,
       occupiedCount: occupiedSeatIds.length,
-      totalSeats: trip.bus?.stacks?.seats?.length || 0
+      totalSeats: allSeats.length,
     };
   } catch (error) {
-    console.error(`Error al obtener asientos del viaje ${tripId}:`, error);
+    console.error(`❌ Error al obtener asientos del viaje ${tripId}:`, error);
     throw error;
   }
 }
