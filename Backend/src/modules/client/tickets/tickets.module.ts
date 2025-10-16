@@ -8,9 +8,9 @@ import { SharedModule } from 'src/common/shared/shared.module';
 import { Ticket } from './entities/ticket.entity';
 import { TicketController } from './tickets.controller';
 import { TicketService } from './tickets.service';
-import { UserProfile } from 'src/modules/admin/user-profile/entities/user-profile.entity';
 import { User } from 'src/modules/admin/user/entities/user.entity';
 import { TripModule } from '../trip/trip.module';
+import { UserProfile } from 'src/modules/admin/user-profile/entities/user-profile.entity';
 
 @Module({
   imports: ([TypeOrmModule.forFeature([Trip, Seat, Payment, Ticket, UserProfile, User]), SharedModule,TripModule,]),

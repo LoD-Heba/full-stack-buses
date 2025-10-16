@@ -4,7 +4,8 @@ import {
   IsOptional, 
   IsEnum,
   IsUUID,
-  IsPositive
+  IsPositive,
+  ValidateIf
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { TicketStatus } from 'src/common/enums/status.enum';
@@ -28,9 +29,15 @@ export class CreateTicketDto {
   @IsUUID('4')
   seatId: string;
 
+  // ✅ Cambiar: userId es OPCIONAL (usuario registrado)
+  @IsOptional()
+  @IsUUID('4')
+  userId?: string;
+
+  // ✅ AGREGAR: userProfileId es REQUERIDO (cliente/invitado)
   @IsNotEmpty()
   @IsUUID('4')
-  userId: string; // Solo usuarios registrados
+  userProfileId: string;
 
   @IsOptional()
   @IsUUID('4')

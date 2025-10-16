@@ -20,6 +20,7 @@ import {
   TicketStatus,
   TripStatus,
 } from 'src/common/enums/status.enum';
+import { UserProfile } from 'src/modules/admin/user-profile/entities/user-profile.entity';
 
 @Injectable()
 export class TicketService {
@@ -29,6 +30,9 @@ export class TicketService {
 
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+
+    @InjectRepository(UserProfile)
+    private readonly userProfileRepository: Repository<UserProfile>,
 
     @InjectRepository(Trip)
     private readonly tripRepository: Repository<Trip>,
@@ -42,12 +46,39 @@ export class TicketService {
   ) {}
 
   async create(createTicketDto: CreateTicketDto): Promise<Ticket> {
-    const { tripId, seatId, userId, paymentId, ...ticketData } =
+    const { tripId, seatId, userId, userProfileId, paymentId, ...ticketData } =
       createTicketDto;
 
+    // ✅ VALIDAR: userProfileId es obligatorio
+    if (!userProfileId) {
+      throw new BadRequestException('userProfileId es requerido');
+    }
+    const userProfile = await this.findUserProfile(userProfileId);
     // Validar que el usuario existe y está activo
-    const user = await this.findUser(userId);
+    // ✅ OPCIONAL: Obtener User si se proporciona (usuario registrado)
+    let user: User | undefined;
+    if (userId) {
+      user = await this.findUser(userId);
 
+      if (
+        !user.profile?.firstName ||
+        !user.profile?.lastName ||
+        !user.profile?.documentNumber
+      ) {
+        throw new BadRequestException('El usuario debe completar su perfil');
+      }
+    }
+
+    // ✅ VALIDAR: UserProfile tiene datos completos
+    if (
+      !userProfile.firstName ||
+      !userProfile.lastName ||
+      !userProfile.documentNumber
+    ) {
+      throw new BadRequestException(
+        'El cliente debe tener nombre, apellido y documento completos',
+      );
+    }
     // Validar que un usuario no tenga mas de 3 tickets pendientes
     const pendingTicketsCount = await this.ticketRepository.count({
       where: {
@@ -110,14 +141,8 @@ export class TicketService {
         'No hay asientos disponibles en este viaje',
       );
     }
-    // Validar que el usuario tenga un perfil completo
-    if (!user.profile) {
-      throw new BadRequestException(
-        'El usuario debe completar su perfil antes de comprar tickets',
-      );
-    }
 
-    const profile = user.profile;
+    const profile = userProfile;
     if (!profile.firstName || !profile.lastName || !profile.documentNumber) {
       throw new BadRequestException(
         'El perfil del usuario debe tener nombre, apellido y número de documento',
@@ -201,9 +226,11 @@ export class TicketService {
       code: ticketCode,
       trip,
       seat,
+      userProfile,
       user,
       payment,
     });
+
     const savedTicket = await this.ticketRepository.save(ticket);
     await this.tripService.updateAvailableSeats(tripId);
     return this.findOne(savedTicket.ticket_id);
@@ -236,6 +263,7 @@ export class TicketService {
         user: {
           profile: true,
         },
+        userProfile: true,
         payment: true,
       },
       order: { created_at: 'DESC' },
@@ -273,6 +301,7 @@ export class TicketService {
         user: {
           profile: true,
         },
+        userProfile: true,
         payment: true,
       },
     });
@@ -302,6 +331,20 @@ export class TicketService {
       },
       order: { created_at: 'DESC' },
     });
+  }
+
+  private async findUserProfile(userProfileId: string): Promise<UserProfile> {
+    const userProfile = await this.userProfileRepository.findOne({
+      where: { id: userProfileId, isActive: true },
+    });
+
+    if (!userProfile) {
+      throw new NotFoundException(
+        `El cliente con ID ${userProfileId} no existe o no está activo`,
+      );
+    }
+
+    return userProfile;
   }
 
   async findByTrip(tripId: string): Promise<Ticket[]> {

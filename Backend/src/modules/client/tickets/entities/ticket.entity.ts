@@ -11,6 +11,7 @@ import { Trip } from '../../trip/entities/trip.entity';
 import { Seat } from '../../seat/entities/seat.entity';
 import { Payment } from '../../payment/entities/payment.entity';
 import { User } from 'src/modules/admin/user/entities/user.entity';
+import { UserProfile } from 'src/modules/admin/user-profile/entities/user-profile.entity';
 
 @Entity('tickets')
 export class Ticket {
@@ -52,13 +53,21 @@ export class Ticket {
   @JoinColumn({ name: 'seat_id' })
   seat: Seat;
 
-  // Relación directa con User (N:1) - SOLO USUARIOS REGISTRADOS
-  @ManyToOne(() => User, (user) => user.tickets, { 
+  // Relación con User (para usuarios registrados, OPCIONAL)
+  @ManyToOne(() => User, (user) => user.tickets, {
     onDelete: 'CASCADE',
-    nullable: false 
+    nullable: true, // ← Cambiar a true
   })
   @JoinColumn({ name: 'user_id' })
-  user: User;
+  user?: User;
+
+  // ✅ AGREGAR: Relación con UserProfile (para clientes, REQUERIDO)
+  @ManyToOne(() => UserProfile, (profile) => profile.tickets, {
+    onDelete: 'CASCADE',
+    nullable: false,
+  })
+  @JoinColumn({ name: 'user_profile_id' })
+  userProfile: UserProfile;
 
   // Relación con Payment (N:1, opcional)
   @ManyToOne(() => Payment, (payment) => payment.tickets, {

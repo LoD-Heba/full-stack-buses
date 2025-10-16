@@ -10,6 +10,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
+import { Ticket } from 'src/modules/client/tickets/entities/ticket.entity';
 
 @Entity('user_profiles')
 export class UserProfile {
@@ -39,6 +40,9 @@ export class UserProfile {
   isGuest: boolean;
 
   //-----------------------------------------------------------------
+
+  @OneToMany(() => Ticket, (ticket) => ticket.userProfile)
+  tickets: Ticket[];
 
   // Relación One-to-One inversa con User (NULLABLE para invitados)
   @OneToOne(() => User, (user) => user.profile, { nullable: true })
