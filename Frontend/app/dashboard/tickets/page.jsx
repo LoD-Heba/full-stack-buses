@@ -89,7 +89,7 @@ export default function TicketsPage() {
           ? `${ticket.user.profile.firstName} ${ticket.user.profile.lastName}`
           : ticket.user?.email || "-",
         user_email: ticket.user?.email || "-",
-        document: ticket.user?.profile?.documentNumber || "-",
+        document: ticket.profile?.documentNumber || "-",
         trip_route: ticket.trip?.route
           ? `${ticket.trip.route.originCity?.name || "?"} → ${
               ticket.trip.route.destinationCity?.name || "?"

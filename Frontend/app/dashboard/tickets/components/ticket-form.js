@@ -29,7 +29,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 export function NewTicketForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const clientId = searchParams.get("clientId");
   const tripId = searchParams.get("tripId");
   const seatsParam = searchParams.get("seats"); // "1A,2A,3A"
@@ -77,7 +77,7 @@ export function NewTicketForm() {
         const res = await fetch(
           `http://localhost:3001/api/v1/clients/${clientId}`
         );
-        
+
         if (!res.ok) {
           throw new Error("Cliente no encontrado");
         }
@@ -114,12 +114,13 @@ export function NewTicketForm() {
         console.log("📝 Parámetros:", { tripId, seatsParam });
 
         // ✅ Obtener viaje y asientos disponibles con la función corregida
-        const { trip: tripData, availableSeats: seats } = await getAvailableSeatsForTrip(tripId);
-        
+        const { trip: tripData, availableSeats: seats } =
+          await getAvailableSeatsForTrip(tripId);
+
         console.log("✅ Datos obtenidos:", {
           tripId: tripData.id,
           availableSeatsCount: seats.length,
-          seatsParam
+          seatsParam,
         });
 
         setTrip(tripData);
@@ -128,57 +129,79 @@ export function NewTicketForm() {
         setValue("price", tripData.price);
 
         // ✅ Procesar asientos seleccionados
-        const seatCodes = seatsParam.split(",").map(s => s.trim().toUpperCase());
+        const seatCodes = seatsParam
+          .split(",")
+          .map((s) => s.trim().toUpperCase());
         console.log("🔍 Buscando códigos:", seatCodes);
 
         // Mostrar todos los códigos disponibles para debug
-        console.log("📋 Códigos disponibles en el bus:", seats.map(s => s.seat_code));
+        console.log(
+          "📋 Códigos disponibles en el bus:",
+          seats.map((s) => s.seat_code)
+        );
 
-        // Buscar los asientos por código (comparación case-insensitive)
         const mappedSeats = seatCodes
-          .map(code => {
+          .map((code) => {
             const seat = seats.find(
-              s => s.seat_code?.toUpperCase() === code || 
-                   s.seat_number?.toString() === code
+              (s) =>
+                s.seat_code?.toUpperCase() === code ||
+                s.seat_number?.toString() === code
             );
-            
+
             if (!seat) {
               console.warn(`⚠️ Asiento no encontrado: ${code}`);
-              console.log("🔍 Asientos disponibles:", seats.slice(0, 5).map(s => ({
-                id: s.id,
-                code: s.seat_code,
-                number: s.seat_number
-              })));
             } else {
-              console.log(`✅ Asiento encontrado: ${code} → ID: ${seat.id}`);
+              // ✅ Validar status del asiento
+              if (seat.status && seat.status !== "disponible") {
+                console.warn(
+                  `⚠️ Asiento ${code} no disponible (status: ${seat.status})`
+                );
+                toast.warning(`El asiento ${code} no está disponible`);
+                return null;
+              }
+              console.log(
+                `✅ Asiento encontrado: ${code} → ID: ${seat.id}, status: ${
+                  seat.status || "N/A"
+                }`
+              );
             }
-            
+
             return seat;
           })
           .filter(Boolean);
-
         if (mappedSeats.length === 0) {
           throw new Error(
-            `No se encontraron los asientos seleccionados: ${seatCodes.join(", ")}. ` +
-            `Asientos disponibles: ${seats.map(s => s.seat_code).slice(0, 10).join(", ")}...`
+            `No se encontraron los asientos seleccionados: ${seatCodes.join(
+              ", "
+            )}. ` +
+              `Asientos disponibles: ${seats
+                .map((s) => s.seat_code)
+                .slice(0, 10)
+                .join(", ")}...`
           );
         }
 
         if (mappedSeats.length < seatCodes.length) {
-          const found = mappedSeats.map(s => s.seat_code);
-          const notFound = seatCodes.filter(code => !found.includes(code));
-          console.warn(`⚠️ Algunos asientos no se encontraron: ${notFound.join(", ")}`);
-          toast.warning(`Algunos asientos no están disponibles: ${notFound.join(", ")}`);
+          const found = mappedSeats.map((s) => s.seat_code);
+          const notFound = seatCodes.filter((code) => !found.includes(code));
+          console.warn(
+            `⚠️ Algunos asientos no se encontraron: ${notFound.join(", ")}`
+          );
+          toast.warning(
+            `Algunos asientos no están disponibles: ${notFound.join(", ")}`
+          );
         }
 
-        console.log("✅ Asientos mapeados correctamente:", mappedSeats.map(s => ({
-          id: s.id,
-          code: s.seat_code,
-          number: s.seat_number
-        })));
-        
-        setSelectedSeats(mappedSeats);
+        console.log(
+          "✅ Asientos mapeados correctamente:",
+          mappedSeats.map((s) => ({
+            id: s.id,
+            code: s.seat_code,
+            number: s.seat_number,
+          }))
+        );
 
+        setSelectedSeats(mappedSeats);
       } catch (error) {
         console.error("❌ Error al cargar viaje:", error);
         toast.error(error.message || "Error al cargar información del viaje");
@@ -212,7 +235,7 @@ export function NewTicketForm() {
 
       // ✅ Validar que todos los asientos tienen ID UUID válido
       const invalidSeats = selectedSeats.filter(
-        seat => !seat.id || typeof seat.id !== 'string' || seat.id.length < 30
+        (seat) => !seat.id || typeof seat.id !== "string" || seat.id.length < 30
       );
 
       if (invalidSeats.length > 0) {
@@ -225,7 +248,7 @@ export function NewTicketForm() {
       console.log("📤 Creando tickets para:", {
         userProfileId: clientId,
         tripId: tripId,
-        seats: selectedSeats.map(s => ({ id: s.id, code: s.seat_code }))
+        seats: selectedSeats.map((s) => ({ id: s.id, code: s.seat_code })),
       });
 
       const ticketsCreated = [];
@@ -236,31 +259,33 @@ export function NewTicketForm() {
         try {
           // ✅ Construir payload correcto según CreateTicketDto
           const ticketData = {
-            userProfileId: clientId,  // ✅ REQUERIDO
-            userId: undefined,        // ✅ Opcional (usuario registrado)
+            userProfileId: clientId, // ✅ REQUERIDO
+            userId: undefined, // ✅ Opcional (usuario registrado)
             tripId: tripId,
-            seatId: seat.id,          // ✅ UUID del asiento
+            seatId: seat.id, // ✅ UUID del asiento
             price: parseFloat(trip.price),
             status: "PENDIENTE",
           };
 
           console.log("📤 Enviando ticket:", ticketData);
 
-          const response = await fetch(
-            "http://localhost:3001/api/v1/tickets",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(ticketData),
-            }
-          );
+          const response = await fetch("http://localhost:3001/api/v1/tickets", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(ticketData),
+          });
 
           const responseData = await response.json();
 
           if (!response.ok) {
-            console.error(`❌ Error en asiento ${seat.seat_code}:`, responseData);
+            console.error(
+              `❌ Error en asiento ${seat.seat_code}:`,
+              responseData
+            );
             ticketErrors.push(
-              `Asiento ${seat.seat_code}: ${responseData.message || "Error desconocido"}`
+              `Asiento ${seat.seat_code}: ${
+                responseData.message || "Error desconocido"
+              }`
             );
           } else {
             console.log(`✅ Ticket creado para ${seat.seat_code}`);
@@ -269,7 +294,9 @@ export function NewTicketForm() {
         } catch (error) {
           console.error(`❌ Error en asiento ${seat.seat_code}:`, error);
           ticketErrors.push(
-            `Asiento ${seat.seat_code}: ${error instanceof Error ? error.message : "Error"}`
+            `Asiento ${seat.seat_code}: ${
+              error instanceof Error ? error.message : "Error"
+            }`
           );
         }
       }
@@ -277,7 +304,9 @@ export function NewTicketForm() {
       // Mostrar resultado
       if (ticketsCreated.length > 0) {
         toast.success(
-          `${ticketsCreated.length} ticket${ticketsCreated.length > 1 ? "s" : ""} creado${ticketsCreated.length > 1 ? "s" : ""} exitosamente`
+          `${ticketsCreated.length} ticket${
+            ticketsCreated.length > 1 ? "s" : ""
+          } creado${ticketsCreated.length > 1 ? "s" : ""} exitosamente`
         );
 
         setTimeout(() => {
@@ -319,7 +348,9 @@ export function NewTicketForm() {
           <CardContent className="pt-6 text-center">
             <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-red-900 mb-2">Error</h2>
-            <p className="text-red-800 mb-6 whitespace-pre-line">{backendError}</p>
+            <p className="text-red-800 mb-6 whitespace-pre-line">
+              {backendError}
+            </p>
             <Button
               onClick={() => router.push("/dashboard/viajes")}
               className="bg-red-600 hover:bg-red-700"
@@ -332,8 +363,7 @@ export function NewTicketForm() {
     );
   }
 
-  const totalPrice =
-    selectedSeats.length * (trip ? parseFloat(trip.price) : 0);
+  const totalPrice = selectedSeats.length * (trip ? parseFloat(trip.price) : 0);
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
@@ -357,7 +387,6 @@ export function NewTicketForm() {
       </div>
 
       <form onSubmit={onSubmit} className="space-y-6">
-        
         {/* Información del Cliente */}
         {clientInfo && (
           <Card className="bg-blue-50 border-blue-200">
@@ -479,7 +508,9 @@ export function NewTicketForm() {
                       <span className="text-gray-600">
                         Cantidad de asientos:
                       </span>
-                      <span className="font-medium">{selectedSeats.length}</span>
+                      <span className="font-medium">
+                        {selectedSeats.length}
+                      </span>
                     </div>
                     <div className="border-t pt-2 flex justify-between text-lg font-bold">
                       <span>Total:</span>
@@ -533,8 +564,9 @@ export function NewTicketForm() {
         <Alert className="bg-blue-50 border-blue-200">
           <AlertCircle className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-800 text-sm">
-            Al confirmar, se crearán {selectedSeats.length} ticket{selectedSeats.length > 1 ? "s" : ""} con estado
-            "Pendiente". Serán confirmados una vez se realice el pago.
+            Al confirmar, se crearán {selectedSeats.length} ticket
+            {selectedSeats.length > 1 ? "s" : ""} con estado "Pendiente". Serán
+            confirmados una vez se realice el pago.
           </AlertDescription>
         </Alert>
       </form>

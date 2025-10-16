@@ -2,12 +2,10 @@
 
 import "./globals.css";
 import { Inter } from "next/font/google";
-// import { SessionProvider } from 'next-auth/react';
 import { Toaster } from "@/components/ui/sonner";
 import Navbar from "@/src/components/Navbar";
 import Footer from "@/src/components/Footer";
 import { clsx } from "clsx";
-import { usePathname } from "next/navigation";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -16,9 +14,6 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  //const pathname = usePathname();
-  //const isDashboard = pathname?.startsWith("/dashboard");
-  // const isLogin = pathname === '/login';
 
   return (
     <html lang="es">

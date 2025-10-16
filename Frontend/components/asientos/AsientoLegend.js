@@ -1,65 +1,33 @@
-import React from 'react';
-import { FaChair, FaTv, FaToilet, FaDoorOpen } from 'react-icons/fa';
-import { MdAirlineSeatReclineExtra } from 'react-icons/md';
+import React from "react";
+import { FaChair, FaTv, FaToilet, FaDoorOpen } from "react-icons/fa";
+import { MdAirlineSeatReclineExtra } from "react-icons/md";
 
 export default function AsientoLegend() {
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h3 className="text-lg font-bold mb-4 text-gray-800">Leyenda</h3>
-      
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        {/* Tipos de asientos */}
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gray-500 rounded flex items-center justify-center">
-            <FaChair className="text-white text-sm" />
-          </div>
-          <span className="text-sm text-gray-700">Normal</span>
-        </div>
+    <div className="flex gap-6 justify-center p-4 bg-white rounded-lg shadow-md">
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 bg-green-400 rounded border-2 border-green-600"></div>
+        <span className="text-sm">Disponible</span>
+      </div>
 
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
-            <FaChair className="text-white text-sm" />
-          </div>
-          <span className="text-sm text-gray-700">Semi cama</span>
-        </div>
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 bg-yellow-400 rounded border-2 border-yellow-600"></div>
+        <span className="text-sm">Reservado</span>
+      </div>
 
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
-            <MdAirlineSeatReclineExtra className="text-white text-sm" />
-          </div>
-          <span className="text-sm text-gray-700">Cama</span>
-        </div>
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 bg-blue-500 rounded border-2 border-blue-700"></div>
+        <span className="text-sm">Seleccionado</span>
+      </div>
 
-        {/* Estados */}
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-yellow-400 rounded flex items-center justify-center">
-            <FaChair className="text-white text-sm" />
-          </div>
-          <span className="text-sm text-gray-700">Seleccionado</span>
-        </div>
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 bg-red-300 rounded border-2 border-red-500"></div>
+        <span className="text-sm">Ocupado</span>
+      </div>
 
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gray-300 rounded flex items-center justify-center">
-            <FaChair className="text-gray-500 text-sm" />
-          </div>
-          <span className="text-sm text-gray-700">Ocupado</span>
-        </div>
-
-        {/* Elementos especiales */}
-        <div className="flex items-center gap-2">
-          <FaTv className="text-blue-500 text-2xl" />
-          <span className="text-sm text-gray-700">TV</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <FaToilet className="text-indigo-400 text-2xl" />
-          <span className="text-sm text-gray-700">Baño</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <FaDoorOpen className="text-amber-500 text-2xl" />
-          <span className="text-sm text-gray-700">Puerta</span>
-        </div>
+      <div className="flex items-center gap-2">
+        <div className="w-6 h-6 bg-gray-400 rounded border-2 border-gray-600"></div>
+        <span className="text-sm">Bloqueado</span>
       </div>
     </div>
   );

@@ -4,26 +4,56 @@ import { AlertCircle } from "lucide-react";
 const AsientoItem = ({ data, selected, disabled, onSelect }) => {
   const handleClick = () => {
     if (!disabled) {
-      // ✅ IMPORTANTE: Enviar seat_code en mayúsculas
       onSelect(data.seat_code?.toUpperCase() || data.seat_code);
     }
   };
 
+  const getStatusColor = () => {
+    if (disabled) {
+      return "bg-red-300 border-red-500 cursor-not-allowed";
+    }
+    if (selected) {
+      return "bg-blue-500 border-blue-700";
+    }
+
+    // Usar el campo status si existe
+    if (data.status) {
+      switch (data.status) {
+        case "disponible":
+          return "bg-green-400 border-green-600 hover:bg-green-500";
+        case "reservado":
+          return "bg-yellow-400 border-yellow-600 cursor-not-allowed";
+        case "ocupado":
+          return "bg-red-300 border-red-500 cursor-not-allowed";
+        case "bloqueado":
+          return "bg-gray-400 border-gray-600 cursor-not-allowed";
+        default:
+          return "bg-green-400 border-green-600 hover:bg-green-500";
+      }
+    }
+
+    // Fallback para compatibilidad
+    return "bg-green-400 border-green-600 hover:bg-green-500";
+  };
+
   const baseClasses = "rounded-md border-2 cursor-pointer transition-all";
-  const statusClasses = disabled
-    ? "bg-red-300 border-red-500 cursor-not-allowed"
-    : selected
-      ? "bg-blue-500 border-blue-700"
-      : "bg-green-400 border-green-600 hover:bg-green-500";
+  const statusClasses = getStatusColor();
 
   return (
     <button
       onClick={handleClick}
-      disabled={disabled}
+      disabled={
+        disabled ||
+        data.status === "reservado" ||
+        data.status === "ocupado" ||
+        data.status === "bloqueado"
+      }
       className={`${baseClasses} ${statusClasses} w-full h-full text-xs font-bold text-white`}
-      title={data.seat_code}
+      title={`${data.seat_code} - ${data.status || "disponible"}`}
     >
-      {data.visual_type === "seat" ? data.seat_number || data.seat_code : data.visual_type?.[0]}
+      {data.visual_type === "seat"
+        ? data.seat_number || data.seat_code
+        : data.visual_type?.[0]}
     </button>
   );
 };
@@ -111,7 +141,7 @@ export default function AsientoMapa({
   // ✅ MODIFICADO: Manejar selección de asientos normalizando a mayúsculas
   const toggleSeat = (seatCode) => {
     const normalizedCode = seatCode.toUpperCase();
-    
+
     setSelectedSeats((prev) => {
       let newSelection;
 
@@ -144,17 +174,20 @@ export default function AsientoMapa({
 
   const renderDeckLayout = (deckData) => {
     const layout = deckData.layout || [];
-    
+
     if (layout.length === 0) {
       return (
         <div className="text-center py-8">
-          <p className="text-gray-500">No hay asientos en {deckData.stack_name}</p>
+          <p className="text-gray-500">
+            No hay asientos en {deckData.stack_name}
+          </p>
         </div>
       );
     }
 
     const maxX = Math.max(...layout.map((s) => s.position_x), 0);
     const maxY = Math.max(...layout.map((s) => s.position_y), 0);
+    
 
     return (
       <div className="flex-1 min-w-0">
@@ -259,22 +292,6 @@ export default function AsientoMapa({
               </button>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Selección actual */}
-      {selectedSeats.length > 0 && (
-        <div className="bg-blue-50 rounded-lg border border-blue-200 p-4">
-          <p className="font-semibold text-blue-900 mb-3">
-            Asientos seleccionados ({selectedSeats.length}/{maxSelection}):
-          </p>
-          <p className="text-blue-700 mb-4">{selectedSeats.join(", ")}</p>
-          <button
-            onClick={clearSelection}
-            className="w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-          >
-            Limpiar Selección
-          </button>
         </div>
       )}
 
