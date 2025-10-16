@@ -577,7 +577,7 @@ export function BusForm({ bus }) {
                   <p className="text-sm text-gray-500 mt-1">
                     {bus?.stacks?.id ? (
                       <span className="text-green-600">
-                        ✓ Asientos configurados ({bus.capacity || 0} asientos)
+                        ✓ Asientos configurados ({bus.stackId.length || 0} asientos)
                       </span>
                     ) : savedBusId ? (
                       <span className="text-yellow-600">

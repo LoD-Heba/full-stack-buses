@@ -49,7 +49,7 @@ export default function AsientoMapa({
 }: AsientoMapaProps) {
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
   const [selectedDeck, setSelectedDeck] = useState<number>(
-    busLayout.decks[0]?.deck || 1
+    busLayout.decks[1]?.deck || 1
   );
   const handleReserve = () => {
     if (selectedSeats.length === 0) {

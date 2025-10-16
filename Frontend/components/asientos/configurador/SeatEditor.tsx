@@ -142,36 +142,42 @@ export default function SeatEditor({ busId, initialLayout, onSave }: SeatEditorP
   };
 
   // Guardar configuración
-  const handleSave = () => {
-    const seats = cells.filter(c => c.visual_type === 'seat');
-    
-    if (seats.length === 0) {
-      alert('Debes agregar al menos un asiento antes de guardar');
-      return;
-    }
+ const handleSave = () => {
+  const seats = cells.filter(c => c.visual_type === 'seat');
+  
+  if (seats.length === 0) {
+    alert('Debes agregar al menos un asiento antes de guardar');
+    return;
+  }
 
-    const layoutData = {
-      decks: [
-        {
-          floor_number: deckNumber,
-          stack_name: stackName,
-          description: `Configuración del piso ${deckNumber}`,
-          seats: cells.map(cell => ({
+  const layoutData = {
+    decks: [
+      {
+        floor_number: deckNumber,
+        stack_name: stackName,
+        description: `Configuración del piso ${deckNumber}`,
+        seats: cells.map(cell => {
+          const seatData: any = {
             seat_code: cell.seat_code || `ELEM-${cell.position_x}-${cell.position_y}`,
-            seat_number: cell.visual_type === 'seat' ? cell.seat_number : undefined,
             position_x: cell.position_x,
             position_y: cell.position_y,
             visual_type: cell.visual_type,
             rotation: cell.rotation || 0,
             type: cell.type || 'normal',
             meta: {},
-          })),
-        },
-      ],
-    };
+          };
+          if (cell.visual_type === 'seat' && cell.seat_number) {
+            seatData.seat_number = cell.seat_number;
+          }
 
-    onSave(layoutData);
+          return seatData;
+        }),
+      },
+    ],
   };
+
+  onSave(layoutData);
+};
 
   // Obtener códigos y números existentes
   const existingCodes = cells

@@ -68,15 +68,23 @@ export default function RouteForm({ initialData, onSubmit, onCancel }) {
     try {
       const response = await busesAPI.getAll();
       console.log("Buses cargados:", response);
-      // Filtrar solo buses activos con asientos configurados
+
+      // Filtrar buses activos con capacidad > 0
       const activeBuses = Array.isArray(response.data)
         ? response.data.filter(
-            (bus) => bus.is_active && bus.stacks?.seats?.length > 0
+            (bus) =>
+              bus.is_active &&
+              (bus.capacity ||
+                bus.stacks?.reduce(
+                  (sum, s) => sum + (s.seats?.length || 0),
+                  0
+                )) > 0
           )
         : [];
+
       setBuses(activeBuses);
       if (activeBuses.length === 0) {
-        toast.warning("No hay buses disponibles para asignar");
+        toast.warning("No hay buses disponibles con asientos configurados");
       }
     } catch (error) {
       toast.error("Error al cargar buses");
@@ -341,7 +349,11 @@ export default function RouteForm({ initialData, onSubmit, onCancel }) {
                         <p className="font-medium">{bus.plate}</p>
                         <p className="text-sm text-gray-500">
                           {bus.model} • {bus.year} •{" "}
-                          {bus.capacity || bus.stacks?.seats?.length || 0}{" "}
+                          {bus.capacity ||
+                            bus.stacks?.reduce(
+                              (sum, s) => sum + (s.seats?.length || 0),
+                              0
+                            )}{" "}
                           asientos
                         </p>
                         <p className="text-xs text-gray-400">
