@@ -101,7 +101,8 @@ export class BusService {
     });
 
     // ✨ Enriquecer con capacidad
-    const busesWithCapacity = await this.capacityHelper.enrichBusesWithCapacity(buses);
+    const busesWithCapacity =
+      await this.capacityHelper.enrichBusesWithCapacity(buses);
 
     return {
       data: busesWithCapacity as any[],
@@ -526,10 +527,23 @@ export class BusService {
     }
 
     // Mapear asientos ocupados
-    const occupiedSeats =
-      trip.tickets
-        ?.filter((ticket) => ticket.status === 'CONFIRMADO' && ticket.seat)
-        .map((ticket) => ticket.seat.seat_code) || [];
+    const seatsWithStatus = await this.seatRepository
+      .createQueryBuilder('seat')
+      .leftJoin('seat.tickets', 'ticket')
+      .leftJoin('ticket.trip', 'trip')
+      .where('trip.id = :tripId', { tripId })
+      .andWhere('seat.stacks.bus_id = :busId', { busId })
+      .select([
+        'seat.id',
+        'seat.seat_code',
+        'seat.status',
+        'ticket.status as ticket_status',
+      ])
+      .getRawMany();
+
+    const occupiedSeats = seatsWithStatus
+      .filter((s) => s.status === 'ocupado' || s.status === 'reservado')
+      .map((s) => s.seat_code);
 
     return {
       ...layout,

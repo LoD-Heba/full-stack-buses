@@ -29,11 +29,11 @@ export class CreateSeatDto {
   @Transform(({ value }) => value?.trim().toUpperCase())
   seat_code: string;
 
-   @IsOptional()  // ← Hacer opcional
+  @IsOptional() // ← Hacer opcional
   @Min(1, { message: 'El número de asiento debe ser mayor que 0' })
   @Max(100, { message: 'El número de asiento no puede exceder 100' })
   seat_number?: number;
-  
+
   @IsOptional()
   @IsInt({ message: 'La posición X debe ser un número entero' })
   @Min(1)
@@ -57,6 +57,10 @@ export class CreateSeatDto {
   @IsOptional()
   @IsObject()
   meta?: Record<string, any>;
+
+  @IsOptional()
+  @IsEnum(['disponible', 'reservado', 'ocupado', 'bloqueado'])
+  status?: string;
 
   @IsEnum(SeatType, {
     message: 'El tipo debe ser: normal, semi_cama o cama',

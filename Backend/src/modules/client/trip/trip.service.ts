@@ -23,6 +23,7 @@ import { User } from 'src/modules/admin/user/entities/user.entity';
 import { UserProfile } from 'src/modules/admin/user-profile/entities/user-profile.entity';
 import { TripStatus, TicketStatus } from 'src/common/enums/status.enum';
 import { Ticket } from '../tickets/entities/ticket.entity';
+import { Seat } from '../seat/entities/seat.entity';
 @Injectable()
 export class TripService {
   constructor(
@@ -43,6 +44,9 @@ export class TripService {
 
     @InjectRepository(Ticket)
     private readonly ticketRepository: Repository<Ticket>,
+
+    @InjectRepository(Seat)
+    private readonly seatRepository: Repository<Seat>,
   ) {}
 
   async create(createTripDto: CreateTripDto): Promise<Trip> {
@@ -636,6 +640,13 @@ export class TripService {
         { ticket_id: In(ticketIds) },
         { is_active: false },
       );
+
+      // Liberar todos los asientos del viaje
+      const seatIds = trip.tickets.map((t) => t.seat.id);
+      await this.seatRepository.update(
+        { id: In(seatIds) },
+        { status: 'disponible' },
+      );
     }
 
     await this.tripRepository.update(id, {
@@ -709,7 +720,7 @@ export class TripService {
 
     return route;
   }
-  
+
   private async calculateAvailableSeats(busId: string): Promise<number> {
     // Esto depende de cómo tengas estructurado el conteo de asientos en el bus
     // Por ahora asumo que tienes una relación con seats o un campo capacity

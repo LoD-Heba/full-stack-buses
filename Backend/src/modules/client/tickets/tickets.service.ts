@@ -167,18 +167,9 @@ export class TicketService {
       );
     }
     // Verificar que el asiento no esté ocupado en este viaje
-    const existingTicket = await this.ticketRepository.findOne({
-      where: {
-        trip: { id: tripId },
-        seat: { id: seatId },
-        status: In([TicketStatus.CONFIRMED, TicketStatus.PENDING]), // AGREGAR PENDING
-        is_active: true,
-      },
-    });
-
-    if (existingTicket) {
+    if (seat.status !== 'disponible') {
       throw new BadRequestException(
-        `El asiento ${seat.seat_number} ya está reservado en este viaje`,
+        `El asiento ${seat.seat_code} no está disponible`,
       );
     }
 
@@ -232,6 +223,12 @@ export class TicketService {
     });
 
     const savedTicket = await this.ticketRepository.save(ticket);
+
+    //Cambiar estado del asiento según el status del ticket
+    const newSeatStatus =
+      savedTicket.status === TicketStatus.CONFIRMED ? 'ocupado' : 'reservado';
+    await this.seatRepository.update(seatId, { status: newSeatStatus });
+
     await this.tripService.updateAvailableSeats(tripId);
     return this.findOne(savedTicket.ticket_id);
   }
@@ -475,13 +472,16 @@ export class TicketService {
       status: TicketStatus.CANCELLED,
     });
 
-    // ====== AGREGAR AQUÍ ======
     // Actualizar asientos disponibles del viaje
+    await this.seatRepository.update(ticket.seat.id, { status: 'disponible' });
+
     await this.tripService.updateAvailableSeats(ticket.trip.id);
     // ==========================
 
     return this.findOne(id);
   }
+
+  ////////////////////////////////////////////
   async confirmTicket(id: string): Promise<Ticket> {
     const ticket = await this.findOne(id);
 
@@ -514,8 +514,7 @@ export class TicketService {
     await this.ticketRepository.update(id, {
       status: TicketStatus.CONFIRMED,
     });
-
-    // ====== AGREGAR AQUÍ ======
+    await this.seatRepository.update(ticket.seat.id, { status: 'ocupado' });
     // Actualizar asientos disponibles del viaje
     await this.tripService.updateAvailableSeats(ticket.trip.id);
     // ==========================

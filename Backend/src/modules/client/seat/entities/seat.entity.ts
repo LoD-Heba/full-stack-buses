@@ -20,7 +20,7 @@ export class Seat {
   @Column({ unique: false }) // Único por stack, no globalmente
   seat_code: string;
 
-  @Column({ type: 'int' , nullable: true})
+  @Column({ type: 'int', nullable: true })
   seat_number: number; // número de asiento
 
   @Column({
@@ -29,20 +29,27 @@ export class Seat {
     default: 'normal',
   })
   type: string;
-  
+
   @Column({ type: 'int', nullable: true })
   position_x?: number;
 
   @Column({ type: 'int', nullable: true })
   position_y?: number;
 
+  @Column({
+    type: 'enum',
+    enum: ['disponible', 'reservado', 'ocupado', 'bloqueado'],
+    default: 'disponible',
+  })
+  status: string;
+
   @Column({ type: 'varchar', default: 'seat', nullable: true })
-  visual_type?: string; 
+  visual_type?: string;
 
   @Column({ type: 'int', default: 0, nullable: true })
   rotation?: number;
 
-  @Column({nullable: true})
+  @Column({ nullable: true })
   deck: number;
 
   @Column({ type: 'jsonb', nullable: true })
