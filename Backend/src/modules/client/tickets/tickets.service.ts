@@ -281,6 +281,20 @@ export class TicketService {
     };
   }
 
+  // Añadir a ticket.service.ts
+  async findByCode(code: string): Promise<Ticket> {
+    const ticket = await this.ticketRepository.findOne({
+      where: { code, is_active: true },
+      relations: { trip: true, seat: true, userProfile: true },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException(`Ticket ${code} no existe`);
+    }
+
+    return ticket;
+  }
+
   async findOne(id: string): Promise<Ticket> {
     const ticket = await this.ticketRepository.findOne({
       where: { ticket_id: id, is_active: true },
@@ -308,27 +322,6 @@ export class TicketService {
     }
 
     return ticket;
-  }
-
-  async findByUser(userId: string): Promise<Ticket[]> {
-    return this.ticketRepository.find({
-      where: {
-        user: { id: userId },
-        is_active: true,
-      },
-      relations: {
-        trip: {
-          route: {
-            originCity: true,
-            destinationCity: true,
-          },
-        },
-        seat: true,
-        userProfile: true,
-        payment: true,
-      },
-      order: { created_at: 'DESC' },
-    });
   }
 
   private async findUserProfile(userProfileId: string): Promise<UserProfile> {
@@ -360,47 +353,6 @@ export class TicketService {
       },
       order: { seat: { seat_number: 'ASC' } },
     });
-  }
-
-  async getUserTicketHistory(userId: string): Promise<{
-    upcoming: Ticket[];
-    past: Ticket[];
-    cancelled: Ticket[];
-  }> {
-    const tickets = await this.ticketRepository.find({
-      where: {
-        user: { id: userId },
-        is_active: true,
-      },
-      relations: {
-        trip: {
-          route: {
-            originCity: true,
-            destinationCity: true,
-          },
-        },
-        seat: true,
-        userProfile: true,
-        payment: true,
-      },
-      order: { created_at: 'DESC' },
-    });
-
-    const now = new Date();
-
-    return {
-      upcoming: tickets.filter(
-        (t) =>
-          t.status === TicketStatus.CONFIRMED &&
-          new Date(t.trip.departure_time) > now,
-      ),
-      past: tickets.filter(
-        (t) =>
-          t.status === TicketStatus.CONFIRMED &&
-          new Date(t.trip.departure_time) <= now,
-      ),
-      cancelled: tickets.filter((t) => t.status === TicketStatus.CANCELLED),
-    };
   }
 
   async update(id: string, updateTicketDto: UpdateTicketDto): Promise<Ticket> {

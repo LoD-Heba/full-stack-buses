@@ -28,16 +28,6 @@ export class TicketController {
     return this.ticketService.findAll(paginationDto);
   }
 
-  @Get('user/:userId')
-  findByUser(@Param('userId', ParseUUIDPipe) userId: string) {
-    return this.ticketService.findByUser(userId);
-  }
-
-  @Get('user/:userId/history')
-  getUserHistory(@Param('userId', ParseUUIDPipe) userId: string) {
-    return this.ticketService.getUserTicketHistory(userId);
-  }
-
   @Get('trip/:tripId')
   findByTrip(@Param('tripId', ParseUUIDPipe) tripId: string) {
     return this.ticketService.findByTrip(tripId);
@@ -47,11 +37,15 @@ export class TicketController {
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.ticketService.findOne(id);
   }
+  @Get('validate/:code')
+  validateQRCode(@Param('code') code: string) {
+    return this.ticketService.findByCode(code);
+  }
 
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateTicketDto: UpdateTicketDto
+    @Body() updateTicketDto: UpdateTicketDto,
   ) {
     return this.ticketService.update(id, updateTicketDto);
   }

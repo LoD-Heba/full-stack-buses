@@ -27,37 +27,26 @@ export class PaymentService {
   ) {}
 
   async create(createPaymentDto: CreatePaymentDto): Promise<Payment> {
-    const { amount, method, ...paymentData } = createPaymentDto;
+  const { amount, method } = createPaymentDto;
 
-    // Validar monto mínimo según método de pago
-    const minAmounts = {
-      CASH: 1,
-      CARD: 5,
-      QR: 1,
-      TRANSFER: 10,
-    };
-
-    if (amount < minAmounts[method]) {
-      throw new BadRequestException(
-        `El monto mínimo para ${method} es ${minAmounts[method]}`,
-      );
-    }
-
-    // Generar referencia automática si no se proporciona
-    const transaction_reference =
-      paymentData.transaction_reference ||
-      this.generateTransactionReference(method);
-
-    const payment = this.paymentRepository.create({
-      ...paymentData,
-      amount,
-      method,
-      transaction_reference,
-      payment_date: new Date(),
-    });
-
-    return this.paymentRepository.save(payment);
+  // Para QR, no necesitas validaciones de monto mínimo
+  if (amount <= 0) {
+    throw new BadRequestException('El monto debe ser mayor a 0');
   }
+
+  const transaction_reference = this.generateTransactionReference(method);
+
+  const payment = this.paymentRepository.create({
+    ...createPaymentDto,
+    amount,
+    method,
+    transaction_reference,
+    payment_date: new Date(),
+    status: 'PENDIENTE', // Siempre comienza PENDIENTE
+  });
+
+  return this.paymentRepository.save(payment);
+}
 
   async findAll(
     paginationDto: PaginationDto,
@@ -306,135 +295,6 @@ export class PaymentService {
     await this.paymentRepository.update(id, { is_active: false });
 
     return { ...payment, is_active: false };
-  }
-
-  async processPayment(id: string): Promise<Payment> {
-    const payment = await this.findOne(id);
-
-    if (payment.status !== PaymentStatus.PENDING) {
-      throw new BadRequestException('Solo se pueden procesar pagos pendientes');
-    }
-
-    // ====== SIMPLIFICADO PARA COMPRENSIÓN ======
-    // Simulación BÁSICA: todos los pagos se aprueban automáticamente
-    // En producción real, aquí irían las integraciones con pasarelas de pago
-
-    let newStatus = PaymentStatus.COMPLETED;
-    let notes = `Pago procesado exitosamente vía ${payment.method}`;
-
-    // Simulación opcional: 5% de fallos aleatorios para pruebas
-    const randomFail = Math.random() < 0.05; // 5% de probabilidad
-    if (randomFail) {
-      newStatus = PaymentStatus.FAILED;
-      notes = `Fallo simulado en procesamiento de ${payment.method}`;
-    }
-
-    await this.paymentRepository.update(id, {
-      status: newStatus,
-      notes: payment.notes ? `${payment.notes}\n${notes}` : notes,
-    });
-    // ====================================
-
-    return this.findOne(id);
-  }
-
-  async refundPayment(id: string, reason?: string): Promise<Payment> {
-    const payment = await this.findOne(id);
-
-    if (payment.status !== PaymentStatus.COMPLETED) {
-      throw new BadRequestException(
-        'Solo se pueden reembolsar pagos completados',
-      );
-    }
-
-    // Calcular monto de reembolso según política
-    let refundPercentage = 100;
-    let refundAmount = payment.amount;
-
-    //Validar tiempo de reserva de ticket
-    if (payment.tickets && payment.tickets.length > 0) {
-      const ticket = payment.tickets[0]; // Asumir un ticket por pago
-      const hoursUntilDeparture =
-        (new Date(ticket.trip.departure_time).getTime() -
-          new Date().getTime()) /
-        (1000 * 60 * 60);
-
-      if (hoursUntilDeparture < 2) {
-        throw new BadRequestException(
-          'No se permiten reembolsos con menos de 2 horas de anticipación',
-        );
-      } else if (hoursUntilDeparture < 24) {
-        refundPercentage = 50;
-        refundAmount = payment.amount * 0.5;
-      } else if (hoursUntilDeparture < 48) {
-        refundPercentage = 80;
-        refundAmount = payment.amount * 0.8;
-      }
-    }
-
-    const refundNotes = reason
-      ? `Reembolso (${refundPercentage}%): ${reason}. Monto: $${refundAmount.toFixed(2)}`
-      : `Reembolso procesado (${refundPercentage}%). Monto: $${refundAmount.toFixed(2)}`;
-
-    await this.paymentRepository.update(id, {
-      status: PaymentStatus.REFUNDED,
-      notes: payment.notes ? `${payment.notes}\n${refundNotes}` : refundNotes,
-    });
-
-    return this.findOne(id);
-  }
-
-  async getPaymentStatistics(fromDate?: Date, toDate?: Date) {
-    const queryBuilder = this.paymentRepository
-      .createQueryBuilder('payment')
-      .where('payment.is_active = :active', { active: true });
-
-    if (fromDate) {
-      queryBuilder.andWhere('payment.payment_date >= :fromDate', { fromDate });
-    }
-
-    if (toDate) {
-      queryBuilder.andWhere('payment.payment_date <= :toDate', { toDate });
-    }
-
-    const stats = await queryBuilder
-      .select([
-        'COUNT(*) as total_payments',
-        `COUNT(CASE WHEN payment.status = '${PaymentStatus.COMPLETED}' THEN 1 END) as completed_payments`,
-        `COUNT(CASE WHEN payment.status = '${PaymentStatus.PENDING}' THEN 1 END) as pending_payments`,
-        `COUNT(CASE WHEN payment.status = '${PaymentStatus.FAILED}' THEN 1 END) as failed_payments`,
-        `COUNT(CASE WHEN payment.status = '${PaymentStatus.REFUNDED}' THEN 1 END) as refunded_payments`,
-        `SUM(CASE WHEN payment.status = '${PaymentStatus.COMPLETED}' THEN payment.amount ELSE 0 END) as total_revenue`,
-        `AVG(CASE WHEN payment.status = '${PaymentStatus.COMPLETED}' THEN payment.amount END) as average_payment`,
-      ])
-      .getRawOne();
-
-    const methodStats = await queryBuilder
-      .select([
-        'payment.method',
-        'COUNT(*) as count',
-        'SUM(payment.amount) as total',
-      ])
-      .andWhere('payment.status = :status', { status: PaymentStatus.COMPLETED })
-      .groupBy('payment.method')
-      .getRawMany();
-
-    return {
-      overview: {
-        totalPayments: parseInt(stats.total_payments) || 0,
-        completedPayments: parseInt(stats.completed_payments) || 0,
-        pendingPayments: parseInt(stats.pending_payments) || 0,
-        failedPayments: parseInt(stats.failed_payments) || 0,
-        refundedPayments: parseInt(stats.refunded_payments) || 0,
-        totalRevenue: parseFloat(stats.total_revenue) || 0,
-        averagePayment: parseFloat(stats.average_payment) || 0,
-      },
-      byMethod: methodStats.map((stat) => ({
-        method: stat.payment_method,
-        count: parseInt(stat.count),
-        total: parseFloat(stat.total),
-      })),
-    };
   }
 
   // Métodos auxiliares privados
