@@ -12,8 +12,6 @@ async function bootstrap() {
   const logger = new Logger(AppModule.name);
   const configService = app.get(ConfigService);
 
-  //Excepciones globales de validacion de datos
-  //app.useGlobalFilters(new AllExceptionsFilter);
    
   //global prefix desde .env
   const apiPrefix = configService.get<string>('API_PREFIX', 'api/v1');

@@ -9,61 +9,20 @@ import {
   Query,
   ParseUUIDPipe,
   ParseEnumPipe,
-  Req,
-  Headers,
-  BadRequestException,
 } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { CreatePaymentDto, PaymentStatus } from './dto/create-payment.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { SearchPaymentDto } from './dto/search-payment.dto';
-import { StripeService } from '../stripe/stripe.service';
 
 @Controller('payments')
 export class PaymentController {
-  constructor(
-    private readonly paymentService: PaymentService,
-    private readonly stripeService: StripeService,
-  ) {}
+  constructor(private readonly paymentService: PaymentService) {}
 
   @Post()
   create(@Body() createPaymentDto: CreatePaymentDto) {
     return this.paymentService.create(createPaymentDto);
-  }
-
-  @Post('webhook')
-  async handleStripeWebhook(
-    @Req() req: Request,
-    @Headers('stripe-signature') signature: string,
-  ) {
-    const rawBody = req.body;
-
-    try {
-      const event = this.stripeService.constructWebhookEvent(
-        RawBody,
-        signature,
-      );
-
-      switch (event.type) {
-        case 'payment_intent.succeeded':
-          const paymentIntent = event.data.object;
-          // Actualizar pago en BD si es necesario
-          break;
-
-        case 'payment_intent.payment_failed':
-          // Manejar fallo de pago
-          break;
-
-        case 'charge.refunded':
-          // Manejar reembolso
-          break;
-      }
-
-      return { received: true };
-    } catch (error) {
-      throw new BadRequestException('Webhook signature verification failed');
-    }
   }
 
   @Get()
@@ -74,7 +33,7 @@ export class PaymentController {
   @Get('search')
   search(
     @Query() searchDto: SearchPaymentDto,
-    @Query() paginationDto: PaginationDto,
+    @Query() paginationDto: PaginationDto
   ) {
     return this.paymentService.search(searchDto, paginationDto);
   }
@@ -82,7 +41,7 @@ export class PaymentController {
   @Get('statistics')
   getStatistics(
     @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string,
+    @Query('toDate') toDate?: string
   ) {
     const from = fromDate ? new Date(fromDate) : undefined;
     const to = toDate ? new Date(toDate) : undefined;
@@ -91,7 +50,7 @@ export class PaymentController {
 
   @Get('status/:status')
   findByStatus(
-    @Param('status', new ParseEnumPipe(PaymentStatus)) status: PaymentStatus,
+    @Param('status', new ParseEnumPipe(PaymentStatus)) status: PaymentStatus
   ) {
     return this.paymentService.findByStatus(status);
   }
@@ -104,11 +63,11 @@ export class PaymentController {
   @Get('date-range')
   findByDateRange(
     @Query('fromDate') fromDate: string,
-    @Query('toDate') toDate: string,
+    @Query('toDate') toDate: string
   ) {
     return this.paymentService.findByDateRange(
       new Date(fromDate),
-      new Date(toDate),
+      new Date(toDate)
     );
   }
 
@@ -120,7 +79,7 @@ export class PaymentController {
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() updatePaymentDto: UpdatePaymentDto,
+    @Body() updatePaymentDto: UpdatePaymentDto
   ) {
     return this.paymentService.update(id, updatePaymentDto);
   }
@@ -133,7 +92,7 @@ export class PaymentController {
   @Patch(':id/refund')
   refundPayment(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body('reason') reason?: string,
+    @Body('reason') reason?: string
   ) {
     return this.paymentService.refundPayment(id, reason);
   }
