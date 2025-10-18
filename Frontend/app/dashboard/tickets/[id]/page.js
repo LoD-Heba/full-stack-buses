@@ -1,3 +1,4 @@
+// Frontend/app/dashboard/tickets/[id]/page.js
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,12 +32,26 @@ export default async function TicketDetailPage({ params }) {
   try {
     const ticket = await getTicket(id);
 
-    const passengerName = ticket.user?.profile
+    //Priorizar userProfile sobre user
+    const passengerName = ticket.userProfile
+      ? `${ticket.userProfile.firstName} ${ticket.userProfile.lastName}`
+      : ticket.user?.profile
       ? `${ticket.user.profile.firstName} ${ticket.user.profile.lastName}`
       : ticket.user?.email || "No disponible";
 
-    const documentNumber =
-      ticket.user?.profile?.documentNumber || "No disponible";
+    const documentNumber = 
+      ticket.userProfile?.documentNumber ||
+      ticket.user?.profile?.documentNumber || 
+      "No disponible";
+
+    const phone = 
+      ticket.userProfile?.phone ||
+      ticket.user?.profile?.phone || 
+      "No disponible";
+
+    const email = 
+      ticket.user?.email || 
+      "No disponible";
 
     return (
       <div className="container mx-auto py-6 space-y-6">
@@ -99,7 +114,7 @@ export default async function TicketDetailPage({ params }) {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Email</p>
-                <p className="font-medium">{ticket.user?.email || "-"}</p>
+                <p className="font-medium">{email}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Documento</p>
@@ -107,9 +122,7 @@ export default async function TicketDetailPage({ params }) {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Teléfono</p>
-                <p className="font-medium">
-                  {ticket.user?.profile?.phone || "No disponible"}
-                </p>
+                <p className="font-medium">{phone}</p>
               </div>
             </CardContent>
           </Card>
@@ -221,16 +234,17 @@ export default async function TicketDetailPage({ params }) {
                   <div>
                     <p className="text-sm text-gray-600">Método de Pago</p>
                     <p className="font-medium capitalize">
-                      {ticket.payment.payment_method?.replace("_", " ") || "-"}
+                      {/* ✅ CORRECCIÓN: Usar 'method' en lugar de 'payment_method' */}
+                      {ticket.payment.method?.replace("_", " ") || "-"}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Estado del Pago</p>
                     <Badge
                       className={
-                        ticket.payment.status === "COMPLETED"
+                        ticket.payment.status === "COMPLETO"
                           ? "bg-green-100 text-green-800"
-                          : ticket.payment.status === "PENDING"
+                          : ticket.payment.status === "PENDIENTE"
                           ? "bg-yellow-100 text-yellow-800"
                           : "bg-red-100 text-red-800"
                       }
@@ -252,6 +266,14 @@ export default async function TicketDetailPage({ params }) {
                       )}
                     </p>
                   </div>
+                  {ticket.payment.transaction_reference && (
+                    <div>
+                      <p className="text-sm text-gray-600">Referencia</p>
+                      <p className="font-medium text-xs">
+                        {ticket.payment.transaction_reference}
+                      </p>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-4">

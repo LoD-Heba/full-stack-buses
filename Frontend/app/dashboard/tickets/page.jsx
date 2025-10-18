@@ -85,15 +85,14 @@ export default function TicketsPage() {
         price: ticket.price,
         status: ticket.status,
         booking_date: new Date(ticket.booking_date).toLocaleDateString("es-ES"),
-        passenger: ticket.user?.profile
+        passenger: ticket.userProfile
+          ? `${ticket.userProfile.firstName} ${ticket.userProfile.lastName}`
+          : ticket.user?.profile
           ? `${ticket.user.profile.firstName} ${ticket.user.profile.lastName}`
           : ticket.user?.email || "-",
         user_email: ticket.user?.email || "-",
-        document: ticket.profile?.documentNumber || "-",
         trip_route: ticket.trip?.route
-          ? `${ticket.trip.route.originCity?.name || "?"} → ${
-              ticket.trip.route.destinationCity?.name || "?"
-            }`
+          ? `${ticket.trip.route.name || "?"}`
           : "-",
         departure_time: ticket.trip?.departure_time
           ? new Date(ticket.trip.departure_time).toLocaleString("es-ES")
@@ -134,13 +133,11 @@ export default function TicketsPage() {
     router.push(`/dashboard/tickets/${item.id}`);
   };
 
-  // Vista previa del ticket
   const handlePreview = (ticket) => {
     setPreviewTicket(ticket);
     setShowPreview(true);
   };
 
-  //  Exportar ticket individual a PDF
   const handleExportSingle = (ticket) => {
     try {
       exportSingleTicketToPDF(ticket);
@@ -151,16 +148,27 @@ export default function TicketsPage() {
     }
   };
 
-const handleDeleteClick = (ticket) => {
-  const validation = canDeleteTicket(ticket);
-  
-  if (!validation.valid) {
-    toast.error(validation.reason);
-    return;
-  }
-  
-  setActionDialog({ open: true, type: "delete", ticket });
-};
+  const handleDeleteClick = (ticket) => {
+    const validation = canDeleteTicket(ticket);
+
+    if (!validation.valid) {
+      toast.error(validation.reason);
+      return;
+    }
+
+    setActionDialog({ open: true, type: "delete", ticket });
+  };
+
+  const handleCancelClick = (ticket) => {
+    const validation = canCancelTicket(ticket);
+
+    if (!validation.valid) {
+      toast.error(validation.reason);
+      return;
+    }
+
+    setActionDialog({ open: true, type: "cancel", ticket });
+  };
 
   const handleConfirmClick = (ticket) => {
     const validation = canConfirmTicket(ticket);
@@ -212,7 +220,6 @@ const handleDeleteClick = (ticket) => {
   const columns = [
     { key: "code", label: "Código" },
     { key: "passenger", label: "Pasajero" },
-    { key: "document", label: "Documento" },
     { key: "trip_route", label: "Ruta" },
     { key: "departure_time", label: "Salida" },
     { key: "seat", label: "Asiento" },
@@ -243,7 +250,6 @@ const handleDeleteClick = (ticket) => {
       </div>
     );
   }
-
   return (
     <div className="p-6 space-y-6">
       {/* Acciones rápidas */}
