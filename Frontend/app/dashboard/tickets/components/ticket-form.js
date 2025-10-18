@@ -22,6 +22,7 @@ import {
   MapPin,
   Calendar,
   AlertCircle,
+  Loader,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -38,9 +39,13 @@ export function NewTicketForm() {
   const [clientInfo, setClientInfo] = useState(null);
   const [trip, setTrip] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
-  const [availableSeats, setAvailableSeats] = useState([]); // ✅ NUEVO
+  const [availableSeats, setAvailableSeats] = useState([]);
   const [backendError, setBackendError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [step, setStep] = useState("review"); // "review" o "payment"
+  const [createdTickets, setCreatedTickets] = useState([]);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("QR");
 
   const {
     handleSubmit,
@@ -48,7 +53,7 @@ export function NewTicketForm() {
     formState: { errors },
   } = useForm({
     defaultValues: {
-      userProfileId: clientId || "", // ✅ CAMBIO: userId → userProfileId
+      userProfileId: clientId || "",
       tripId: tripId || "",
       price: "",
     },
@@ -91,7 +96,7 @@ export function NewTicketForm() {
         }
 
         setClientInfo(data);
-        setValue("userProfileId", clientId); // ✅ CAMBIO
+        setValue("userProfileId", clientId);
       } catch (error) {
         console.error("Error al cargar cliente:", error);
         toast.error("Error al cargar información del cliente");
@@ -104,7 +109,7 @@ export function NewTicketForm() {
     fetchClientInfo();
   }, [clientId, setValue, router]);
 
-  // ✅ Cargar información del viaje y asientos seleccionados
+  // Cargar información del viaje y asientos seleccionados
   useEffect(() => {
     const fetchTripAndSeats = async () => {
       if (!tripId || !seatsParam) return;
@@ -113,7 +118,6 @@ export function NewTicketForm() {
         console.log("🔄 Iniciando carga de datos...");
         console.log("📝 Parámetros:", { tripId, seatsParam });
 
-        // ✅ Obtener viaje y asientos disponibles con la función corregida
         const { trip: tripData, availableSeats: seats } =
           await getAvailableSeatsForTrip(tripId);
 
@@ -128,13 +132,12 @@ export function NewTicketForm() {
         setValue("tripId", tripId);
         setValue("price", tripData.price);
 
-        // ✅ Procesar asientos seleccionados
+        // Procesar asientos seleccionados
         const seatCodes = seatsParam
           .split(",")
           .map((s) => s.trim().toUpperCase());
         console.log("🔍 Buscando códigos:", seatCodes);
 
-        // Mostrar todos los códigos disponibles para debug
         console.log(
           "📋 Códigos disponibles en el bus:",
           seats.map((s) => s.seat_code)
@@ -151,7 +154,6 @@ export function NewTicketForm() {
             if (!seat) {
               console.warn(`⚠️ Asiento no encontrado: ${code}`);
             } else {
-              // ✅ Validar status del asiento
               if (seat.status && seat.status !== "disponible") {
                 console.warn(
                   `⚠️ Asiento ${code} no disponible (status: ${seat.status})`
@@ -169,6 +171,7 @@ export function NewTicketForm() {
             return seat;
           })
           .filter(Boolean);
+
         if (mappedSeats.length === 0) {
           throw new Error(
             `No se encontraron los asientos seleccionados: ${seatCodes.join(
@@ -212,8 +215,8 @@ export function NewTicketForm() {
     fetchTripAndSeats();
   }, [tripId, seatsParam, setValue]);
 
-  // ✅ Manejar envío del formulario
-  const onSubmit = handleSubmit(async () => {
+  // Crear tickets sin pagar (PENDIENTE)
+  const createTicketsOnly = async () => {
     try {
       setSubmitting(true);
       setBackendError(null);
@@ -233,18 +236,6 @@ export function NewTicketForm() {
         return;
       }
 
-      // ✅ Validar que todos los asientos tienen ID UUID válido
-      const invalidSeats = selectedSeats.filter(
-        (seat) => !seat.id || typeof seat.id !== "string" || seat.id.length < 30
-      );
-
-      if (invalidSeats.length > 0) {
-        console.error("❌ Asientos con ID inválido:", invalidSeats);
-        toast.error("Error: Algunos asientos no tienen ID válido");
-        setBackendError("Algunos asientos seleccionados no son válidos");
-        return;
-      }
-
       console.log("📤 Creando tickets para:", {
         userProfileId: clientId,
         tripId: tripId,
@@ -254,15 +245,13 @@ export function NewTicketForm() {
       const ticketsCreated = [];
       const ticketErrors = [];
 
-      // Crear un ticket por cada asiento seleccionado
       for (const seat of selectedSeats) {
         try {
-          // ✅ Construir payload correcto según CreateTicketDto
           const ticketData = {
-            userProfileId: clientId, // ✅ REQUERIDO
-            userId: undefined, // ✅ Opcional (usuario registrado)
+            userProfileId: clientId,
+            userId: undefined,
             tripId: tripId,
-            seatId: seat.id, // ✅ UUID del asiento
+            seatId: seat.id,
             price: parseFloat(trip.price),
             status: "PENDIENTE",
           };
@@ -301,26 +290,26 @@ export function NewTicketForm() {
         }
       }
 
-      // Mostrar resultado
-      if (ticketsCreated.length > 0) {
-        toast.success(
-          `${ticketsCreated.length} ticket${
-            ticketsCreated.length > 1 ? "s" : ""
-          } creado${ticketsCreated.length > 1 ? "s" : ""} exitosamente`
-        );
-
-        setTimeout(() => {
-          router.push(`/dashboard/clientes/${clientId}/perfil`);
-        }, 1500);
+      if (ticketsCreated.length === 0) {
+        throw new Error("No se pudieron crear los tickets");
       }
 
       if (ticketErrors.length > 0) {
         const errorMessage = ticketErrors.join("\n");
         setBackendError(errorMessage);
         toast.error(`Se encontraron errores:\n${errorMessage}`);
+        return;
       }
+
+      setCreatedTickets(ticketsCreated);
+      toast.success(
+        `${ticketsCreated.length} ticket${
+          ticketsCreated.length > 1 ? "s" : ""
+        } creado${ticketsCreated.length > 1 ? "s" : ""}`
+      );
+      setStep("payment");
     } catch (error) {
-      console.error("Error en onSubmit:", error);
+      console.error("Error en createTicketsOnly:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Error al crear los tickets";
       setBackendError(errorMessage);
@@ -328,7 +317,112 @@ export function NewTicketForm() {
     } finally {
       setSubmitting(false);
     }
-  });
+  };
+
+  // Procesar pago
+  const handlePayment = async () => {
+    try {
+      setProcessingPayment(true);
+      setBackendError(null);
+
+      if (createdTickets.length === 0) {
+        throw new Error("No hay tickets para pagar");
+      }
+
+      const totalAmount = createdTickets.reduce(
+        (sum, ticket) => sum + parseFloat(ticket.price),
+        0
+      );
+
+      // 1. Crear el pago
+      console.log("💳 Creando pago...");
+      const paymentResponse = await fetch("http://localhost:3001/api/v1/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: totalAmount,
+          method: paymentMethod,
+          category: "adulto",
+          notes: `Pago para ${createdTickets.length} ticket(s): ${createdTickets
+            .map((t) => t.code)
+            .join(", ")}`,
+        }),
+      });
+
+      if (!paymentResponse.ok) {
+        const errorData = await paymentResponse.json();
+        throw new Error(errorData.message || "Error al crear el pago");
+      }
+
+      const payment = await paymentResponse.json();
+      console.log("✅ Pago creado:", payment.id);
+
+      // 2. Simular procesamiento
+      console.log("⏳ Procesando pago...");
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      // 3. Confirmar el pago
+      console.log("✔️ Confirmando pago...");
+      const confirmResponse = await fetch(
+        `http://localhost:3001/api/v1/payments/${payment.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: "COMPLETO",
+          }),
+        }
+      );
+
+      if (!confirmResponse.ok) {
+        throw new Error("Error al confirmar el pago");
+      }
+
+      console.log("✅ Pago confirmado");
+
+      // 4. Actualizar tickets con payment_id y cambiar a CONFIRMADO
+      console.log("🔗 Vinculando tickets con pago...");
+      const updateTicketPromises = createdTickets.map((ticket) =>
+        fetch(`http://localhost:3001/api/v1/tickets/${ticket.ticket_id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            paymentId: payment.id,
+            status: "CONFIRMADO",
+          }),
+        })
+      );
+
+      const updateResults = await Promise.all(updateTicketPromises);
+      const allUpdatesOk = updateResults.every((res) => res.ok);
+
+      if (!allUpdatesOk) {
+        throw new Error("Error al actualizar tickets");
+      }
+
+      console.log("✅ Tickets confirmados");
+
+      toast.success("¡Pago procesado exitosamente!");
+
+      // 5. Redirigir a página de confirmación con QR
+      const firstTicketId = createdTickets[0].ticket_id;
+      const firstTicketCode = createdTickets[0].code;
+
+      setTimeout(() => {
+        router.push(
+          `/tickets/${firstTicketId}?payment=success&code=${firstTicketCode}`
+        );
+      }, 1500);
+    } catch (error) {
+      console.error("Error en handlePayment:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Error al procesar el pago";
+      setBackendError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -378,198 +472,361 @@ export function NewTicketForm() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
-            Confirmar Compra de Tickets
+            {step === "review" ? "Confirmar Compra de Tickets" : "Procesamiento de Pago"}
           </h1>
           <p className="text-gray-600 mt-1">
-            Revisa los detalles antes de confirmar
+            {step === "review"
+              ? "Revisa los detalles antes de proceder al pago"
+              : "Completa el pago para confirmar tu compra"}
           </p>
         </div>
       </div>
 
-      <form onSubmit={onSubmit} className="space-y-6">
-        {/* Información del Cliente */}
-        {clientInfo && (
-          <Card className="bg-blue-50 border-blue-200">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <User className="h-5 w-5 text-blue-600" />
-                Cliente
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600">Nombre</p>
-                  <p className="font-medium">
-                    {clientInfo.firstName} {clientInfo.lastName}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Documento</p>
-                  <p className="font-medium">{clientInfo.documentNumber}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Teléfono</p>
-                  <p className="font-medium">
-                    {clientInfo.phone || "No especificado"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+      {/* Pasos */}
+      {step === "payment" && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center font-bold">
+              ✓
+            </div>
+            <span className="text-green-600 font-medium">Tickets Creados</span>
+          </div>
+          <div className="flex-1 h-1 bg-green-600 mx-4" />
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold">
+              2
+            </div>
+            <span className="text-orange-600 font-medium">Pago</span>
+          </div>
+        </div>
+      )}
 
-        {/* Información del Viaje */}
-        {trip && (
+      {step === "review" && (
+        <form onSubmit={handleSubmit(createTicketsOnly)} className="space-y-6">
+          {/* Información del Cliente */}
+          {clientInfo && (
+            <Card className="bg-blue-50 border-blue-200">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <User className="h-5 w-5 text-blue-600" />
+                  Cliente
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Nombre</p>
+                    <p className="font-medium">
+                      {clientInfo.firstName} {clientInfo.lastName}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Documento</p>
+                    <p className="font-medium">{clientInfo.documentNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Teléfono</p>
+                    <p className="font-medium">
+                      {clientInfo.phone || "No especificado"}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Información del Viaje */}
+          {trip && (
+            <Card className="bg-green-50 border-green-200">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Bus className="h-5 w-5 text-green-600" />
+                  Detalles del Viaje
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-600 flex items-center gap-1">
+                      <MapPin className="h-4 w-4" />
+                      Ruta
+                    </p>
+                    <p className="font-medium mt-1">
+                      {trip.route?.originCity?.name} →{" "}
+                      {trip.route?.destinationCity?.name}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600 flex items-center gap-1">
+                      <Calendar className="h-4 w-4" />
+                      Salida
+                    </p>
+                    <p className="font-medium mt-1">
+                      {new Date(trip.departure_time).toLocaleDateString(
+                        "es-ES"
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(trip.departure_time).toLocaleTimeString(
+                        "es-ES",
+                        {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600 flex items-center gap-1">
+                      <Bus className="h-4 w-4" />
+                      Bus
+                    </p>
+                    <p className="font-medium mt-1">{trip.bus?.plate}</p>
+                    <p className="text-xs text-gray-500">{trip.bus?.model}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Precio/Asiento</p>
+                    <p className="font-semibold text-green-600 mt-1">
+                      Bs. {parseFloat(trip.price).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Asientos Seleccionados */}
+          {selectedSeats.length > 0 && (
+            <Card className="bg-purple-50 border-purple-200">
+              <CardHeader>
+                <CardTitle className="text-lg">
+                  Asientos Seleccionados ({selectedSeats.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  {selectedSeats.map((seat) => (
+                    <Badge
+                      key={seat.id}
+                      className="bg-purple-600 hover:bg-purple-700 px-3 py-2 text-sm"
+                    >
+                      {seat.seat_code}{" "}
+                      {seat.seat_number && `(Asiento ${seat.seat_number})`}
+                    </Badge>
+                  ))}
+                </div>
+
+                <Card className="bg-white border">
+                  <CardContent className="pt-4 space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Precio unitario:</span>
+                        <span className="font-medium">
+                          Bs.{" "}
+                          {trip
+                            ? parseFloat(trip.price).toFixed(2)
+                            : "0.00"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">
+                          Cantidad de asientos:
+                        </span>
+                        <span className="font-medium">
+                          {selectedSeats.length}
+                        </span>
+                      </div>
+                      <div className="border-t pt-2 flex justify-between text-lg font-bold">
+                        <span>Total:</span>
+                        <span className="text-green-600">
+                          Bs. {totalPrice.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Errores del servidor */}
+          {backendError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="whitespace-pre-line">
+                {backendError}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Botones de acción */}
+          <div className="flex gap-3 pt-4 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => router.back()}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={submitting || selectedSeats.length === 0}
+              className="flex-1 bg-green-600 hover:bg-green-700"
+            >
+              {submitting ? (
+                <>
+                  <Loader className="animate-spin h-4 w-4 mr-2" />
+                  Procesando...
+                </>
+              ) : (
+                `Proceder al Pago → Bs. ${totalPrice.toFixed(2)}`
+              )}
+            </Button>
+          </div>
+
+          <Alert className="bg-blue-50 border-blue-200">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800 text-sm">
+              Al confirmar, se crearán {selectedSeats.length} ticket
+              {selectedSeats.length > 1 ? "s" : ""} con estado "Pendiente". A
+              continuación podrás proceder con el pago para confirmarlos.
+            </AlertDescription>
+          </Alert>
+        </form>
+      )}
+
+      {step === "payment" && (
+        <div className="space-y-6">
+          {/* Resumen de Tickets Creados */}
           <Card className="bg-green-50 border-green-200">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <Bus className="h-5 w-5 text-green-600" />
-                Detalles del Viaje
+                <TicketIcon className="h-5 w-5 text-green-600" />
+                Tickets Creados
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-600 flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    Ruta
-                  </p>
-                  <p className="font-medium mt-1">
-                    {trip.route?.originCity?.name} →{" "}
-                    {trip.route?.destinationCity?.name}
-                  </p>
+            <CardContent className="space-y-3">
+              {createdTickets.map((ticket) => (
+                <div
+                  key={ticket.ticket_id}
+                  className="flex justify-between items-center p-3 bg-white rounded border"
+                >
+                  <div>
+                    <p className="font-medium">{ticket.code}</p>
+                    <p className="text-sm text-gray-600">
+                      Asiento: {ticket.seat?.seat_code}
+                    </p>
+                  </div>
+                  <Badge className="bg-yellow-100 text-yellow-800">
+                    {ticket.status}
+                  </Badge>
                 </div>
-                <div>
-                  <p className="text-gray-600 flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    Salida
-                  </p>
-                  <p className="font-medium mt-1">
-                    {new Date(trip.departure_time).toLocaleDateString("es-ES")}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {new Date(trip.departure_time).toLocaleTimeString("es-ES", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-600 flex items-center gap-1">
-                    <Bus className="h-4 w-4" />
-                    Bus
-                  </p>
-                  <p className="font-medium mt-1">{trip.bus?.plate}</p>
-                  <p className="text-xs text-gray-500">{trip.bus?.model}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Precio/Asiento</p>
-                  <p className="font-semibold text-green-600 mt-1">
-                    Bs. {parseFloat(trip.price).toFixed(2)}
-                  </p>
-                </div>
-              </div>
+              ))}
             </CardContent>
           </Card>
-        )}
 
-        {/* Asientos Seleccionados */}
-        {selectedSeats.length > 0 && (
-          <Card className="bg-purple-50 border-purple-200">
+          {/* Método de Pago */}
+          <Card>
             <CardHeader>
-              <CardTitle className="text-lg">
-                Asientos Seleccionados ({selectedSeats.length})
-              </CardTitle>
+              <CardTitle className="text-lg">Método de Pago</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                {selectedSeats.map((seat) => (
-                  <Badge
-                    key={seat.id}
-                    className="bg-purple-600 hover:bg-purple-700 px-3 py-2 text-sm"
+              <div className="grid grid-cols-3 gap-2">
+                {["QR", "EFECTIVO", "TARJETA"].map((method) => (
+                  <button
+                    key={method}
+                    onClick={() => setPaymentMethod(method)}
+                    disabled={processingPayment}
+                    className={`p-3 rounded-lg border-2 transition ${
+                      paymentMethod === method
+                        ? "border-blue-600 bg-blue-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    } disabled:opacity-50`}
                   >
-                    {seat.seat_code}{" "}
-                    {seat.seat_number && `(Asiento ${seat.seat_number})`}
-                  </Badge>
+                    <div className="text-sm font-medium">{method}</div>
+                  </button>
                 ))}
               </div>
-
-              <Card className="bg-white border">
-                <CardContent className="pt-4 space-y-3">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Precio unitario:</span>
-                      <span className="font-medium">
-                        Bs. {trip ? parseFloat(trip.price).toFixed(2) : "0.00"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">
-                        Cantidad de asientos:
-                      </span>
-                      <span className="font-medium">
-                        {selectedSeats.length}
-                      </span>
-                    </div>
-                    <div className="border-t pt-2 flex justify-between text-lg font-bold">
-                      <span>Total:</span>
-                      <span className="text-green-600">
-                        Bs. {totalPrice.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </CardContent>
           </Card>
-        )}
 
-        {/* Errores del servidor */}
-        {backendError && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="whitespace-pre-line">
-              {backendError}
+          {/* Resumen de Pago */}
+          <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200">
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex justify-between">
+                <span className="text-gray-600">
+                  {createdTickets.length} ticket(s) × Bs.{" "}
+                  {trip ? parseFloat(trip.price).toFixed(2) : "0.00"}
+                </span>
+                <span className="font-medium">
+                  Bs.{" "}
+                  {(
+                    createdTickets.length * parseFloat(trip?.price || 0)
+                  ).toFixed(2)}
+                </span>
+              </div>
+              <div className="border-t-2 border-green-300 pt-4 flex justify-between">
+                <span className="text-lg font-bold">Total a Pagar:</span>
+                <span className="text-2xl font-bold text-green-600">
+                  Bs.{" "}
+                  {(
+                    createdTickets.length * parseFloat(trip?.price || 0)
+                  ).toFixed(2)}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Errores */}
+          {backendError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{backendError}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Nota */}
+          <Alert className="bg-blue-50 border-blue-200">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800 text-sm">
+              Esto es una simulación de pago. Al confirmar, se procesará el pago
+              y se generará tu código QR.
             </AlertDescription>
           </Alert>
-        )}
 
-        {/* Botones de acción */}
-        <div className="flex gap-3 pt-4 border-t">
-          <Button
-            type="button"
-            variant="outline"
-            className="flex-1"
-            onClick={() => router.back()}
-          >
-            Cancelar
-          </Button>
-          <Button
-            type="submit"
-            disabled={submitting || selectedSeats.length === 0}
-            className="flex-1 bg-green-600 hover:bg-green-700"
-          >
-            {submitting ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Procesando...
-              </>
-            ) : (
-              `Confirmar Compra (Bs. ${totalPrice.toFixed(2)})`
-            )}
-          </Button>
+          {/* Botones */}
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                setStep("review");
+                setCreatedTickets([]);
+                setBackendError(null);
+              }}
+              disabled={processingPayment}
+            >
+              ← Volver
+            </Button>
+            <Button
+              onClick={handlePayment}
+              disabled={processingPayment || createdTickets.length === 0}
+              className="flex-1 bg-green-600 hover:bg-green-700"
+              size="lg"
+            >
+              {processingPayment ? (
+                <>
+                  <Loader className="animate-spin h-4 w-4 mr-2" />
+                  Procesando pago...
+                </>
+              ) : (
+                `Confirmar Pago`
+              )}
+            </Button>
+          </div>
         </div>
-
-        <Alert className="bg-blue-50 border-blue-200">
-          <AlertCircle className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-800 text-sm">
-            Al confirmar, se crearán {selectedSeats.length} ticket
-            {selectedSeats.length > 1 ? "s" : ""} con estado "Pendiente". Serán
-            confirmados una vez se realice el pago.
-          </AlertDescription>
-        </Alert>
-      </form>
+      )}
     </div>
   );
 }
