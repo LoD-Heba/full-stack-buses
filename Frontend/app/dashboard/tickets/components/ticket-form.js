@@ -336,18 +336,21 @@ export function NewTicketForm() {
 
       // 1. Crear el pago
       console.log("💳 Creando pago...");
-      const paymentResponse = await fetch("http://localhost:3001/api/v1/payments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: totalAmount,
-          method: paymentMethod,
-          category: "adulto",
-          notes: `Pago para ${createdTickets.length} ticket(s): ${createdTickets
-            .map((t) => t.code)
-            .join(", ")}`,
-        }),
-      });
+      const paymentResponse = await fetch(
+        "http://localhost:3001/api/v1/payments",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: totalAmount,
+            method: paymentMethod,
+            category: "adulto",
+            notes: `Pago para ${
+              createdTickets.length
+            } ticket(s): ${createdTickets.map((t) => t.code).join(", ")}`,
+          }),
+        }
+      );
 
       if (!paymentResponse.ok) {
         const errorData = await paymentResponse.json();
@@ -410,7 +413,7 @@ export function NewTicketForm() {
 
       setTimeout(() => {
         router.push(
-          `/tickets/${firstTicketId}?payment=success&code=${firstTicketCode}`
+          `/dashboard/tickets/${firstTicketId}?payment=success&code=${firstTicketCode}`
         );
       }, 1500);
     } catch (error) {
@@ -472,7 +475,9 @@ export function NewTicketForm() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
-            {step === "review" ? "Confirmar Compra de Tickets" : "Procesamiento de Pago"}
+            {step === "review"
+              ? "Confirmar Compra de Tickets"
+              : "Procesamiento de Pago"}
           </h1>
           <p className="text-gray-600 mt-1">
             {step === "review"
@@ -623,9 +628,7 @@ export function NewTicketForm() {
                         <span className="text-gray-600">Precio unitario:</span>
                         <span className="font-medium">
                           Bs.{" "}
-                          {trip
-                            ? parseFloat(trip.price).toFixed(2)
-                            : "0.00"}
+                          {trip ? parseFloat(trip.price).toFixed(2) : "0.00"}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">

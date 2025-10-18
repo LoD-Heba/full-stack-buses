@@ -2,7 +2,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import CheckoutFlow from '../../components/Payment/CheckoutFlow';
+import CheckoutFlow from '../../components/CheckoutFlow';
 
 export default function CheckoutPage() {
   const searchParams = useSearchParams();

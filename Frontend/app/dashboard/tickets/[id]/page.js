@@ -1,17 +1,14 @@
-// Frontend/app/dashboard/tickets/[id]/page.js
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   User,
   MapPin,
   Calendar,
-  DollarSign,
   Bus,
   Armchair,
   CreditCard,
@@ -22,9 +19,11 @@ import {
   CheckCircle,
   AlertCircle,
   QrCode,
+  Loader,
 } from 'lucide-react';
 import Link from 'next/link';
-import { getTicket } from '../api/api-tickets';
+
+const BASE_URL = 'http://localhost:3001/api/v1';
 
 const STATUS_COLORS = {
   PENDIENTE: 'bg-yellow-100 text-yellow-800 border-yellow-300',
@@ -32,7 +31,7 @@ const STATUS_COLORS = {
   CANCELADO: 'bg-red-100 text-red-800 border-red-300',
 };
 
-export default function TicketDetailPage() {
+export default function PublicTicketPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const id = params.id;
@@ -43,7 +42,6 @@ export default function TicketDetailPage() {
   const [error, setError] = useState(null);
 
   const paymentSuccess = searchParams.get('payment') === 'success';
-  const ticketCode = searchParams.get('code');
 
   useEffect(() => {
     const fetchTicketData = async () => {
@@ -55,21 +53,28 @@ export default function TicketDetailPage() {
           throw new Error('ID de ticket inválido');
         }
 
-        // 1. Obtener ticket
-        const ticketData = await getTicket(id);
+        // Obtener ticket
+        const ticketRes = await fetch(`${BASE_URL}/tickets/${id}`, {
+          cache: 'no-store',
+        });
+
+        if (!ticketRes.ok) {
+          throw new Error('Ticket no encontrado');
+        }
+
+        const ticketData = await ticketRes.json();
         setTicket(ticketData);
 
-        // 2. Obtener QR si el ticket está confirmado
+        // Obtener QR si está confirmado
         if (ticketData.status === 'CONFIRMADO') {
           try {
-            const qrResponse = await fetch(`/api/tickets/${id}/qr`);
-            if (qrResponse.ok) {
-              const qrData = await qrResponse.json();
+            const qrRes = await fetch(`/api/tickets/${id}/qr`);
+            if (qrRes.ok) {
+              const qrData = await qrRes.json();
               setQrCode(qrData.qrCode);
             }
           } catch (qrError) {
             console.error('Error al obtener QR:', qrError);
-            // No fallar si no se puede obtener QR
           }
         }
       } catch (err) {
@@ -102,7 +107,7 @@ export default function TicketDetailPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+          <Loader className="animate-spin h-12 w-12 border-b-2 border-orange-500 mx-auto" />
           <p className="mt-4 text-gray-600">Cargando ticket...</p>
         </div>
       </div>
@@ -155,7 +160,7 @@ export default function TicketDetailPage() {
               Volver
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold">Detalle del Ticket</h1>
+          <h1 className="text-3xl font-bold">Mi Ticket</h1>
           <p className="text-gray-600">Código: {ticket.code}</p>
         </div>
         <div className="flex gap-2">
@@ -199,13 +204,13 @@ export default function TicketDetailPage() {
                 <TicketIcon className="w-12 h-12 text-orange-500" />
                 <div>
                   <p className="text-sm text-gray-600">Estado del Ticket</p>
-                  <Badge
+                  <div
                     className={`${
                       STATUS_COLORS[ticket.status]
-                    } text-lg px-4 py-1`}
+                    } text-lg px-4 py-1 rounded inline-block`}
                   >
                     {ticket.status}
-                  </Badge>
+                  </div>
                 </div>
               </div>
               <div className="text-right">
@@ -221,13 +226,11 @@ export default function TicketDetailPage() {
         {/* QR - Solo si está confirmado */}
         {ticket.status === 'CONFIRMADO' && qrCode && (
           <Card className="bg-blue-50 border-blue-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <QrCode className="w-5 h-5" />
-                Código QR - Escanea para Validar
-              </CardTitle>
-            </CardHeader>
             <CardContent className="flex flex-col items-center py-8">
+              <QrCode className="w-5 h-5 mb-4" />
+              <p className="text-gray-600 text-sm mb-4 uppercase font-semibold">
+                Escanea para Validar
+              </p>
               <img
                 src={qrCode}
                 alt="Código QR del ticket"
@@ -243,15 +246,13 @@ export default function TicketDetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Información del Pasajero */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardContent className="pt-6 space-y-3">
+              <h3 className="font-semibold flex items-center gap-2">
                 <User className="w-5 h-5" />
-                Información del Pasajero
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+                Pasajero
+              </h3>
               <div>
-                <p className="text-sm text-gray-600">Nombre Completo</p>
+                <p className="text-sm text-gray-600">Nombre</p>
                 <p className="font-medium">{passengerName}</p>
               </div>
               <div>
@@ -271,13 +272,11 @@ export default function TicketDetailPage() {
 
           {/* Información del Viaje */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardContent className="pt-6 space-y-3">
+              <h3 className="font-semibold flex items-center gap-2">
                 <MapPin className="w-5 h-5" />
                 Información del Viaje
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+              </h3>
               <div>
                 <p className="text-sm text-gray-600">Ruta</p>
                 <p className="font-medium text-lg">
@@ -286,180 +285,81 @@ export default function TicketDetailPage() {
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Fecha y Hora de Salida</p>
+                <p className="text-sm text-gray-600">Salida</p>
                 <p className="font-medium">
                   {ticket.trip?.departure_time
                     ? new Date(ticket.trip.departure_time).toLocaleString(
-                        'es-ES',
-                        {
-                          dateStyle: 'full',
-                          timeStyle: 'short',
-                        }
+                        'es-ES'
                       )
                     : '-'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Duración Estimada</p>
-                <p className="font-medium">
-                  {ticket.trip?.route?.duration
-                    ? `${ticket.trip.route.duration} horas`
-                    : 'No disponible'}
                 </p>
               </div>
             </CardContent>
           </Card>
 
-          {/* Información del Bus y Asiento */}
+          {/* Bus y Asiento */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardContent className="pt-6 space-y-3">
+              <h3 className="font-semibold flex items-center gap-2">
                 <Bus className="w-5 h-5" />
                 Bus y Asiento
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+              </h3>
               <div>
                 <p className="text-sm text-gray-600">Bus</p>
                 <p className="font-medium">
-                  {ticket.trip?.bus?.plate || 'No disponible'} -{' '}
-                  {ticket.trip?.bus?.model || ''}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Tipo de Servicio</p>
-                <p className="font-medium capitalize">
-                  {ticket.trip?.bus?.service_type?.replace('_', ' ') ||
-                    'No disponible'}
+                  {ticket.trip?.bus?.plate || '-'} - {ticket.trip?.bus?.model || ''}
                 </p>
               </div>
               <div className="flex items-center gap-4">
                 <div>
-                  <p className="text-sm text-gray-600">Número de Asiento</p>
+                  <p className="text-sm text-gray-600">Asiento</p>
                   <div className="flex items-center gap-2">
                     <Armchair className="w-5 h-5 text-orange-500" />
                     <p className="text-2xl font-bold">
                       {ticket.seat?.seat_number || '-'}
                     </p>
-                    <span className="text-sm text-gray-500">
-                      ({ticket.seat?.seat_code || '-'})
-                    </span>
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600">Tipo de Asiento</p>
-                  <p className="font-medium capitalize">
-                    {ticket.seat?.type?.replace('_', ' ') || '-'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Tipo</p>
-                  <p className="font-medium capitalize">
-                    {ticket.seat?.seat_type?.replace('_', ' ') || '-'}
-                  </p>
+                  <p className="text-sm text-gray-600">Código</p>
+                  <p className="font-medium">{ticket.seat?.seat_code || '-'}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Información de Pago */}
+          {/* Pago */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardContent className="pt-6 space-y-3">
+              <h3 className="font-semibold flex items-center gap-2">
                 <CreditCard className="w-5 h-5" />
                 Información de Pago
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+              </h3>
               {ticket.payment ? (
                 <>
                   <div>
-                    <p className="text-sm text-gray-600">Método de Pago</p>
-                    <p className="font-medium capitalize">
-                      {ticket.payment.method?.replace('_', ' ') || '-'}
-                    </p>
+                    <p className="text-sm text-gray-600">Método</p>
+                    <p className="font-medium">{ticket.payment.method || '-'}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Estado del Pago</p>
-                    <Badge
-                      className={
-                        ticket.payment.status === 'COMPLETO'
-                          ? 'bg-green-100 text-green-800'
-                          : ticket.payment.status === 'PENDIENTE'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-red-100 text-red-800'
-                      }
-                    >
-                      {ticket.payment.status}
-                    </Badge>
+                    <p className="text-sm text-gray-600">Estado</p>
+                    <p className="font-medium">{ticket.payment.status || '-'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Monto</p>
-                    <p className="font-medium text-lg">
+                    <p className="font-medium">
                       Bs. {parseFloat(ticket.payment.amount).toFixed(2)}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Fecha de Pago</p>
-                    <p className="font-medium">
-                      {new Date(ticket.payment.payment_date).toLocaleString(
-                        'es-ES'
-                      )}
-                    </p>
-                  </div>
-                  {ticket.payment.transaction_reference && (
-                    <div>
-                      <p className="text-sm text-gray-600">Referencia</p>
-                      <p className="font-medium text-xs">
-                        {ticket.payment.transaction_reference}
-                      </p>
-                    </div>
-                  )}
                 </>
               ) : (
-                <div className="text-center py-4">
-                  <p className="text-gray-500">
-                    No hay información de pago asociada
-                  </p>
-                </div>
+                <p className="text-gray-500">Sin pago asociado</p>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Información Adicional */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Información Adicional
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <p className="text-sm text-gray-600">Fecha de Reserva</p>
-                <p className="font-medium">
-                  {new Date(ticket.booking_date).toLocaleString('es-ES')}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Fecha de Creación</p>
-                <p className="font-medium">
-                  {new Date(ticket.created_at).toLocaleString('es-ES')}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Última Actualización</p>
-                <p className="font-medium">
-                  {new Date(ticket.updated_at).toLocaleString('es-ES')}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Información importante */}
+        {/* Nota */}
         <Alert className="bg-yellow-50 border-yellow-200">
           <AlertCircle className="h-4 w-4 text-yellow-600" />
           <AlertDescription className="text-yellow-800">
