@@ -1,3 +1,4 @@
+// Backend/src/modules/client/payment/entities/payment.entity.ts
 import { 
   Column, 
   Entity, 
@@ -21,30 +22,30 @@ export class Payment {
   category: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  amount: number; // monto pagado
+  amount: number;
 
   @Column({
     type: 'enum',
     enum: ['EFECTIVO', 'TARJETA', 'QR', 'TRANSFERENCIA'],
     default: 'EFECTIVO',
   })
-  method: string; // método de pago
+  method: string; // ✅ Este es el campo correcto
 
   @Column({
     type: 'enum',
     enum: ['PENDIENTE', 'COMPLETO', 'FALLIDO', 'REEMBOLSO'],
     default: 'PENDIENTE',
   })
-  status: string; // estado del pago
+  status: string;
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
-  payment_date: Date; // fecha del pago
+  payment_date: Date;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
-  transaction_reference?: string; // referencia externa
+  transaction_reference?: string;
 
   @Column({ type: 'text', nullable: true })
-  notes?: string; // notas adicionales del pago
+  notes?: string;
 
   @Column({ type: 'boolean', default: true })
   is_active: boolean;
@@ -55,7 +56,6 @@ export class Payment {
   @UpdateDateColumn({ name: 'updated_at' })
   updated_at: Date;
 
-  // Relación con Tickets (1:N)
   @OneToMany(() => Ticket, (ticket) => ticket.payment)
   tickets: Ticket[];
 }

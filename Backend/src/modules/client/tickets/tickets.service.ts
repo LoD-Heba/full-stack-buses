@@ -1,10 +1,11 @@
+// Backend/src/modules/client/tickets/tickets.service.ts
 import {
   Injectable,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { Ticket } from './entities/ticket.entity';
@@ -43,194 +44,151 @@ export class TicketService {
     @InjectRepository(Payment)
     private readonly paymentRepository: Repository<Payment>,
     private readonly tripService: TripService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(createTicketDto: CreateTicketDto): Promise<Ticket> {
     const { tripId, seatId, userId, userProfileId, paymentId, ...ticketData } =
       createTicketDto;
 
-    // ✅ VALIDAR: userProfileId es obligatorio
-    if (!userProfileId) {
-      throw new BadRequestException('userProfileId es requerido');
-    }
-    const userProfile = await this.findUserProfile(userProfileId);
-    // Validar que el usuario existe y está activo
-    // ✅ OPCIONAL: Obtener User si se proporciona (usuario registrado)
-    let user: User | undefined;
-    if (userId) {
-      user = await this.findUser(userId);
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
+    try {
+      const {
+        tripId,
+        seatId,
+        userId,
+        userProfileId,
+        paymentId,
+        ...ticketData
+      } = createTicketDto;
+
+      // Validaciones previas (pueden estar fuera de la transacción)
+      if (!userProfileId) {
+        throw new BadRequestException('userProfileId es requerido');
+      }
+
+      const userProfile = await this.findUserProfile(userProfileId);
+      let user: User | undefined;
+      if (userId) {
+        user = await this.findUser(userId);
+        if (
+          !user.profile?.firstName ||
+          !user.profile?.lastName ||
+          !user.profile?.documentNumber
+        ) {
+          throw new BadRequestException('El usuario debe completar su perfil');
+        }
+      }
+
+      // ✅ VALIDAR: UserProfile tiene datos completos
       if (
-        !user.profile?.firstName ||
-        !user.profile?.lastName ||
-        !user.profile?.documentNumber
+        !userProfile.firstName ||
+        !userProfile.lastName ||
+        !userProfile.documentNumber
       ) {
-        throw new BadRequestException('El usuario debe completar su perfil');
-      }
-    }
-
-    // ✅ VALIDAR: UserProfile tiene datos completos
-    if (
-      !userProfile.firstName ||
-      !userProfile.lastName ||
-      !userProfile.documentNumber
-    ) {
-      throw new BadRequestException(
-        'El cliente debe tener nombre, apellido y documento completos',
-      );
-    }
-    // Validar que un usuario no tenga mas de 3 tickets pendientes
-    const pendingTicketsCount = await this.ticketRepository.count({
-      where: {
-        user: { id: userId },
-        status: TicketStatus.PENDING,
-        is_active: true,
-      },
-    });
-
-    const MAX_PENDING_TICKETS = 3;
-    if (pendingTicketsCount >= MAX_PENDING_TICKETS) {
-      throw new BadRequestException(
-        `Tienes ${pendingTicketsCount} tickets pendientes de pago. Por favor completa o cancela tus reservas antes de crear nuevas.`,
-      );
-    }
-
-    //Validar limite de compras de tickets
-    const userTicketsInTrip = await this.ticketRepository.count({
-      where: {
-        trip: { id: tripId },
-        user: { id: userId },
-        status: In([TicketStatus.CONFIRMED, TicketStatus.PENDING]),
-        is_active: true,
-      },
-    });
-
-    const MAX_TICKETS_PER_USER = 5;
-    if (userTicketsInTrip >= MAX_TICKETS_PER_USER) {
-      throw new BadRequestException(
-        `No puedes comprar más de ${MAX_TICKETS_PER_USER} tickets del mismo viaje`,
-      );
-    }
-    // Validar Trip
-    const trip = await this.findTrip(tripId);
-
-    // Verificar que el viaje esté programado y no haya comenzado
-    if (trip.status !== TripStatus.SCHEDULED) {
-      throw new BadRequestException(
-        'Solo se pueden comprar tickets para viajes programados',
-      );
-    }
-
-    const minutosAntesDeSalida =
-      (new Date(trip.departure_time).getTime() - new Date().getTime()) /
-      (1000 * 60);
-
-    if (minutosAntesDeSalida < 30) {
-      throw new BadRequestException(
-        'No se pueden comprar tickets con menos de 30 minutos antes de la salida',
-      );
-    }
-    if (new Date(trip.departure_time) <= new Date()) {
-      throw new BadRequestException(
-        'No se pueden comprar tickets para viajes que ya comenzaron',
-      );
-    }
-
-    if (trip.available_seats <= 0) {
-      throw new BadRequestException(
-        'No hay asientos disponibles en este viaje',
-      );
-    }
-
-    const profile = userProfile;
-    if (!profile.firstName || !profile.lastName || !profile.documentNumber) {
-      throw new BadRequestException(
-        'El perfil del usuario debe tener nombre, apellido y número de documento',
-      );
-    }
-
-    // Validar Seat
-    const seat = await this.findSeat(seatId);
-
-    //Valicacion de asientos inexistentes
-    const seatBelongsToBus = await this.seatRepository
-      .createQueryBuilder('seat')
-      .innerJoin('seat.stacks', 'stack')
-      .innerJoin('stack.bus', 'bus')
-      .where('seat.id = :seatId', { seatId })
-      .andWhere('bus.id = :busId', { busId: trip.bus.id })
-      .getOne();
-
-    if (!seatBelongsToBus) {
-      throw new BadRequestException(
-        `El asiento ${seat.seat_code} no pertenece al bus de este viaje`,
-      );
-    }
-    // Verificar que el asiento no esté ocupado en este viaje
-    if (seat.status !== 'disponible') {
-      throw new BadRequestException(
-        `El asiento ${seat.seat_code} no está disponible`,
-      );
-    }
-
-    // Verificar que el usuario no tenga ya un ticket confirmado para este viaje
-    const userTicketInTrip = await this.ticketRepository.findOne({
-      where: {
-        trip: { id: tripId },
-        user: { id: userId },
-        status: TicketStatus.CONFIRMED,
-        is_active: true,
-      },
-    });
-
-    if (userTicketInTrip) {
-      throw new BadRequestException(
-        'El usuario ya tiene un ticket confirmado para este viaje',
-      );
-    }
-
-    // Validar Payment si se proporciona
-    let payment: Payment | undefined;
-    if (paymentId) {
-      payment = await this.findPayment(paymentId);
-    }
-    if (payment) {
-      if (Math.abs(payment.amount - ticketData.price) > 0.01) {
         throw new BadRequestException(
-          `El monto del pago (${payment.amount}) no coincide con el precio del ticket (${ticketData.price})`,
+          'El cliente debe tener nombre, apellido y documento completos',
         );
       }
 
-      if (payment.status !== PaymentStatus.COMPLETED) {
+      // Validar que un usuario no tenga mas de 3 tickets pendientes
+      const pendingTicketsCount = await this.ticketRepository.count({
+        where: {
+          userProfile: { id: userProfileId },
+          status: TicketStatus.PENDING,
+          is_active: true,
+        },
+      });
+
+      const MAX_PENDING_TICKETS = 3;
+      if (pendingTicketsCount >= MAX_PENDING_TICKETS) {
         throw new BadRequestException(
-          'Solo se pueden asociar pagos completados a tickets',
+          `El cliente tiene ${pendingTicketsCount} tickets pendientes de pago. Por favor completa o cancela las reservas antes de crear nuevas.`,
         );
       }
+
+      // Validar limite de compras de tickets por viaje
+      const userTicketsInTrip = await this.ticketRepository.count({
+        where: {
+          trip: { id: tripId },
+          userProfile: { id: userProfileId },
+          status: In([TicketStatus.CONFIRMED, TicketStatus.PENDING]),
+          is_active: true,
+        },
+      });
+
+      const MAX_TICKETS_PER_USER = 5;
+      if (userTicketsInTrip >= MAX_TICKETS_PER_USER) {
+        throw new BadRequestException(
+          `No se pueden comprar más de ${MAX_TICKETS_PER_USER} tickets del mismo viaje`,
+        );
+      }
+
+      // ====== LOCK DEL TRIP Y SEAT DENTRO DE TRANSACCIÓN ======
+      const trip = await queryRunner.manager.findOne(Trip, {
+        where: { id: tripId, is_active: true },
+        relations: { bus: true, route: true },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!trip) {
+        throw new NotFoundException(`El viaje ${tripId} no existe`);
+      }
+
+      if (trip.available_seats <= 0) {
+        throw new BadRequestException(
+          'No hay asientos disponibles en este viaje',
+        );
+      }
+
+      const seat = await queryRunner.manager.findOne(Seat, {
+        where: { id: seatId, is_active: true },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!seat || seat.status !== 'disponible') {
+        throw new BadRequestException(`El asiento no está disponible`);
+      }
+
+      // Generar código único
+      const ticketCode = await this.generateTicketCode();
+
+      // Crear ticket
+      const ticket = queryRunner.manager.create(Ticket, {
+        ...ticketData,
+        code: ticketCode,
+        trip,
+        seat,
+        userProfile,
+        user,
+        payment: paymentId ? await this.findPayment(paymentId) : undefined,
+      });
+
+      const savedTicket = await queryRunner.manager.save(ticket);
+
+      // Actualizar asiento
+      const newSeatStatus =
+        savedTicket.status === TicketStatus.CONFIRMED ? 'ocupado' : 'reservado';
+      await queryRunner.manager.update(Seat, seatId, { status: newSeatStatus });
+
+      // Actualizar asientos disponibles del viaje
+      if (savedTicket.status === TicketStatus.CONFIRMED) {
+        await queryRunner.manager.update(Trip, tripId, {
+          available_seats: trip.available_seats - 1,
+        });
+      }
+
+      await queryRunner.commitTransaction();
+      return this.findOne(savedTicket.ticket_id);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
-
-    // Generar código único del ticket
-    const ticketCode = await this.generateTicketCode();
-
-    // Crear el ticket
-    const ticket = this.ticketRepository.create({
-      ...ticketData,
-      code: ticketCode,
-      trip,
-      seat,
-      userProfile,
-      user,
-      payment,
-    });
-
-    const savedTicket = await this.ticketRepository.save(ticket);
-
-    //Cambiar estado del asiento según el status del ticket
-    const newSeatStatus =
-      savedTicket.status === TicketStatus.CONFIRMED ? 'ocupado' : 'reservado';
-    await this.seatRepository.update(seatId, { status: newSeatStatus });
-
-    await this.tripService.updateAvailableSeats(tripId);
-    return this.findOne(savedTicket.ticket_id);
   }
 
   async findAll(
@@ -253,7 +211,10 @@ export class TicketService {
       where: { is_active: true },
       relations: {
         trip: {
-          route: true,
+          route: {
+            originCity: true,
+            destinationCity: true,
+          },
           bus: true,
         },
         seat: true,
@@ -324,6 +285,7 @@ export class TicketService {
           },
         },
         seat: true,
+        userProfile: true,
         payment: true,
       },
       order: { created_at: 'DESC' },
@@ -355,6 +317,7 @@ export class TicketService {
         user: {
           profile: true,
         },
+        userProfile: true,
       },
       order: { seat: { seat_number: 'ASC' } },
     });
@@ -378,6 +341,7 @@ export class TicketService {
           },
         },
         seat: true,
+        userProfile: true,
         payment: true,
       },
       order: { created_at: 'DESC' },
@@ -401,10 +365,8 @@ export class TicketService {
   }
 
   async update(id: string, updateTicketDto: UpdateTicketDto): Promise<Ticket> {
-    // Verificar que el ticket existe
     const existingTicket = await this.findOne(id);
 
-    // Solo permitir actualizar ciertos campos
     const { status, paymentId } = updateTicketDto;
 
     if (!status && !paymentId) {
@@ -413,12 +375,10 @@ export class TicketService {
 
     const updateData: any = {};
 
-    // Actualizar estado si se proporciona
     if (status) {
       updateData.status = status;
     }
 
-    // Actualizar payment si se proporciona
     if (paymentId) {
       const payment = await this.findPayment(paymentId);
       updateData.payment = payment;
@@ -432,96 +392,229 @@ export class TicketService {
   async remove(id: string): Promise<Ticket> {
     const ticket = await this.findOne(id);
 
-    // Solo permitir cancelar tickets pendientes
     if (ticket.status === 'CONFIRMADO') {
       throw new BadRequestException(
         'No se puede eliminar un ticket confirmado. Use la función de cancelación.',
       );
     }
 
-    // Soft delete
     await this.ticketRepository.update(id, { is_active: false });
 
     return { ...ticket, is_active: false };
   }
 
   async cancelTicket(id: string): Promise<Ticket> {
-    const ticket = await this.findOne(id);
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (ticket.status === TicketStatus.CANCELLED) {
-      // USAR ENUM
-      throw new BadRequestException('El ticket ya está cancelado');
+    try {
+      const ticket = await this.findOne(id);
+
+      if (ticket.status === TicketStatus.CANCELLED) {
+        throw new BadRequestException('El ticket ya está cancelado');
+      }
+
+      const trip = await queryRunner.manager.findOne(Trip, {
+        where: { id: ticket.trip.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      await queryRunner.manager.update(Ticket, id, {
+        status: TicketStatus.CANCELLED,
+      });
+
+      await queryRunner.manager.update(Seat, ticket.seat.id, {
+        status: 'disponible',
+      });
+
+      await queryRunner.manager.update(Trip, trip.id, {
+        available_seats: trip.available_seats + 1,
+      });
+
+      await queryRunner.commitTransaction();
+      return this.findOne(id);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
-    const horasAntesDeSalida =
-      (new Date(ticket.trip.departure_time).getTime() - new Date().getTime()) /
-      (1000 * 60 * 60);
-
-    if (horasAntesDeSalida < 2) {
-      throw new BadRequestException(
-        'No se pueden cancelar tickets con menos de 2 horas antes de la salida',
-      );
-    }
-    // Verificar si el viaje ya comenzó
-    if (new Date(ticket.trip.departure_time) <= new Date()) {
-      throw new BadRequestException(
-        'No se puede cancelar un ticket de un viaje que ya comenzó',
-      );
-    }
-
-    await this.ticketRepository.update(id, {
-      status: TicketStatus.CANCELLED,
-    });
-
-    // Actualizar asientos disponibles del viaje
-    await this.seatRepository.update(ticket.seat.id, { status: 'disponible' });
-
-    await this.tripService.updateAvailableSeats(ticket.trip.id);
-    // ==========================
-
-    return this.findOne(id);
   }
+  async createTicketWithPayment(
+    createTicketDto: CreateTicketDto,
+    paymentMethodId: string, // ← Desde el frontend
+  ): Promise<{ ticket: Ticket; payment: Payment }> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-  ////////////////////////////////////////////
+    try {
+      // 1. VALIDACIONES PREVIAS (sin locks)
+      const { tripId, seatId, userProfileId, ...ticketData } = createTicketDto;
+
+      const userProfile = await this.findUserProfile(userProfileId);
+      const user = createTicketDto.userId
+        ? await this.findUser(createTicketDto.userId)
+        : undefined;
+
+      // 2. LOCKS PESIMISTAS dentro de transacción
+      const trip = await queryRunner.manager.findOne(Trip, {
+        where: { id: tripId, is_active: true },
+        relations: { bus: true, route: true },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!trip || trip.available_seats <= 0) {
+        throw new BadRequestException('No hay asientos disponibles');
+      }
+
+      const seat = await queryRunner.manager.findOne(Seat, {
+        where: { id: seatId, is_active: true, status: 'disponible' },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!seat) {
+        throw new BadRequestException('Asiento no disponible');
+      }
+
+      // 3. CREAR PAYMENT en Stripe
+      const paymentIntent = await this.stripeService.createPaymentIntent(
+        ticketData.price,
+        {
+          tripId,
+          seatId,
+          userProfileId,
+        },
+      );
+
+      // 4. CONFIRMAR PAGO en Stripe
+      const confirmedPayment = await this.stripeService.confirmPaymentIntent(
+        paymentIntent.id,
+        paymentMethodId,
+      );
+
+      if (confirmedPayment.status !== 'succeeded') {
+        throw new BadRequestException('El pago no se pudo procesar');
+      }
+
+      // 5. CREAR PAYMENT en BD
+      const payment = queryRunner.manager.create(Payment, {
+        amount: ticketData.price,
+        method: PaymentMethod.CARD,
+        status: PaymentStatus.COMPLETED,
+        transaction_reference: paymentIntent.id,
+        payment_date: new Date(),
+      });
+
+      const savedPayment = await queryRunner.manager.save(payment);
+
+      // 6. CREAR TICKET
+      const ticketCode = await this.generateTicketCode();
+      const ticket = queryRunner.manager.create(Ticket, {
+        ...ticketData,
+        code: ticketCode,
+        status: TicketStatus.CONFIRMED,
+        trip,
+        seat,
+        userProfile,
+        user,
+        payment: savedPayment,
+      });
+
+      const savedTicket = await queryRunner.manager.save(ticket);
+
+      // 7. ACTUALIZAR ASIENTO Y VIAJE
+      await queryRunner.manager.update(Seat, seatId, { status: 'ocupado' });
+      await queryRunner.manager.update(Trip, tripId, {
+        available_seats: trip.available_seats - 1,
+      });
+
+      await queryRunner.commitTransaction();
+
+      return {
+        ticket: await this.findOne(savedTicket.ticket_id),
+        payment: savedPayment,
+      };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+
+      // Si Stripe cobró pero falló algo, reembolsar automáticamente
+      // (implementar según tu lógica de negocio)
+
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
   async confirmTicket(id: string): Promise<Ticket> {
-    const ticket = await this.findOne(id);
+    // Usar queryRunner para manejar la transacción manualmente
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (ticket.status === TicketStatus.CONFIRMED) {
-      // USAR ENUM
-      throw new BadRequestException('El ticket ya está confirmado');
+    try {
+      // 1. Buscar el ticket (sin lock aún)
+      const ticket = await this.findOne(id);
+
+      // 2. Validaciones de estado del ticket
+      if (ticket.status === TicketStatus.CONFIRMED) {
+        throw new BadRequestException('El ticket ya está confirmado');
+      }
+
+      if (ticket.status === TicketStatus.CANCELLED) {
+        throw new BadRequestException(
+          'No se puede confirmar un ticket cancelado',
+        );
+      }
+
+      // 3. Buscar el trip CON LOCK dentro de la transacción
+      const trip = await queryRunner.manager.findOne(Trip, {
+        where: { id: ticket.trip.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!trip) {
+        throw new NotFoundException(`El viaje ${ticket.trip.id} no existe`);
+      }
+
+      // 4. Verificar disponibilidad de asientos
+      if (trip.available_seats <= 0) {
+        throw new BadRequestException(
+          'Ya no hay asientos disponibles en este viaje',
+        );
+      }
+
+      // 5. Actualizar el ticket
+      await queryRunner.manager.update(Ticket, id, {
+        status: TicketStatus.CONFIRMED,
+      });
+
+      // 6. Actualizar el asiento
+      await queryRunner.manager.update(Seat, ticket.seat.id, {
+        status: 'ocupado',
+      });
+
+      // 7. Actualizar asientos disponibles del viaje
+      await queryRunner.manager.update(Trip, ticket.trip.id, {
+        available_seats: trip.available_seats - 1,
+      });
+
+      // 8. Commit de la transacción
+      await queryRunner.commitTransaction();
+
+      // 9. Retornar el ticket actualizado
+      return this.findOne(id);
+    } catch (error) {
+      // Rollback en caso de error
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      // Liberar el queryRunner
+      await queryRunner.release();
     }
-
-    if (ticket.status === TicketStatus.CANCELLED) {
-      // USAR ENUM
-      throw new BadRequestException(
-        'No se puede confirmar un ticket cancelado',
-      );
-    }
-    const trip = await this.tripRepository.findOne({
-      where: { id: ticket.trip.id },
-      lock: { mode: 'pessimistic_write' }, // Lock para evitar race conditions
-    });
-
-    if (!trip) {
-      throw new NotFoundException(`El viaje ${ticket.trip.id} no existe`);
-    }
-
-    if (trip.available_seats <= 0) {
-      throw new BadRequestException(
-        'Ya no hay asientos disponibles en este viaje',
-      );
-    }
-
-    await this.ticketRepository.update(id, {
-      status: TicketStatus.CONFIRMED,
-    });
-    await this.seatRepository.update(ticket.seat.id, { status: 'ocupado' });
-    // Actualizar asientos disponibles del viaje
-    await this.tripService.updateAvailableSeats(ticket.trip.id);
-    // ==========================
-
-    return this.findOne(id);
   }
-  // Métodos auxiliares privados
+
   private async generateTicketCode(): Promise<string> {
     const year = new Date().getFullYear();
     const count = (await this.ticketRepository.count()) + 1;
@@ -546,7 +639,7 @@ export class TicketService {
   private async findTrip(tripId: string): Promise<Trip> {
     const trip = await this.tripRepository.findOne({
       where: { id: tripId, is_active: true },
-      relations: { bus: true, route: true }, // AGREGAR RELACIONES
+      relations: { bus: true, route: true },
     });
 
     if (!trip) {
@@ -579,13 +672,11 @@ export class TicketService {
 
     return payment;
   }
+
   async changeTicketStatus(id: string, status: string): Promise<Ticket> {
     const ticket = await this.findOne(id);
     await this.ticketRepository.update(id, { status });
-
-    // Actualizar asientos disponibles del viaje
     await this.tripService.updateAvailableSeats(ticket.trip.id);
-
     return this.findOne(id);
   }
 }

@@ -18,12 +18,17 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
 import { SearchPaymentDto } from './dto/search-payment.dto';
 import { Cron } from '@nestjs/schedule';
+import { Seat } from '../seat/entities/seat.entity';
+import { DataSource } from 'typeorm';
+import { StripeService } from '../stripe/stripe.service';
 
 @Injectable()
 export class PaymentService {
   constructor(
     @InjectRepository(Payment)
     private readonly paymentRepository: Repository<Payment>,
+    private readonly dataSource: DataSource,
+    private readonly stripeService: StripeService,
   ) {}
 
   async create(createPaymentDto: CreatePaymentDto): Promise<Payment> {
@@ -47,7 +52,19 @@ export class PaymentService {
     const transaction_reference =
       paymentData.transaction_reference ||
       this.generateTransactionReference(method);
+    const seatBelongsToBus = await queryRunner.manager
+      .createQueryBuilder(Seat, 'seat')
+      .innerJoin('seat.stacks', 'stack')
+      .innerJoin('stack.bus', 'bus')
+      .where('seat.id = :seatId', { seatId })
+      .andWhere('bus.id = :busId', { busId: trip.bus.id })
+      .andWhere('seat.status = :status', { status: 'disponible' })
+      .setLock('pessimistic_write')
+      .getOne();
 
+    if (!seatBelongsToBus) {
+      throw new BadRequestException('El asiento no está disponible');
+    }
     const payment = this.paymentRepository.create({
       ...paymentData,
       amount,
@@ -107,6 +124,185 @@ export class PaymentService {
         hasPrevPage,
       },
     };
+  }
+
+  async createPaymentWithStripe(
+    createPaymentDto: CreatePaymentDto,
+    metadata?: Record<string, string>,
+  ): Promise<{ payment: Payment; clientSecret: string }> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 1. Crear el pago en tu BD (estado PENDING)
+      const payment = queryRunner.manager.create(Payment, {
+        ...createPaymentDto,
+        status: PaymentStatus.PENDING,
+        payment_date: new Date(),
+        transaction_reference: this.generateTransactionReference(createPaymentDto.method),
+      });
+
+      const savedPayment = await queryRunner.manager.save(payment);
+
+      // 2. Crear PaymentIntent en Stripe
+      const paymentIntent = await this.stripeService.createPaymentIntent(
+        savedPayment.amount,
+        {
+          paymentId: savedPayment.id,
+          ...metadata,
+        },
+      );
+
+      // 3. Guardar referencia de Stripe en el pago
+      await queryRunner.manager.update(Payment, savedPayment.id, {
+        transaction_reference: paymentIntent.id,
+      });
+
+      await queryRunner.commitTransaction();
+
+      return {
+        payment: await this.findOne(savedPayment.id),
+        clientSecret: paymentIntent.client_secret,
+      };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+   async processPaymentWithStripe(
+    paymentId: string,
+    paymentMethodId: string,
+  ): Promise<Payment> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const payment = await queryRunner.manager.findOne(Payment, {
+        where: { id: paymentId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!payment) {
+        throw new NotFoundException(`Pago ${paymentId} no existe`);
+      }
+
+      if (payment.status !== PaymentStatus.PENDING) {
+        throw new BadRequestException('Solo se pueden procesar pagos pendientes');
+      }
+
+      // Confirmar pago en Stripe
+      const paymentIntent = await this.stripeService.confirmPaymentIntent(
+        payment.transaction_reference,
+        paymentMethodId,
+      );
+
+      let newStatus: PaymentStatus;
+      let notes: string;
+
+      if (paymentIntent.status === 'succeeded') {
+        newStatus = PaymentStatus.COMPLETED;
+        notes = `Pago procesado exitosamente via Stripe`;
+      } else if (paymentIntent.status === 'requires_action') {
+        // 3D Secure u otra acción requerida
+        throw new BadRequestException(
+          'El pago requiere autenticación adicional',
+        );
+      } else {
+        newStatus = PaymentStatus.FAILED;
+        notes = `Pago fallido: ${paymentIntent.status}`;
+      }
+
+      await queryRunner.manager.update(Payment, paymentId, {
+        status: newStatus,
+        notes,
+      });
+
+      await queryRunner.commitTransaction();
+      return this.findOne(paymentId);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  async refundPaymentWithStripe(
+    paymentId: string,
+    reason?: string,
+  ): Promise<Payment> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      const payment = await queryRunner.manager.findOne(Payment, {
+        where: { id: paymentId },
+        relations: { tickets: { trip: true } },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!payment) {
+        throw new NotFoundException(`Pago ${paymentId} no existe`);
+      }
+
+      if (payment.status !== PaymentStatus.COMPLETED) {
+        throw new BadRequestException(
+          'Solo se pueden reembolsar pagos completados',
+        );
+      }
+
+      // Calcular monto de reembolso
+      let refundAmount = payment.amount;
+      let refundPercentage = 100;
+
+      if (payment.tickets && payment.tickets.length > 0) {
+        const ticket = payment.tickets[0];
+        const hoursUntilDeparture =
+          (new Date(ticket.trip.departure_time).getTime() - Date.now()) /
+          (1000 * 60 * 60);
+
+        if (hoursUntilDeparture < 2) {
+          throw new BadRequestException(
+            'No se permiten reembolsos con menos de 2 horas de anticipación',
+          );
+        } else if (hoursUntilDeparture < 24) {
+          refundPercentage = 50;
+          refundAmount = payment.amount * 0.5;
+        } else if (hoursUntilDeparture < 48) {
+          refundPercentage = 80;
+          refundAmount = payment.amount * 0.8;
+        }
+      }
+
+      // Crear reembolso en Stripe
+      await this.stripeService.createRefund(
+        payment.transaction_reference,
+        refundAmount,
+      );
+
+      const refundNotes = reason
+        ? `Reembolso (${refundPercentage}%): ${reason}. Monto: $${refundAmount.toFixed(2)}`
+        : `Reembolso procesado (${refundPercentage}%). Monto: $${refundAmount.toFixed(2)}`;
+
+      await queryRunner.manager.update(Payment, paymentId, {
+        status: PaymentStatus.REFUNDED,
+        notes: payment.notes ? `${payment.notes}\n${refundNotes}` : refundNotes,
+      });
+
+      await queryRunner.commitTransaction();
+      return this.findOne(paymentId);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async findOne(id: string): Promise<Payment> {
@@ -309,33 +505,48 @@ export class PaymentService {
   }
 
   async processPayment(id: string): Promise<Payment> {
-    const payment = await this.findOne(id);
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (payment.status !== PaymentStatus.PENDING) {
-      throw new BadRequestException('Solo se pueden procesar pagos pendientes');
+    try {
+      const payment = await queryRunner.manager.findOne(Payment, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!payment) {
+        throw new NotFoundException(`El pago con ID ${id} no existe`);
+      }
+
+      if (payment.status !== PaymentStatus.PENDING) {
+        throw new BadRequestException(
+          'Solo se pueden procesar pagos pendientes',
+        );
+      }
+
+      if (payment.status !== PaymentStatus.PENDING) {
+        throw new BadRequestException(
+          'Solo se pueden procesar pagos pendientes',
+        );
+      }
+
+      const newStatus =
+        Math.random() < 0.05 ? PaymentStatus.FAILED : PaymentStatus.COMPLETED;
+
+      await queryRunner.manager.update(Payment, id, {
+        status: newStatus,
+        notes: `Procesado: ${newStatus}`,
+      });
+
+      await queryRunner.commitTransaction();
+      return this.findOne(id);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
-
-    // ====== SIMPLIFICADO PARA COMPRENSIÓN ======
-    // Simulación BÁSICA: todos los pagos se aprueban automáticamente
-    // En producción real, aquí irían las integraciones con pasarelas de pago
-
-    let newStatus = PaymentStatus.COMPLETED;
-    let notes = `Pago procesado exitosamente vía ${payment.method}`;
-
-    // Simulación opcional: 5% de fallos aleatorios para pruebas
-    const randomFail = Math.random() < 0.05; // 5% de probabilidad
-    if (randomFail) {
-      newStatus = PaymentStatus.FAILED;
-      notes = `Fallo simulado en procesamiento de ${payment.method}`;
-    }
-
-    await this.paymentRepository.update(id, {
-      status: newStatus,
-      notes: payment.notes ? `${payment.notes}\n${notes}` : notes,
-    });
-    // ====================================
-
-    return this.findOne(id);
   }
 
   async refundPayment(id: string, reason?: string): Promise<Payment> {

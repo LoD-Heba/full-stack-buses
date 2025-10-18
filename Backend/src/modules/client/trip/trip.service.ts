@@ -266,7 +266,6 @@ export class TripService {
     const hasPrevPage = page > 1;
 
     const data = await this.tripRepository.find({
-      where: { is_active: true },
       relations: {
         bus: {
           user: true,

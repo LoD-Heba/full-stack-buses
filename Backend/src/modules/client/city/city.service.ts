@@ -80,6 +80,7 @@ export class CityService {
   }
   async remove(id: string) {
     const deleteCity = await this.findOne(id);
+    
     await this.cityRepository.remove(deleteCity!);
     return { message: 'Ciudad eliminada' };
   }
