@@ -27,7 +27,14 @@ export class TicketController {
   findAll(@Query() paginationDto: PaginationDto) {
     return this.ticketService.findAll(paginationDto);
   }
-
+ /**
+   * Valida un ticket por código y retorna su QR
+   * GET /tickets/qr/validate/:code
+   */
+  @Get('qr/validate/:code')
+  validateQRCode(@Param('code') code: string) {
+    return this.ticketService.getTicketByCodeWithQR(code);
+  }
   @Get('trip/:tripId')
   findByTrip(@Param('tripId', ParseUUIDPipe) tripId: string) {
     return this.ticketService.findByTrip(tripId);
@@ -36,10 +43,6 @@ export class TicketController {
   @Get(':id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.ticketService.findOne(id);
-  }
-  @Get('validate/:code')
-  validateQRCode(@Param('code') code: string) {
-    return this.ticketService.findByCode(code);
   }
 
   @Patch(':id')
@@ -64,4 +67,14 @@ export class TicketController {
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.ticketService.remove(id);
   }
+
+    /**
+   * Obtiene un ticket con su QR generado
+   * GET /tickets/:id/qr
+   */
+  @Get(':id/qr')
+  getTicketQR(@Param('id', ParseUUIDPipe) id: string) {
+    return this.ticketService.getTicketWithQR(id);
+  }
+
 }

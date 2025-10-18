@@ -3,7 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-
+import { QRService } from '../qr/qr.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { CreateTicketDto } from './dto/create-ticket.dto';
@@ -44,6 +44,7 @@ export class TicketService {
     @InjectRepository(Payment)
     private readonly paymentRepository: Repository<Payment>,
     private readonly tripService: TripService,
+    private readonly qrService: QRService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -493,6 +494,39 @@ export class TicketService {
       // Liberar el queryRunner
       await queryRunner.release();
     }
+  }
+
+  async getTicketWithQR(ticketId: string) {
+    const ticket = await this.findOne(ticketId);
+
+    // Construir URL del ticket
+    const ticketUrl = this.qrService.buildTicketUrl(ticket.code);
+
+    // Generar QR
+    const qrImage = await this.qrService.generateQRCode(ticketUrl);
+
+    return {
+      ticket,
+      qrCode: qrImage,
+      ticketUrl,
+    };
+  }
+
+  /**
+   * Retorna un ticket por código con su QR
+   */
+  async getTicketByCodeWithQR(code: string) {
+    const ticket = await this.findByCode(code);
+
+    const ticketUrl = this.qrService.buildTicketUrl(ticket.code);
+    const qrImage = await this.qrService.generateQRCode(ticketUrl);
+
+    return {
+      ticket,
+      qrCode: qrImage,
+      ticketUrl,
+      isValid: ticket.status === 'CONFIRMADO',
+    };
   }
 
   ///////////////////////////////////////////////////

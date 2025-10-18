@@ -11,9 +11,10 @@ import { TicketService } from './tickets.service';
 import { User } from 'src/modules/admin/user/entities/user.entity';
 import { TripModule } from '../trip/trip.module';
 import { UserProfile } from 'src/modules/admin/user-profile/entities/user-profile.entity';
+import { QRModule } from '../qr/qr.module';
 
 @Module({
-  imports: ([TypeOrmModule.forFeature([Trip, Seat, Payment, Ticket, UserProfile, User]), SharedModule,TripModule,]),
+  imports: ([TypeOrmModule.forFeature([Trip, Seat, Payment, Ticket, UserProfile, User]), SharedModule,TripModule, QRModule]),
   controllers: [TicketController],
   providers: [TicketService],
   exports: [TicketService]
