@@ -481,7 +481,7 @@ export default function TripsManagement() {
                 <Select
                   value={formData.routeId}
                   onValueChange={(value) => {
-                    setFormData({ ...formData, routeId: value, busId: "" }); // Limpiar bus al cambiar ruta
+                    setFormData({ ...formData, routeId: value, busId: "" });
                   }}
                 >
                   <SelectTrigger>
@@ -895,10 +895,7 @@ export default function TripsManagement() {
                             <MapPin className="w-4 h-4 text-gray-400" />
                             <div>
                               <div className="font-medium">
-                                {trip.route?.origin}
-                              </div>
-                              <div className="text-sm text-gray-500">
-                                → {trip.route?.destination}
+                                {trip.route?.name}
                               </div>
                             </div>
                           </div>
@@ -1095,7 +1092,6 @@ export default function TripsManagement() {
             )}
           </CardContent>
         </Card>
-        ;
       </Dialog>
     </div>
   );

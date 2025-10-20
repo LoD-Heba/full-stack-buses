@@ -13,7 +13,6 @@ const menuItems = [
   { href: "/dashboard/ciudades", label: "Ciudades" },
   { href: "/dashboard/tickets", label: "Tickeds" },
   { href: "/dashboard/buses", label: "Buses" },
-  { href: "/dashboard/stack-asientos", label: "Stack Asientos" },
   { href: "/dashboard/clientes", label: "Clientes" },
   { href: "/dashboard/viajes", label: "Viajes" },
   { href: "/dashboard/noticias", label: "Noticias" },

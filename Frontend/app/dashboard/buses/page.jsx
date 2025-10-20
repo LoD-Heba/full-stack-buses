@@ -64,7 +64,6 @@ export default function BusesPage() {
   });
   const router = useRouter();
 
-  // Cargar buses
   useEffect(() => {
     loadBuses();
   }, [meta.page, meta.limit, filters, showInactive]);
@@ -73,7 +72,6 @@ export default function BusesPage() {
     try {
       setLoading(true);
 
-      // Si hay filtros aplicados, usar search
       const hasFilters =
         filters.searchTerm || filters.service_type || filters.status;
 
@@ -84,7 +82,6 @@ export default function BusesPage() {
         response = await getBuses(meta.page, meta.limit);
       }
 
-      // Filtrar buses inactivos si no se muestran
       let busesData = response.data || [];
       if (!showInactive) {
         busesData = busesData.filter((bus) => bus.is_active);
@@ -99,10 +96,9 @@ export default function BusesPage() {
     }
   };
 
-  // Manejadores de filtros
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
-    setMeta((prev) => ({ ...prev, page: 1 })); // Reset a página 1
+    setMeta((prev) => ({ ...prev, page: 1 }));
   };
 
   const handleClearFilters = () => {
@@ -118,7 +114,6 @@ export default function BusesPage() {
     setMeta((prev) => ({ ...prev, page: 1 }));
   };
 
-  // Manejadores de eventos
   const handleAdd = () => {
     router.push("/dashboard/buses/new");
   };
@@ -136,7 +131,44 @@ export default function BusesPage() {
   };
 
   const handleDeleteClick = (bus) => {
-    // Determinar si es soft o hard delete
+    // ✨ VALIDACIÓN: Verificar viajes activos antes de mostrar el diálogo
+    const activeTrips = bus.trips?.filter(
+      (trip) => trip.status === "SCHEDULED" || trip.status === "IN_PROGRESS"
+    ) || [];
+
+    if (activeTrips.length > 0 && bus.is_active) {
+      const scheduledCount = activeTrips.filter(
+        (t) => t.status === "SCHEDULED"
+      ).length;
+      const inProgressCount = activeTrips.filter(
+        (t) => t.status === "IN_PROGRESS"
+      ).length;
+
+      const messages = [];
+      if (scheduledCount > 0) {
+        messages.push(
+          `${scheduledCount} viaje${scheduledCount > 1 ? "s" : ""} programado${
+            scheduledCount > 1 ? "s" : ""
+          }`
+        );
+      }
+      if (inProgressCount > 0) {
+        messages.push(
+          `${inProgressCount} viaje${inProgressCount > 1 ? "s" : ""} en progreso`
+        );
+      }
+
+      toast.error(
+        `No se puede desactivar este bus. Tiene ${messages.join(" y ")}`,
+        {
+          duration: 5000,
+          description:
+            "Debes cancelar o completar los viajes activos antes de desactivar el bus.",
+        }
+      );
+      return;
+    }
+
     const isHardDelete = !bus.is_active;
     setDeleteDialog({ open: true, bus, isHardDelete });
   };
@@ -154,7 +186,9 @@ export default function BusesPage() {
       setDeleteDialog({ open: false, bus: null, isHardDelete: false });
       loadBuses();
     } catch (error) {
-      toast.error(error.message || "No se pudo eliminar el bus");
+      toast.error(error.message || "No se pudo eliminar el bus", {
+        duration: 5000,
+      });
     }
   };
 
@@ -187,7 +221,6 @@ export default function BusesPage() {
     setMeta((prev) => ({ ...prev, limit: newLimit, page: 1 }));
   };
 
-  // Acciones personalizadas para buses inactivos
   const customActions = (bus) => {
     if (!bus.is_active) {
       return (
@@ -205,21 +238,46 @@ export default function BusesPage() {
     return null;
   };
 
-  // Definición de columnas
+  // ✨ Helper para mostrar info de viajes activos
+  const renderTripInfo = (bus) => {
+    if (!bus.trips || bus.trips.length === 0) return null;
+
+    const activeTrips = bus.trips.filter(
+      (trip) => trip.status === "SCHEDULED" || trip.status === "IN_PROGRESS"
+    );
+
+    if (activeTrips.length === 0) return null;
+
+    return (
+      <div className="flex items-center gap-1 text-xs">
+        <AlertTriangle className="h-3 w-3 text-yellow-600" />
+        <span className="text-yellow-700">
+          {activeTrips.length} viaje{activeTrips.length > 1 ? "s" : ""} activo
+          {activeTrips.length > 1 ? "s" : ""}
+        </span>
+      </div>
+    );
+  };
+
   const columns = [
     {
       key: "plate",
       label: "Placa",
       render: (value, row) => (
-        <div className="flex items-center gap-2">
-          <span className={!row.is_active ? "text-gray-400 line-through" : ""}>
-            {value}
-          </span>
-          {!row.is_active && (
-            <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">
-              Inactivo
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span
+              className={!row.is_active ? "text-gray-400 line-through" : ""}
+            >
+              {value}
             </span>
-          )}
+            {!row.is_active && (
+              <span className="text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">
+                Inactivo
+              </span>
+            )}
+          </div>
+          {renderTripInfo(row)}
         </div>
       ),
     },
@@ -281,7 +339,6 @@ export default function BusesPage() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Filtros */}
       <BusFilters
         filters={filters}
         onFilterChange={handleFilterChange}
@@ -290,7 +347,6 @@ export default function BusesPage() {
         onToggleInactive={handleToggleInactive}
       />
 
-      {/* Tabla */}
       <DataTable
         title="Gestión de Buses"
         columns={columns}
@@ -303,7 +359,6 @@ export default function BusesPage() {
         customActions={customActions}
       />
 
-      {/* Paginación */}
       {buses.length > 0 && (
         <Pagination
           meta={meta}
@@ -312,7 +367,6 @@ export default function BusesPage() {
         />
       )}
 
-      {/* Dialog de confirmación de eliminación */}
       <AlertDialog
         open={deleteDialog.open}
         onOpenChange={(open) =>
@@ -352,13 +406,18 @@ export default function BusesPage() {
                     <strong>{deleteDialog.bus?.plate}</strong>.
                   </p>
                   {deleteDialog.bus?.trips?.length > 0 && (
-                    <p className="text-yellow-600">
-                      ⚠️ Este bus tiene {deleteDialog.bus.trips.length} viajes
-                      registrados.
-                    </p>
+                    <div className="bg-blue-50 p-3 rounded-md">
+                      <p className="text-sm text-blue-800">
+                        ℹ️ Este bus tiene {deleteDialog.bus.trips.length} viaje
+                        {deleteDialog.bus.trips.length > 1 ? "s" : ""}{" "}
+                        registrado
+                        {deleteDialog.bus.trips.length > 1 ? "s" : ""} (solo
+                        completados o cancelados).
+                      </p>
+                    </div>
                   )}
                   {deleteDialog.bus?.routes?.length > 0 && (
-                    <p className="text-yellow-600">
+                    <p className="text-yellow-600 text-sm">
                       ⚠️ Este bus está asignado a{" "}
                       {deleteDialog.bus.routes.length} ruta(s).
                     </p>

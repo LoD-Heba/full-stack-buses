@@ -1,6 +1,7 @@
 import React from 'react';
 import { FaChair, FaTv, FaToilet, FaDoorOpen } from 'react-icons/fa';
 import { MdAirlineSeatReclineExtra } from 'react-icons/md';
+import { GiSteeringWheel } from "react-icons/gi";
 
 const TOOL_ITEMS = [
   {
@@ -10,6 +11,14 @@ const TOOL_ITEMS = [
     label: 'Normal',
     icon: FaChair,
     color: 'bg-gray-500',
+  },
+  {
+    type: 'seat',
+    visualType: 'seat',
+    seatType: 'conductor',
+    label: 'Conductor',
+    icon: GiSteeringWheel,
+    color: 'bg-gray-900',
   },
   {
     type: 'seat',

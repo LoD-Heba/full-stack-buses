@@ -16,8 +16,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { createBus, updateBus } from "../api/api-buses";
-import { Loader2, Upload, X, Bus as BusIcon, Settings } from "lucide-react";
+import { getUsersWithProfile } from "../api/api-users";
+import { Loader2, Upload, X, Bus as BusIcon, Settings, Users } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
 
@@ -49,6 +51,7 @@ export function BusForm({ bus }) {
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [savedBusId, setSavedBusId] = useState(null);
+  const [selectedUserBusCount, setSelectedUserBusCount] = useState(0);
   const router = useRouter();
 
   const isEditing = !!bus;
@@ -77,7 +80,7 @@ export function BusForm({ bus }) {
   const selectedStatus = watch("status");
   const selectedUserId = watch("userId");
 
-  // 🆕 Cargar usuarios disponibles
+  // ✨ Cargar usuarios con perfil y conteo de buses
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -85,21 +88,25 @@ export function BusForm({ bus }) {
   const fetchUsers = async () => {
     try {
       setLoadingUsers(true);
-      const response = await fetch(
-        "http://localhost:3001/api/v1/users?limit=100"
-      );
-      const data = await response.json();
-
-      // Filtrar solo usuarios activos
-      const activeUsers = (data.data || []).filter((user) => user.isActive);
-      setUsers(activeUsers);
+      const usersWithProfile = await getUsersWithProfile();
+      setUsers(usersWithProfile);
     } catch (error) {
       console.error("Error al cargar usuarios:", error);
-      toast.error("Error al cargar la lista de usuarios");
+      toast.error("Error al cargar usuarios con perfil completo");
     } finally {
       setLoadingUsers(false);
     }
   };
+
+  // ✨ Actualizar conteo cuando cambia el usuario seleccionado
+  useEffect(() => {
+    if (selectedUserId) {
+      const selectedUser = users.find((u) => u.id === selectedUserId);
+      setSelectedUserBusCount(selectedUser?.busCount || 0);
+    } else {
+      setSelectedUserBusCount(0);
+    }
+  }, [selectedUserId, users]);
 
   // Cargar datos del bus en modo edición
   useEffect(() => {
@@ -116,7 +123,6 @@ export function BusForm({ bus }) {
 
       setSavedBusId(bus.id);
 
-      // Cargar imagen existente
       if (bus.image_url) {
         const imageUrl = bus.image_url.startsWith("http")
           ? bus.image_url
@@ -183,20 +189,20 @@ export function BusForm({ bus }) {
     }
   };
 
- const handleConfigureSeats = () => {
-  if (savedBusId) {
-    router.push(`/dashboard/asientos/configurador?busId=${savedBusId}`);
-  } else {
-    toast.error("Debes guardar el bus primero");
-  }
-};
+  const handleConfigureSeats = () => {
+    if (savedBusId) {
+      router.push(`/dashboard/asientos/configurador?busId=${savedBusId}`);
+    } else {
+      toast.error("Debes guardar el bus primero");
+    }
+  };
 
   const onSubmit = handleSubmit(async (data) => {
     try {
       setIsSubmitting(true);
       setBackendError(null);
 
-      // Validación de año (frontend)
+      // Validación de año
       if (
         data.year &&
         (Number(data.year) < 1950 || Number(data.year) > currentYear + 2)
@@ -217,14 +223,6 @@ export function BusForm({ bus }) {
           return;
         }
       }
-      if (
-        data.year &&
-        (Number(data.year) < 1950 || Number(data.year) > currentYear + 2)
-      ) {
-        setBackendError(`El año debe estar entre 1950 y ${currentYear + 2}`);
-        setIsSubmitting(false);
-        return;
-      }
 
       const formattedData = {
         plate: data.plate.toUpperCase().trim(),
@@ -236,7 +234,6 @@ export function BusForm({ bus }) {
         userId: data.userId.trim(),
       };
 
-      // Remover undefined
       Object.keys(formattedData).forEach(
         (key) => formattedData[key] === undefined && delete formattedData[key]
       );
@@ -250,7 +247,6 @@ export function BusForm({ bus }) {
         setSavedBusId(res.id);
       }
 
-      // Subir imagen si existe
       if (imageFile && res?.id) {
         try {
           await uploadImage(res.id);
@@ -266,7 +262,6 @@ export function BusForm({ bus }) {
           : "Bus creado exitosamente. Ahora puedes configurar los asientos."
       );
 
-      // Si es creación, no redirigir inmediatamente para permitir configurar asientos
       if (isEditing) {
         router.push("/dashboard/buses");
         router.refresh();
@@ -509,7 +504,7 @@ export function BusForm({ bus }) {
           </Card>
         </div>
 
-        {/* 🆕 Asignación mejorada */}
+        {/* ✨ Asignación mejorada con conteo */}
         <Card>
           <CardHeader>
             <CardTitle>Asignación y Configuración</CardTitle>
@@ -522,41 +517,68 @@ export function BusForm({ bus }) {
               {loadingUsers ? (
                 <div className="flex items-center gap-2 text-gray-500 text-sm py-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Cargando usuarios...
+                  Cargando usuarios con perfil completo...
                 </div>
               ) : (
-                <Select
-                  value={selectedUserId}
-                  onValueChange={(val) => setValue("userId", val)}
-                >
-                  <SelectTrigger
-                    id="userId"
-                    className={errors.userId ? "border-red-500" : ""}
+                <>
+                  <Select
+                    value={selectedUserId}
+                    onValueChange={(val) => setValue("userId", val)}
                   >
-                    <SelectValue placeholder="Selecciona un usuario" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.length === 0 ? (
-                      <div className="p-2 text-center text-sm text-gray-500">
-                        No hay usuarios disponibles
-                      </div>
-                    ) : (
-                      users.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          {user.email || user.username}
-                          {user.profile?.firstName &&
-                            ` - ${user.profile.firstName} ${
-                              user.profile.lastName || ""
-                            }`}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                    <SelectTrigger
+                      id="userId"
+                      className={errors.userId ? "border-red-500" : ""}
+                    >
+                      <SelectValue placeholder="Selecciona un usuario" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.length === 0 ? (
+                        <div className="p-4 text-center text-sm text-gray-500">
+                          No hay usuarios con perfil completo
+                        </div>
+                      ) : (
+                        users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            <div className="flex items-center justify-between w-full gap-4">
+                              <span>
+                                {user.profile?.firstName &&
+                                user.profile?.lastName
+                                  ? `${user.profile.firstName} ${user.profile.lastName}`
+                                  : user.email || user.username}
+                              </span>
+                              <Badge
+                                variant="secondary"
+                                className="ml-2 flex items-center gap-1"
+                              >
+                                <BusIcon className="h-3 w-3" />
+                                {user.busCount || 0}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+
+                  {/* ✨ Mostrar conteo del usuario seleccionado */}
+                  {selectedUserId && (
+                    <div className="mt-2 flex items-center gap-2 text-sm text-gray-600 bg-blue-50 p-2 rounded-md">
+                      <Users className="h-4 w-4 text-blue-600" />
+                      <span>
+                        Este usuario tiene{" "}
+                        <strong className="text-blue-700">
+                          {selectedUserBusCount}
+                        </strong>{" "}
+                        {selectedUserBusCount === 1 ? "bus" : "buses"}{" "}
+                        registrado{selectedUserBusCount === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
               {errors.userId && (
                 <p className="text-red-500 text-sm mt-1">
-                  Debes seleccionar un usuario responsable
+                  Debes seleccionar un usuario responsable con perfil completo
                 </p>
               )}
               <input
@@ -567,7 +589,7 @@ export function BusForm({ bus }) {
               />
             </div>
 
-            {/* 🆕 Configuración de Asientos */}
+            {/* Configuración de Asientos */}
             <div className="border-t pt-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -577,7 +599,8 @@ export function BusForm({ bus }) {
                   <p className="text-sm text-gray-500 mt-1">
                     {bus?.stacks?.id ? (
                       <span className="text-green-600">
-                        ✓ Asientos configurados ({bus.stackId.length || 0} asientos)
+                        ✓ Asientos configurados ({bus.stackId.length || 0}{" "}
+                        asientos)
                       </span>
                     ) : savedBusId ? (
                       <span className="text-yellow-600">

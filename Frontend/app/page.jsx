@@ -120,21 +120,14 @@ export default function Home() {
         </div>
       </section>
 
-      <section
-        className="py-16 bg-green-200"
-        style={{
-          backgroundImage: `
-      url('/img/img7.jpg')
-    `,
-          backgroundPosition: "center",
-          backgroundRepeat: "repeat",
-          backgroundSize: "cover"
-        }}
-      >
-        <div className="container mx-auto px-4 ">
-          <h2 className="text-3xl font-bold text-center mb-12 z-10">
+      <section className="py-16 bg-gray-100">
+        <div className="container mx-auto px-4">
+          <h2 className="text-4xl font-bold text-center mb-4 text-gray-900">
             Nuestros Destinos
           </h2>
+          <p className="text-center text-gray-600 mb-12 text-lg">
+            Explora nuestros destinos principales en toda Bolivia
+          </p>
 
           {loading && (
             <div className="text-center py-12">
@@ -144,58 +137,68 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {ciudades.map((ciudad) => (
-              <Card
+              <div
                 key={ciudad.id}
-                className="overflow-hidden hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+                className="group relative overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer h-96"
               >
-                <div className="relative h-48 bg-gradient-to-br from-verde-400 to-verde-600">
+                {/* Imagen de fondo */}
+                <div className="absolute inset-0">
                   {ciudad.image_url ? (
                     <Image
                       src={`http://localhost:3001${ciudad.image_url}`}
                       alt={ciudad.city}
                       fill
-                      className="object-cover"
+                      className="object-cover group-hover:scale-110 transition-transform duration-500"
+                      priority
                     />
                   ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <MapPin size={64} className="text-white opacity-50" />
+                    <div className="flex items-center justify-center h-full bg-gradient-to-br from-verde-400 to-verde-600">
+                      <MapPin size={80} className="text-white opacity-30" />
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end">
-                    <div className="p-4 text-white w-full">
-                      <h3 className="text-xl font-bold">{ciudad.city}</h3>
-                      <p className="text-sm opacity-90">{ciudad.department}</p>
-                    </div>
-                  </div>
                 </div>
 
-                <CardContent className="p-4">
+                {/* Overlay gradiente */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-100 group-hover:opacity-95 transition-opacity duration-300"></div>
+
+                {/* Contenido */}
+                <div className="absolute inset-0 flex flex-col justify-between p-6 text-white">
+                  {/* Descripción - aparece en hover */}
                   {ciudad.description && (
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                      {ciudad.description}
-                    </p>
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform translate-y-4 group-hover:translate-y-0">
+                      <p className="text-sm text-gray-200 line-clamp-3">
+                        {ciudad.description}
+                      </p>
+                    </div>
                   )}
 
-                  <div className="flex gap-2">
+                  {/* Título y departamento - siempre visible */}
+                  <div>
+                    <h3 className="text-3xl font-bold mb-2">{ciudad.city}</h3>
+                    <p className="text-sm opacity-80 flex items-center gap-1">
+                      <MapPin size={16} />
+                      {ciudad.department}
+                    </p>
+                  </div>
+
+                  {/* Botones - aparecen en hover */}
+                  <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-4 group-hover:translate-y-0">
                     <button
                       onClick={(e) => handleViewSchedule(ciudad, e)}
-                      className="flex-1 border border-verde-500 text-green-500 hover:bg-green-50 py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                      className="flex-1 border-2 border-white text-white hover:bg-white hover:text-gray-900 py-2 px-3 rounded-lg transition-all font-semibold flex items-center justify-center gap-2 text-sm"
                     >
                       <Clock className="w-4 h-4" />
-                      Ver Horarios
+                      Horarios
                     </button>
                     <Link href="/comprar" className="flex-1">
-                      <Button
-                        className="w-full bg-verde-500 hover:bg-green-600 text-white"
-                        size="sm"
-                      >
-                        <ArrowRight className="w-4 h-4 mr-1" />
+                      <button className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 px-3 rounded-lg transition-colors font-semibold flex items-center justify-center gap-2 text-sm">
+                        <ArrowRight className="w-4 h-4" />
                         Comprar
-                      </Button>
+                      </button>
                     </Link>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
           </div>
 
