@@ -1,24 +1,27 @@
 "use client"
 
 import { useState, useEffect } from 'react';
-import { MapPin, Clock, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MapPin, Upload, Loader2, AlertCircle, Check, Edit2, Trash2, Plus, X, RotateCcw, Eye, EyeOff, Zap } from 'lucide-react';
+
+const API_URL = 'http://localhost:3001/api/v1';
 
 export default function CiudadesPage() {
   const [ciudades, setCiudades] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [selectedCity, setSelectedCity] = useState(null);
+  const [inactivas, setInactivas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     city: '',
     department: '',
     description: '',
-    schedule: ['']
+    schedule: '',
   });
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState('');
-
-  const API_URL = 'http://localhost:3001/api/v1/city';
+  const [selectedCityRoutes, setSelectedCityRoutes] = useState(null);
 
   useEffect(() => {
     fetchCiudades();
@@ -27,324 +30,554 @@ export default function CiudadesPage() {
   const fetchCiudades = async () => {
     try {
       setLoading(true);
-      const res = await fetch(API_URL);
-      const data = await res.json();
-      setCiudades(data);
+      const [activeRes, inactiveRes] = await Promise.all([
+        fetch(`${API_URL}/city`),
+        fetch(`${API_URL}/city/list/inactive`),
+      ]);
+
+      if (!activeRes.ok) throw new Error('Error al cargar ciudades');
+      if (!inactiveRes.ok) throw new Error('Error al cargar ciudades inactivas');
+
+      const activeData = await activeRes.json();
+      const inactiveData = await inactiveRes.json();
+
+      setCiudades(activeData);
+      setInactivas(inactiveData);
     } catch (error) {
-      console.error('Error al cargar ciudades');
+      console.error('Error:', error);
+      setSuccessMessage('❌ Error al cargar ciudades');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => setImagePreview(reader.result);
-      reader.readAsDataURL(file);
-    }
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  const handleSubmit = async () => {
+    if (!formData.city || !formData.department) {
+      setSuccessMessage('❌ Completa los campos requeridos');
+      return;
+    }
 
     try {
-      const payload = { ...formData };
-      const url = selectedCity ? `${API_URL}/${selectedCity.id}` : API_URL;
-      const method = selectedCity ? 'PATCH' : 'POST';
+      const scheduleArray = formData.schedule
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s);
 
-      const res = await fetch(url, {
+      const payload = {
+        city: formData.city,
+        department: formData.department,
+        description: formData.description || undefined,
+        schedule: scheduleArray.length > 0 ? scheduleArray : undefined,
+      };
+
+      const url = editingId ? `${API_URL}/city/${editingId}` : `${API_URL}/city`;
+      const method = editingId ? 'PATCH' : 'POST';
+
+      const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error();
+      if (!response.ok) throw new Error('Error al guardar');
 
-      const savedCity = await res.json();
-
-      if (imageFile) {
-        const formData = new FormData();
-        formData.append('image', imageFile);
-        
-        await fetch(`${API_URL}/${savedCity.id}/upload-image`, {
-          method: 'POST',
-          body: formData
-        });
-      }
-
-      alert(selectedCity ? 'Ciudad actualizada' : 'Ciudad creada');
-      setShowModal(false);
-      resetForm();
+      setSuccessMessage(editingId ? '✅ Ciudad actualizada' : '✅ Ciudad creada');
+      setShowForm(false);
+      setEditingId(null);
+      setFormData({ city: '', department: '', description: '', schedule: '' });
       fetchCiudades();
+      setTimeout(() => setSuccessMessage(''), 2000);
     } catch (error) {
-      alert('Error al guardar ciudad');
-    } finally {
-      setLoading(false);
+      console.error('Error:', error);
+      setSuccessMessage('❌ Error al guardar la ciudad');
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('¿Eliminar esta ciudad?')) return;
+  const handleEdit = (ciudad) => {
+    setEditingId(ciudad.id);
+    setFormData({
+      city: ciudad.city,
+      department: ciudad.department,
+      description: ciudad.description || '',
+      schedule: ciudad.schedule ? ciudad.schedule.join(', ') : '',
+    });
+    setShowForm(true);
+  };
+
+  const handleSoftDelete = async (id) => {
+    if (!window.confirm('¿Desactivar esta ciudad? Se marcará como inactiva pero podrá recuperarse.')) return;
 
     try {
-      await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
-      alert('Ciudad eliminada');
+      const response = await fetch(`${API_URL}/city/${id}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Error al desactivar');
+      }
+      setSuccessMessage('✅ Ciudad desactivada');
       fetchCiudades();
+      setTimeout(() => setSuccessMessage(''), 2000);
     } catch (error) {
-      alert('Error al eliminar');
+      console.error('Error:', error);
+      setSuccessMessage(`❌ ${error.message}`);
     }
   };
 
-  const openModal = (city = null) => {
-    if (city) {
-      setSelectedCity(city);
-      setFormData({
-        city: city.city,
-        department: city.department,
-        description: city.description || '',
-        schedule: city.schedule || ['']
+  const handleHardDelete = async (id) => {
+    if (!window.confirm('⚠️ Esto eliminará la ciudad PERMANENTEMENTE. ¿Estás seguro?')) return;
+
+    try {
+      const response = await fetch(`${API_URL}/city/${id}/hard`, { method: 'DELETE' });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Error al eliminar');
+      }
+      setSuccessMessage('✅ Ciudad eliminada permanentemente');
+      fetchCiudades();
+      setTimeout(() => setSuccessMessage(''), 2000);
+    } catch (error) {
+      console.error('Error:', error);
+      setSuccessMessage(`❌ ${error.message}`);
+    }
+  };
+
+  const handleReactivate = async (id) => {
+    if (!window.confirm('¿Reactivar esta ciudad?')) return;
+
+    try {
+      const response = await fetch(`${API_URL}/city/${id}/reactivate`, { method: 'PATCH' });
+      if (!response.ok) throw new Error('Error al reactivar');
+      setSuccessMessage('✅ Ciudad reactivada');
+      fetchCiudades();
+      setTimeout(() => setSuccessMessage(''), 2000);
+    } catch (error) {
+      console.error('Error:', error);
+      setSuccessMessage('❌ Error al reactivar');
+    }
+  };
+
+  const handleCheckRoutes = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/city/${id}/routes`);
+      if (!response.ok) throw new Error('Error al obtener rutas');
+      const data = await response.json();
+      setSelectedCityRoutes(data);
+    } catch (error) {
+      console.error('Error:', error);
+      setSuccessMessage('❌ Error al obtener rutas asociadas');
+    }
+  };
+
+  const handleUploadImage = async (e, cityId) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploading(cityId);
+      const formDataUpload = new FormData();
+      formDataUpload.append('image', file);
+
+      const response = await fetch(`${API_URL}/city/${cityId}/upload-image`, {
+        method: 'POST',
+        body: formDataUpload,
       });
-      setImagePreview(city.image_url ? `http://localhost:3001/api/v1/${city.image_url}` : '');
+
+      if (!response.ok) throw new Error('Error al subir imagen');
+      const updatedCity = await response.json();
+      setCiudades(ciudades.map(c => c.id === cityId ? updatedCity : c));
+      setSuccessMessage('✅ Imagen subida exitosamente');
+      setTimeout(() => setSuccessMessage(''), 2000);
+    } catch (error) {
+      console.error('Error:', error);
+      setSuccessMessage('❌ Error al subir la imagen');
+    } finally {
+      setUploading(null);
     }
-    setShowModal(true);
   };
 
-  const resetForm = () => {
-    setSelectedCity(null);
-    setFormData({ city: '', department: '', description: '', schedule: [''] });
-    setImageFile(null);
-    setImagePreview('');
-  };
-
-  const addScheduleField = () => {
-    setFormData(prev => ({ ...prev, schedule: [...prev.schedule, ''] }));
-  };
-
-  const updateSchedule = (index, value) => {
-    const newSchedule = [...formData.schedule];
-    newSchedule[index] = value;
-    setFormData(prev => ({ ...prev, schedule: newSchedule }));
-  };
-
-  const removeSchedule = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      schedule: prev.schedule.filter((_, i) => i !== index)
-    }));
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Gestión de Ciudades</h1>
-          <button
-            onClick={() => openModal()}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
-          >
-            <Plus size={20} />
-            Nueva Ciudad
-          </button>
-        </div>
-
-        {loading && <p className="text-center">Cargando...</p>}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {ciudades.map((ciudad) => (
-            <div key={ciudad.id} className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-xl transition">
-              <div className="relative h-48 bg-gradient-to-r from-blue-500 to-purple-600">
-                {ciudad.image_url ? (
-                  <img
-                    src={`http://localhost:3001${ciudad.image_url}`}
-                    alt={ciudad.city}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <MapPin size={64} className="text-white opacity-50" />
-                  </div>
-                )}
-                <div className="absolute top-2 right-2 flex gap-2">
-                  <button
-                    onClick={() => openModal(ciudad)}
-                    className="bg-white p-2 rounded-full hover:bg-gray-100"
-                  >
-                    <Pencil size={16} className="text-blue-600" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(ciudad.id)}
-                    className="bg-white p-2 rounded-full hover:bg-gray-100"
-                  >
-                    <Trash2 size={16} className="text-red-600" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-4">
-                <h3 className="text-xl font-bold text-gray-800 mb-1">{ciudad.city}</h3>
-                <p className="text-sm text-gray-500 mb-3">{ciudad.department}</p>
-                {ciudad.description && (
-                  <p className="text-sm text-gray-600 mb-3">{ciudad.description}</p>
-                )}
-                
-                {ciudad.schedule?.length > 0 && (
-                  <button
-                    onClick={() => {
-                      setSelectedCity(ciudad);
-                      setShowScheduleModal(true);
-                    }}
-                    className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm"
-                  >
-                    <Clock size={16} />
-                    Ver Horarios
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Cargando ciudades...</p>
         </div>
       </div>
+    );
+  }
 
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold">
-                  {selectedCity ? 'Editar Ciudad' : 'Nueva Ciudad'}
-                </h2>
-                <button onClick={() => { setShowModal(false); resetForm(); }}>
-                  <X size={24} />
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-12 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <MapPin className="w-10 h-10 text-indigo-600" />
+              <h1 className="text-5xl font-bold text-gray-900">Ciudades</h1>
+            </div>
+            <p className="text-lg text-gray-600 ml-13">Gestiona las ciudades de servicio</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowInactive(!showInactive)}
+              className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2 transition-colors"
+            >
+              {showInactive ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              {showInactive ? 'Ocultar Inactivas' : 'Ver Inactivas'}
+            </button>
+            <button
+              onClick={() => {
+                setEditingId(null);
+                setFormData({ city: '', department: '', description: '', schedule: '' });
+                setShowForm(!showForm);
+              }}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2 transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              Nueva Ciudad
+            </button>
+          </div>
+        </div>
+
+        {/* Success Message */}
+        {successMessage && (
+          <div className={`mb-6 p-4 rounded-lg border flex items-center gap-2 ${
+            successMessage.includes('✅') 
+              ? 'bg-green-50 border-green-200 text-green-700' 
+              : 'bg-red-50 border-red-200 text-red-700'
+          }`}>
+            <Check className="w-5 h-5" />
+            {successMessage}
+          </div>
+        )}
+
+        {/* Modal de Rutas Asociadas */}
+        {selectedCityRoutes && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <Card className="w-full max-w-2xl max-h-96 overflow-auto">
+              <CardHeader className="flex items-center justify-between flex-row bg-gradient-to-r from-indigo-50 to-blue-50">
+                <CardTitle>Rutas Asociadas a {selectedCityRoutes.city.city}</CardTitle>
+                <button onClick={() => setSelectedCityRoutes(null)} className="text-gray-500 hover:text-gray-700">
+                  <X className="w-6 h-6" />
+                </button>
+              </CardHeader>
+              <CardContent className="pt-6 space-y-4">
+                {selectedCityRoutes.totalRoutes === 0 ? (
+                  <p className="text-gray-600">No hay rutas asociadas</p>
+                ) : (
+                  <>
+                    {selectedCityRoutes.originRoutes.length > 0 && (
+                      <div>
+                        <h3 className="font-bold text-lg mb-2 text-indigo-600">Como Origen:</h3>
+                        {selectedCityRoutes.originRoutes.map(route => (
+                          <div key={route.id} className="p-2 bg-blue-50 rounded mb-2">
+                            {selectedCityRoutes.city.city} → {route.destinationCity.city}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {selectedCityRoutes.destinationRoutes.length > 0 && (
+                      <div>
+                        <h3 className="font-bold text-lg mb-2 text-indigo-600">Como Destino:</h3>
+                        {selectedCityRoutes.destinationRoutes.map(route => (
+                          <div key={route.id} className="p-2 bg-blue-50 rounded mb-2">
+                            {route.originCity.city} → {selectedCityRoutes.city.city}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Formulario */}
+        {showForm && (
+          <Card className="mb-8 border-2 border-indigo-300 bg-white shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-2xl">
+                  {editingId ? 'Editar Ciudad' : 'Nueva Ciudad'}
+                </CardTitle>
+                <button onClick={() => setShowForm(false)} className="text-gray-500 hover:text-gray-700">
+                  <X className="w-6 h-6" />
                 </button>
               </div>
-
+            </CardHeader>
+            <CardContent className="pt-6">
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Ciudad</label>
-                  <input
-                    type="text"
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Nombre de la Ciudad *
+                    </label>
+                    <input
+                      type="text"
+                      name="city"
+                      value={formData.city}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="Ej: La Paz"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Departamento *
+                    </label>
+                    <input
+                      type="text"
+                      name="department"
+                      value={formData.department}
+                      onChange={handleFormChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="Ej: La Paz"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Departamento</label>
-                  <input
-                    type="text"
-                    value={formData.department}
-                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Descripción</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Descripción
+                  </label>
                   <textarea
+                    name="description"
                     value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2"
+                    onChange={handleFormChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                    placeholder="Descripción de la ciudad"
                     rows="3"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Imagen</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Horarios (separados por coma)
+                  </label>
                   <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="w-full border rounded-lg px-3 py-2"
+                    type="text"
+                    name="schedule"
+                    value={formData.schedule}
+                    onChange={handleFormChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="Ej: 08:00, 14:00, 20:00"
                   />
-                  {imagePreview && (
-                    <img src={imagePreview} alt="Preview" className="mt-2 h-32 rounded-lg" />
-                  )}
                 </div>
 
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-sm font-medium">Horarios</label>
-                    <button
-                      type="button"
-                      onClick={addScheduleField}
-                      className="text-blue-600 text-sm hover:text-blue-700"
-                    >
-                      + Agregar
-                    </button>
-                  </div>
-                  {formData.schedule.map((horario, index) => (
-                    <div key={index} className="flex gap-2 mb-2">
-                      <input
-                        type="text"
-                        placeholder="Ej: Lunes-Viernes: 6:00-22:00"
-                        value={horario}
-                        onChange={(e) => updateSchedule(index, e.target.value)}
-                        className="flex-1 border rounded-lg px-3 py-2"
-                      />
-                      {formData.schedule.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeSchedule(index)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <X size={20} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex gap-2 pt-4">
+                <div className="flex gap-3 pt-4">
                   <button
-                    type="button"
-                    onClick={() => { setShowModal(false); resetForm(); }}
-                    className="flex-1 border border-gray-300 rounded-lg py-2 hover:bg-gray-50"
+                    onClick={handleSubmit}
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                  >
+                    {editingId ? 'Actualizar' : 'Crear'}
+                  </button>
+                  <button
+                    onClick={() => setShowForm(false)}
+                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition-colors"
                   >
                     Cancelar
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={loading}
-                    className="flex-1 bg-blue-600 text-white rounded-lg py-2 hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {loading ? 'Guardando...' : 'Guardar'}
-                  </button>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+            </CardContent>
+          </Card>
+        )}
 
-      {showScheduleModal && selectedCity && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold">Horarios - {selectedCity.city}</h2>
-              <button onClick={() => setShowScheduleModal(false)}>
-                <X size={24} />
+        {/* Ciudades Activas */}
+        <div className="mb-12">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <Zap className="w-6 h-6 text-green-600" />
+            Ciudades Activas ({ciudades.length})
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {ciudades.map((ciudad) => (
+              <Card key={ciudad.id} className="overflow-hidden hover:shadow-xl transition-all duration-300 transform hover:scale-105 bg-white">
+                {/* Imagen */}
+                <div className="relative bg-gradient-to-br from-indigo-100 to-blue-100 h-48 overflow-hidden group">
+                  {ciudad.image_url ? (
+                    <img
+                      src={`http://localhost:3001${ciudad.image_url}`}
+                      alt={ciudad.city}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Upload className="w-16 h-16 text-indigo-300" />
+                    </div>
+                  )}
+
+                  <label className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/40 group-hover:bg-black/40 transition-colors cursor-pointer opacity-0 group-hover:opacity-100">
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="w-8 h-8 text-white" />
+                      <span className="text-white text-sm font-medium">Cambiar imagen</span>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleUploadImage(e, ciudad.id)}
+                      disabled={uploading === ciudad.id}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {uploading === ciudad.id && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <Loader2 className="w-8 h-8 text-white animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50 pb-4">
+                  <CardTitle className="flex items-center gap-2 text-2xl text-gray-900">
+                    <MapPin className="w-6 h-6 text-indigo-600 flex-shrink-0" />
+                    {ciudad.city}
+                  </CardTitle>
+                </CardHeader>
+
+                <CardContent className="pt-6 space-y-4">
+                  <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                    <span className="text-gray-600 font-medium">Departamento</span>
+                    <span className="font-semibold text-gray-900 bg-indigo-50 px-3 py-1 rounded-full">
+                      {ciudad.department}
+                    </span>
+                  </div>
+
+                  {ciudad.description && (
+                    <div className="pb-4 border-b border-gray-100">
+                      <p className="text-gray-600 text-sm leading-relaxed">
+                        {ciudad.description}
+                      </p>
+                    </div>
+                  )}
+
+                  {ciudad.schedule && ciudad.schedule.length > 0 && (
+                    <div className="pb-4 border-b border-gray-100">
+                      <p className="text-gray-600 font-medium text-sm mb-2">Horarios</p>
+                      <div className="flex flex-wrap gap-2">
+                        {ciudad.schedule.map((time, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium"
+                          >
+                            {time}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      onClick={() => handleCheckRoutes(ciudad.id)}
+                      className="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm"
+                    >
+                      🔗 Rutas
+                    </button>
+                    <button
+                      onClick={() => handleEdit(ciudad)}
+                      className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleSoftDelete(ciudad.id)}
+                      className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {ciudades.length === 0 && !showForm && (
+            <div className="text-center py-12">
+              <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600 text-lg mb-6">No hay ciudades registradas</p>
+              <button
+                onClick={() => setShowForm(true)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2 mx-auto transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                Crear Primera Ciudad
               </button>
             </div>
-            <div className="space-y-3">
-              {selectedCity.schedule?.map((horario, index) => (
-                <div key={index} className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
-                  <Clock size={20} className="text-blue-600 mt-0.5" />
-                  <span className="text-gray-700">{horario}</span>
-                </div>
+          )}
+        </div>
+
+        {/* Ciudades Inactivas */}
+        {showInactive && inactivas.length > 0 && (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <EyeOff className="w-6 h-6 text-gray-600" />
+              Ciudades Inactivas ({inactivas.length})
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {inactivas.map((ciudad) => (
+                <Card key={ciudad.id} className="overflow-hidden opacity-75 hover:opacity-100 transition-opacity bg-gray-50 border-2 border-gray-300">
+                  {/* Imagen */}
+                  <div className="relative bg-gray-200 h-48 overflow-hidden">
+                    {ciudad.image_url ? (
+                      <img
+                        src={`http://localhost:3001${ciudad.image_url}`}
+                        alt={ciudad.city}
+                        className="w-full h-full object-cover opacity-60"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Upload className="w-16 h-16 text-gray-400" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <span className="text-white font-bold text-lg">INACTIVA</span>
+                    </div>
+                  </div>
+
+                  <CardHeader className="bg-gray-100 pb-4">
+                    <CardTitle className="flex items-center gap-2 text-2xl text-gray-700">
+                      <MapPin className="w-6 h-6 text-gray-500 flex-shrink-0" />
+                      {ciudad.city}
+                    </CardTitle>
+                  </CardHeader>
+
+                  <CardContent className="pt-6 space-y-4">
+                    <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+                      <span className="text-gray-600 font-medium">Departamento</span>
+                      <span className="font-semibold text-gray-700 bg-gray-200 px-3 py-1 rounded-full">
+                        {ciudad.department}
+                      </span>
+                    </div>
+
+                    <div className="flex gap-2 pt-4">
+                      <button
+                        onClick={() => handleReactivate(ciudad.id)}
+                        className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Reactivar
+                      </button>
+                      <button
+                        onClick={() => handleHardDelete(ciudad.id)}
+                        className="flex-1 bg-red-700 hover:bg-red-800 text-white font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Eliminar
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
-              {(!selectedCity.schedule || selectedCity.schedule.length === 0) && (
-                <p className="text-gray-500 text-center py-4">No hay horarios registrados</p>
-              )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

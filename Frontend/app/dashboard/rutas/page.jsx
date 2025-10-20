@@ -8,13 +8,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { routesAPI } from './api/routes.api';
-import { Eye, Trash2 } from 'lucide-react';
+import { Eye, Trash2, RotateCcw, EyeOff } from 'lucide-react';
 
 export default function DashboardRutasPage() {
   const [routes, setRoutes] = useState([]);
+  const [inactiveRoutes, setInactiveRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -29,11 +31,16 @@ export default function DashboardRutasPage() {
   const loadRoutes = async () => {
     setLoading(true);
     try {
-      const response = await routesAPI.getAll(pagination.page, pagination.limit);
-      setRoutes(response.data || []);
+      const [activeRes, inactiveRes] = await Promise.all([
+        routesAPI.getAll(pagination.page, pagination.limit),
+        routesAPI.getAllInactive(),
+      ]);
+
+      setRoutes(activeRes.data || []);
+      setInactiveRoutes(Array.isArray(inactiveRes) ? inactiveRes : inactiveRes.data || []);
       setPagination(prev => ({
         ...prev,
-        total: response.meta?.total || 0,
+        total: activeRes.meta?.total || 0,
       }));
     } catch (error) {
       toast.error('Error al cargar rutas');
@@ -50,7 +57,6 @@ export default function DashboardRutasPage() {
 
   const handleEdit = async (route) => {
     try {
-      // Cargar detalles completos de la ruta
       const fullRoute = await routesAPI.getById(route.id);
       setSelectedRoute(fullRoute);
       setShowForm(true);
@@ -69,17 +75,45 @@ export default function DashboardRutasPage() {
     }
   };
 
-  const handleDelete = async (route) => {
-    if (!confirm(`¿Está seguro de eliminar la ruta "${route.name}"?`)) {
+  const handleSoftDelete = async (route) => {
+    if (!confirm(`¿Está seguro de desactivar la ruta "${route.name}"?\nSe marcará como inactiva pero podrá recuperarse.`)) {
       return;
     }
 
     try {
-      await routesAPI.delete(route.id);
-      toast.success('Ruta eliminada exitosamente');
+      await routesAPI.softDelete(route.id);
+      toast.success('Ruta desactivada exitosamente');
+      loadRoutes();
+    } catch (error) {
+      toast.error(error.message || 'Error al desactivar ruta');
+    }
+  };
+
+  const handleHardDelete = async (route) => {
+    if (!confirm(`⚠️ ¿Está seguro de ELIMINAR PERMANENTEMENTE la ruta "${route.name}"?\nEsta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      await routesAPI.hardDelete(route.id);
+      toast.success('Ruta eliminada permanentemente');
       loadRoutes();
     } catch (error) {
       toast.error(error.message || 'Error al eliminar ruta');
+    }
+  };
+
+  const handleReactivate = async (route) => {
+    if (!confirm(`¿Reactivar la ruta "${route.name}"?`)) {
+      return;
+    }
+
+    try {
+      await routesAPI.reactivate(route.id);
+      toast.success('Ruta reactivada exitosamente');
+      loadRoutes();
+    } catch (error) {
+      toast.error(error.message || 'Error al reactivar ruta');
     }
   };
 
@@ -96,7 +130,7 @@ export default function DashboardRutasPage() {
       setSelectedRoute(null);
       loadRoutes();
     } catch (error) {
-      throw error; // Re-throw para que el formulario lo maneje
+      throw error;
     }
   };
 
@@ -144,8 +178,8 @@ export default function DashboardRutasPage() {
     },
   ];
 
-  // Acciones personalizadas
-  const customActions = (route) => (
+  // Acciones para rutas activas
+  const activeRoutesActions = (route) => (
     <>
       <Button
         variant="ghost"
@@ -158,11 +192,40 @@ export default function DashboardRutasPage() {
       <Button
         variant="ghost"
         size="icon"
-        onClick={() => handleDelete(route)}
-        title="Eliminar"
-        disabled={route.trips?.some(t => t.status === 'SCHEDULED' || t.status === 'IN_PROGRESS')}
+        onClick={() => handleEdit(route)}
+        title="Editar"
+      >
+        <span className="text-yellow-500">✏️</span>
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => handleSoftDelete(route)}
+        title="Desactivar"
       >
         <Trash2 className="h-4 w-4 text-red-500" />
+      </Button>
+    </>
+  );
+
+  // Acciones para rutas inactivas
+  const inactiveRoutesActions = (route) => (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => handleReactivate(route)}
+        title="Reactivar"
+      >
+        <RotateCcw className="h-4 w-4 text-green-500" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => handleHardDelete(route)}
+        title="Eliminar permanentemente"
+      >
+        <Trash2 className="h-4 w-4 text-red-700" />
       </Button>
     </>
   );
@@ -180,15 +243,41 @@ export default function DashboardRutasPage() {
 
   return (
     <>
-      <DataTable
-        title="Gestión de Rutas"
-        columns={columns}
-        data={routes}
-        onAdd={handleAdd}
-        onEdit={handleEdit}
-        customActions={customActions}
-        loading={loading}
-      />
+      {/* Rutas Activas */}
+      <div className="mb-8">
+        <DataTable
+          title={`Rutas Activas (${routes.length})`}
+          columns={columns}
+          data={routes}
+          onAdd={handleAdd}
+          customActions={activeRoutesActions}
+          loading={loading}
+        />
+      </div>
+
+      {/* Toggle Inactivas */}
+      <div className="mb-6">
+        <Button
+          onClick={() => setShowInactive(!showInactive)}
+          variant={showInactive ? 'default' : 'outline'}
+          className={showInactive ? 'bg-gray-600 hover:bg-gray-700' : ''}
+        >
+          {showInactive ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+          {showInactive ? 'Ocultar' : 'Ver'} Rutas Inactivas ({inactiveRoutes.length})
+        </Button>
+      </div>
+
+      {/* Rutas Inactivas */}
+      {showInactive && inactiveRoutes.length > 0 && (
+        <DataTable
+          title={`Rutas Inactivas (${inactiveRoutes.length})`}
+          columns={columns}
+          data={inactiveRoutes}
+          customActions={inactiveRoutesActions}
+          loading={loading}
+          rowClassName="opacity-75 bg-gray-50"
+        />
+      )}
 
       {showForm && (
         <RouteForm

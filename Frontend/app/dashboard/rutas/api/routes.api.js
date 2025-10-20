@@ -1,12 +1,26 @@
-// Frontend/src/services/api/routes.api.js
+// Frontend/app/dashboard/rutas/api/routes.api.js
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
 export const routesAPI = {
-  // Obtener todas las rutas con paginación
+  // Obtener todas las rutas activas con paginación
   getAll: async (page = 1, limit = 10) => {
     const response = await fetch(`${API_URL}/routes?page=${page}&limit=${limit}`);
     if (!response.ok) throw new Error('Error al obtener rutas');
+    return response.json();
+  },
+
+  // Obtener rutas inactivas
+  getInactive: async (page = 1, limit = 10) => {
+    const response = await fetch(`${API_URL}/routes?inactive=true&page=${page}&limit=${limit}`);
+    if (!response.ok) throw new Error('Error al obtener rutas inactivas');
+    return response.json();
+  },
+
+  // Obtener lista de inactivas sin paginación
+  getAllInactive: async () => {
+    const response = await fetch(`${API_URL}/routes/list/inactive`);
+    if (!response.ok) throw new Error('Error al obtener rutas inactivas');
     return response.json();
   },
 
@@ -49,9 +63,21 @@ export const routesAPI = {
     return response.json();
   },
 
-  // Eliminar ruta (soft delete)
-  delete: async (id) => {
+  // Soft delete (desactivar ruta)
+  softDelete: async (id) => {
     const response = await fetch(`${API_URL}/routes/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Error al desactivar ruta');
+    }
+    return response.json();
+  },
+
+  // Hard delete (eliminar permanentemente)
+  hardDelete: async (id) => {
+    const response = await fetch(`${API_URL}/routes/${id}/hard`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -61,22 +87,53 @@ export const routesAPI = {
     return response.json();
   },
 
-  // Buscar rutas
-  search: async (filters, page = 1, limit = 10) => {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      limit: limit.toString(),
-      ...filters,
+  // Reactivar ruta inactiva
+  reactivate: async (id) => {
+    const response = await fetch(`${API_URL}/routes/${id}/reactivate`, {
+      method: 'PATCH',
     });
-    const response = await fetch(`${API_URL}/routes/search?${params}`);
-    if (!response.ok) throw new Error('Error al buscar rutas');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Error al reactivar ruta');
+    }
     return response.json();
   },
 
-  // Obtener estadísticas de una ruta
-  getStatistics: async (id) => {
-    const response = await fetch(`${API_URL}/routes/${id}/statistics`);
-    if (!response.ok) throw new Error('Error al obtener estadísticas');
+  // Obtener rutas por ciudad
+  getByCity: async (cityId, type = 'both') => {
+    const response = await fetch(`${API_URL}/routes/city/${cityId}?type=${type}`);
+    if (!response.ok) throw new Error('Error al obtener rutas');
+    return response.json();
+  },
+
+  // Obtener buses de una ruta
+  getBusesForRoute: async (routeId) => {
+    const response = await fetch(`${API_URL}/routes/${routeId}/buses`);
+    if (!response.ok) throw new Error('Error al obtener buses de la ruta');
+    return response.json();
+  },
+
+  // Asignar bus a ruta
+  assignBus: async (routeId, busId) => {
+    const response = await fetch(`${API_URL}/routes/${routeId}/buses/${busId}`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Error al asignar bus');
+    }
+    return response.json();
+  },
+
+  // Remover bus de ruta
+  removeBus: async (routeId, busId) => {
+    const response = await fetch(`${API_URL}/routes/${routeId}/buses/${busId}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Error al remover bus');
+    }
     return response.json();
   },
 };
