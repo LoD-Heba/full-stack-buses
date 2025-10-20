@@ -6,13 +6,12 @@ import { Route } from '../route/entities/route.entity';
 import { SharedModule } from 'src/common/shared/shared.module';
 import { City } from './entities/city.entity';
 import { MulterModule } from '@nestjs/platform-express';
+import { createMulterOptions } from 'src/config/upload.config';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Route, City]),
-    MulterModule.register({
-      dest: './uploads/cities',
-    }),
+    MulterModule.register(createMulterOptions('cities')),
     SharedModule,
   ],
   controllers: [CityController],

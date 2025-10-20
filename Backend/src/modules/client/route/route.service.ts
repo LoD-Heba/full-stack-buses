@@ -4,16 +4,15 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, Like } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { CreateRouteDto } from './dto/create-route.dto';
 import { UpdateRouteDto } from './dto/update-route.dto';
-import { SearchRoutesDto } from './dto/search-routes.dto';
 import { Route } from './entities/route.entity';
 import { City } from '../city/entities/city.entity';
 import { Bus } from '../bus/entities/bus.entity';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
-import { TripStatus, TicketStatus } from 'src/common/enums/status.enum';
+import { TripStatus } from 'src/common/enums/status.enum';
 import { BusStatus } from '../bus/dto/create-bus.dto';
 
 @Injectable()
@@ -40,7 +39,7 @@ export class RouteService {
       );
     }
 
-    // Validar que las ciudades existen
+    // Validar que las ciudades existen y están activas
     const originCity = await this.findCity(originCityId);
     const destinationCity = await this.findCity(destinationCityId);
 
@@ -77,7 +76,7 @@ export class RouteService {
       buses,
     });
 
-    //No puede recorrer 500km en 10 minutos
+    // Validar coherencia entre distancia y duración
     if (createRouteDto.distance_km && createRouteDto.approx_duration) {
       const [hours, minutes] = createRouteDto.approx_duration
         .split(':')
@@ -85,13 +84,13 @@ export class RouteService {
       const totalHours = hours + minutes / 60;
       const avgSpeed = createRouteDto.distance_km / totalHours;
 
-      // Validar velocidad promedio razonable (20-100 km/h)
       if (avgSpeed < 20 || avgSpeed > 100) {
         throw new BadRequestException(
           `La duración no es coherente con la distancia. Velocidad promedio: ${avgSpeed.toFixed(1)} km/h (debe estar entre 20-100 km/h)`,
         );
       }
     }
+
     return this.routeRepository.save(route);
   }
 
@@ -139,9 +138,11 @@ export class RouteService {
     };
   }
 
-  async findOne(id: string): Promise<Route> {
+  async findOne(id: string, includeInactive = false): Promise<Route> {
+    const where = includeInactive ? { id } : { id, is_active: true };
+
     const route = await this.routeRepository.findOne({
-      where: { id, is_active: true },
+      where,
       relations: {
         originCity: true,
         destinationCity: true,
@@ -162,81 +163,6 @@ export class RouteService {
     }
 
     return route;
-  }
-
-  async search(searchDto: SearchRoutesDto, paginationDto: PaginationDto) {
-    const { page = 1, limit = 10 } = paginationDto;
-    const { originCityId, destinationCityId, searchTerm } = searchDto;
-
-    const take = Math.min(Math.max(limit, 1), 100);
-    const skip = (page - 1) * take;
-
-    const queryBuilder = this.routeRepository
-      .createQueryBuilder('route')
-      .leftJoinAndSelect('route.originCity', 'originCity')
-      .leftJoinAndSelect('route.destinationCity', 'destinationCity')
-      .leftJoinAndSelect('route.buses', 'buses')
-      .where('route.is_active = :active', { active: true });
-
-    // Filtros opcionales
-    if (originCityId) {
-      queryBuilder.andWhere('originCity.id = :originCityId', { originCityId });
-    }
-
-    if (destinationCityId) {
-      queryBuilder.andWhere('destinationCity.id = :destinationCityId', {
-        destinationCityId,
-      });
-    }
-
-    if (searchTerm) {
-      queryBuilder.andWhere(
-        '(route.name ILIKE :searchTerm OR route.description ILIKE :searchTerm OR originCity.name ILIKE :searchTerm OR destinationCity.name ILIKE :searchTerm)',
-        { searchTerm: `%${searchTerm}%` },
-      );
-    }
-
-    const total = await queryBuilder.getCount();
-
-    const data = await queryBuilder
-      .orderBy('route.created_at', 'DESC')
-      .skip(skip)
-      .take(take)
-      .getMany();
-
-    const lastPage = Math.ceil(total / take);
-    const hasNextPage = page < lastPage;
-    const hasPrevPage = page > 1;
-
-    return {
-      data,
-      meta: {
-        total,
-        page,
-        lastPage,
-        limit: take,
-        hasNextPage,
-        hasPrevPage,
-      },
-    };
-  }
-
-  async findPopularRoutes(limit: number = 5) {
-    return this.routeRepository
-      .createQueryBuilder('route')
-      .leftJoinAndSelect('route.originCity', 'originCity')
-      .leftJoinAndSelect('route.destinationCity', 'destinationCity')
-      .leftJoin('route.trips', 'trips')
-      .leftJoin('trips.tickets', 'tickets')
-      .select(['route', 'originCity', 'destinationCity'])
-      .addSelect('COUNT(tickets.ticket_id)', 'ticket_count')
-      .where('route.is_active = :active', { active: true })
-      .groupBy('route.id')
-      .addGroupBy('originCity.id')
-      .addGroupBy('destinationCity.id')
-      .orderBy('ticket_count', 'DESC')
-      .limit(limit)
-      .getMany();
   }
 
   async findByCity(
@@ -355,35 +281,124 @@ export class RouteService {
     return this.findOne(id);
   }
 
-  async remove(id: string): Promise<Route> {
+  /**
+   * Soft delete - marca como inactiva
+   * La ruta sigue existiendo pero no aparece en listados normales
+   */
+  async softDelete(id: string) {
     const route = await this.findOne(id);
 
-    // Verificar si tiene viajes programados o en progreso
-    const activeTrips =
-      route.trips?.filter(
-        (trip) =>
-          trip.status === TripStatus.SCHEDULED ||
-          trip.status === TripStatus.IN_PROGRESS,
-      ) || [];
-
-    route.buses = [];
-    await this.routeRepository.save(route);
+    // Verificar si hay viajes activos
+    const activeTrips = route.trips?.filter(
+      (trip) =>
+        trip.status === TripStatus.SCHEDULED ||
+        trip.status === TripStatus.IN_PROGRESS,
+    ) || [];
 
     if (activeTrips.length > 0) {
       throw new BadRequestException(
-        'No se puede eliminar una ruta que tiene viajes programados o en progreso',
+        `No puedes desactivar esta ruta porque tiene ${activeTrips.length} viaje(s) activo(s)`,
       );
     }
 
-    // Soft delete
     await this.routeRepository.update(id, { is_active: false });
+    return { message: 'Ruta desactivada correctamente' };
+  }
 
-    return { ...route, is_active: false };
+  /**
+   * Hard delete - elimina completamente de la base de datos
+   * Solo funciona si no hay viajes asociados
+   */
+  async hardDelete(id: string) {
+    const route = await this.findOne(id, true); // Permitir buscar inactivas
+
+    // Verificar si hay viajes (activos o inactivos) asociados
+    const totalTrips = route.trips?.length || 0;
+
+    if (totalTrips > 0) {
+      throw new BadRequestException(
+        `No puedes eliminar esta ruta porque tiene ${totalTrips} viaje(s) asociado(s). Primero elimina o cancela los viajes.`,
+      );
+    }
+
+    // Limpiar buses antes de eliminar
+    route.buses = [];
+    await this.routeRepository.save(route);
+
+    await this.routeRepository.remove(route);
+    return { message: 'Ruta eliminada permanentemente' };
+  }
+
+  /**
+   * Obtener rutas inactivas para administración
+   */
+  async findInactive(paginationDto?: PaginationDto) {
+    if (!paginationDto) {
+      return await this.routeRepository.find({
+        where: { is_active: false },
+        order: { updated_at: 'DESC' },
+        relations: {
+          originCity: true,
+          destinationCity: true,
+          buses: true,
+          trips: true,
+        },
+      });
+    }
+
+    const { page = 1, limit = 10 } = paginationDto;
+    const take = Math.min(Math.max(limit, 1), 100);
+    const skip = (page - 1) * take;
+
+    const total = await this.routeRepository.count({
+      where: { is_active: false },
+    });
+
+    const lastPage = Math.ceil(total / take);
+
+    const data = await this.routeRepository.find({
+      where: { is_active: false },
+      order: { updated_at: 'DESC' },
+      relations: {
+        originCity: true,
+        destinationCity: true,
+        buses: true,
+        trips: true,
+      },
+      skip,
+      take,
+    });
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        lastPage,
+        limit: take,
+        hasNextPage: page < lastPage,
+        hasPrevPage: page > 1,
+      },
+    };
+  }
+
+  /**
+   * Reactivar una ruta inactiva
+   */
+  async reactivate(id: string) {
+    const route = await this.findOne(id, true);
+
+    if (route.is_active) {
+      throw new BadRequestException('Esta ruta ya está activa');
+    }
+
+    await this.routeRepository.update(id, { is_active: true });
+    return this.findOne(id);
   }
 
   async assignBus(routeId: string, busId: string): Promise<Route> {
     const route = await this.routeRepository.findOne({
-      where: { id: routeId, is_active: true }, // AGREGAR is_active
+      where: { id: routeId, is_active: true },
       relations: { buses: true },
     });
 
@@ -393,7 +408,7 @@ export class RouteService {
 
     const bus = await this.findBus(busId);
 
-    //Validar que el bus no esté en mantenimiento o fuera de servicio
+    // Validar que el bus no esté en mantenimiento o fuera de servicio
     if (
       bus.status === BusStatus.MANTENIMIENTO ||
       bus.status === BusStatus.FUERA_DE_SERVICIO
@@ -402,6 +417,7 @@ export class RouteService {
         `No se puede asignar el bus ${bus.plate} porque está en estado: ${bus.status}`,
       );
     }
+
     // Verificar que el bus tenga asientos configurados
     const busWithSeats = await this.busRepository.findOne({
       where: { id: busId },
@@ -424,7 +440,7 @@ export class RouteService {
         `El bus ${bus.plate} no tiene asientos activos`,
       );
     }
-    // ====================================
+
     // Verificar si el bus ya está asignado
     const busAlreadyAssigned = route.buses.some((b) => b.id === busId);
     if (busAlreadyAssigned) {
@@ -436,7 +452,7 @@ export class RouteService {
 
     return this.findOne(routeId);
   }
-  //////////////////////////////////////////////////////////
+
   async getBusesForRoute(routeId: string): Promise<Bus[]> {
     const route = await this.routeRepository.findOne({
       where: { id: routeId, is_active: true },
@@ -455,13 +471,9 @@ export class RouteService {
 
     // Filtrar solo buses que tengan stacks con asientos activos
     return route.buses.filter((bus) => {
-      // El bus debe estar activo
       if (!bus.is_active) return false;
-
-      // Debe tener al menos un stack
       if (!bus.stacks || bus.stacks.length === 0) return false;
 
-      // Debe tener al menos un asiento activo en cualquier stack
       const totalActiveSeats = bus.stacks.reduce((total, stack) => {
         return (
           total + (stack.seats?.filter((seat) => seat.is_active).length || 0)
@@ -471,7 +483,7 @@ export class RouteService {
       return totalActiveSeats > 0;
     });
   }
-  ///////////////////////////////////////////////////////////////
+
   async removeBus(routeId: string, busId: string): Promise<Route> {
     const route = await this.routeRepository.findOne({
       where: { id: routeId },
@@ -493,7 +505,7 @@ export class RouteService {
 
     if (activeTripsWithBus.length > 0) {
       throw new BadRequestException(
-        `No se puede desasignar el bus porque tiene ${activeTripsWithBus.length} viajes activos en esta ruta`,
+        `No se puede desasignar el bus porque tiene ${activeTripsWithBus.length} viaje(s) activo(s) en esta ruta`,
       );
     }
 
@@ -503,44 +515,14 @@ export class RouteService {
     return this.findOne(routeId);
   }
 
-  async getRouteStatistics(id: string) {
-    const route = await this.findOne(id);
-
-    const stats = await this.routeRepository
-      .createQueryBuilder('route')
-      .leftJoin('route.trips', 'trips')
-      .leftJoin('trips.tickets', 'tickets')
-      .select([
-        'COUNT(DISTINCT trips.id) as total_trips',
-        `COUNT(DISTINCT CASE WHEN trips.status = '${TripStatus.SCHEDULED}' THEN trips.id END) as scheduled_trips`,
-        `COUNT(DISTINCT CASE WHEN trips.status = '${TripStatus.COMPLETED}' THEN trips.id END) as completed_trips`,
-        'COUNT(tickets.ticket_id) as total_tickets',
-        `SUM(CASE WHEN tickets.status = '${TicketStatus.CONFIRMED}' THEN tickets.price ELSE 0 END) as total_revenue`,
-      ])
-      .where('route.id = :id', { id })
-      .getRawOne();
-
-    return {
-      route,
-      statistics: {
-        totalTrips: parseInt(stats.total_trips) || 0,
-        scheduledTrips: parseInt(stats.scheduled_trips) || 0,
-        completedTrips: parseInt(stats.completed_trips) || 0,
-        totalTickets: parseInt(stats.total_tickets) || 0,
-        totalRevenue: parseFloat(stats.total_revenue) || 0,
-        assignedBuses: route.buses?.length || 0,
-      },
-    };
-  }
-
   // Métodos auxiliares privados
   private async findCity(cityId: string): Promise<City> {
     const city = await this.cityRepository.findOne({
-      where: { id: cityId },
+      where: { id: cityId, is_active: true },
     });
 
     if (!city) {
-      throw new NotFoundException(`La ciudad ${cityId} no existe`);
+      throw new NotFoundException(`La ciudad ${cityId} no existe o no está activa`);
     }
 
     return city;
