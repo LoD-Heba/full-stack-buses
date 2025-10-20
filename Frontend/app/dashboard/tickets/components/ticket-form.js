@@ -413,7 +413,7 @@ export function NewTicketForm() {
 
       setTimeout(() => {
         router.push(
-          `/dashboard/tickets/${firstTicketId}?payment=success&code=${firstTicketCode}`
+          `/tickets/${firstTicketId}?payment=success&code=${firstTicketCode}`
         );
       }, 1500);
     } catch (error) {
