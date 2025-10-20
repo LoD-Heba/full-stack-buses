@@ -288,6 +288,8 @@ export class BusService {
       updateData.user = user;
     }
 
+    
+
     // Verificar que hay algo para actualizar
     if (Object.keys(updateData).length === 0) {
       throw new BadRequestException('No hay datos para actualizar');
@@ -303,30 +305,45 @@ export class BusService {
   }
 
   async remove(id: string): Promise<Bus> {
-    const bus = await this.findOne(id);
+  const bus = await this.findOne(id);
 
-    // Verificar si tiene viajes programados o en progreso
-    const activeTrips =
-      bus.trips?.filter(
-        (trip) =>
-          trip.status === TripStatus.SCHEDULED ||
-          trip.status === TripStatus.IN_PROGRESS, ///////////////
-      ) || [];
+  // ✨ NUEVA VALIDACIÓN: Verificar viajes programados O en progreso
+  const activeTrips =
+    bus.trips?.filter(
+      (trip) =>
+        trip.status === TripStatus.SCHEDULED ||
+        trip.status === TripStatus.IN_PROGRESS,
+    ) || [];
 
-    if (activeTrips.length > 0) {
-      throw new BadRequestException(
-        'No se puede eliminar un bus que tiene viajes programados o en progreso',
-      );
+  if (activeTrips.length > 0) {
+    const scheduledCount = activeTrips.filter(
+      (t) => t.status === TripStatus.SCHEDULED
+    ).length;
+    const inProgressCount = activeTrips.filter(
+      (t) => t.status === TripStatus.IN_PROGRESS
+    ).length;
+
+    const messages: string[] = [];
+    if (scheduledCount > 0) {
+      messages.push(`${scheduledCount} programado(s)`);
+    }
+    if (inProgressCount > 0) {
+      messages.push(`${inProgressCount} en progreso`);
     }
 
-    // Soft delete
-    await this.busRepository.update(id, {
-      is_active: false,
-      status: BusStatus.FUERA_DE_SERVICIO,
-    });
-
-    return { ...bus, is_active: true };
+    throw new BadRequestException(
+      `No se puede desactivar un bus que tiene viajes activos: ${messages.join(' y ')}`,
+    );
   }
+
+  // Soft delete
+  await this.busRepository.update(id, {
+    is_active: false,
+    status: BusStatus.FUERA_DE_SERVICIO,
+  });
+
+  return { ...bus, is_active: false };
+}
 
   async hardDelete(id: string): Promise<void> {
     const bus = await this.busRepository.findOne({

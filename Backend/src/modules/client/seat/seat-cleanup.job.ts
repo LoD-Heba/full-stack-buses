@@ -5,6 +5,7 @@ import { Repository, LessThan, In } from 'typeorm';
 import { Ticket } from '../tickets/entities/ticket.entity';
 import { Seat } from './entities/seat.entity';
 import { TicketStatus } from 'src/common/enums/status.enum';
+import { Trip } from '../trip/entities/trip.entity';
 
 @Injectable()
 export class SeatCleanupJob {
@@ -14,6 +15,9 @@ export class SeatCleanupJob {
     
     @InjectRepository(Seat)
     private readonly seatRepository: Repository<Seat>,
+
+    @InjectRepository(Trip)
+    private readonly tripRepository : Repository<Trip>
   ) {}
 
   @Cron('*/5 * * * *') // Cada 5 minutos
@@ -28,7 +32,7 @@ export class SeatCleanupJob {
         is_active: true,
         created_at: LessThan(expirationTime),
       },
-      relations: ['seat'],
+      relations: ['seat','trip'],
     });
 
     if (expiredTickets.length === 0) return;
@@ -47,6 +51,31 @@ export class SeatCleanupJob {
       { status: 'disponible' }
     );
 
-    console.log(`✅ Liberados ${seatIds.length} asientos de reservas expiradas`);
+    const tripIds = [...new Set(expiredTickets.map(t => t.trip.id))];
+  
+  for (const tripId of tripIds) {
+    const trip = await this.tripRepository.findOne({
+      where: { id: tripId },
+      relations: { tickets: true }
+    });
+
+    if (trip) {
+      const confirmedCount = trip.tickets.filter(
+        t => t.status === TicketStatus.CONFIRMED && t.is_active
+      ).length;
+
+      const totalSeats = await this.seatRepository
+        .createQueryBuilder('seat')
+        .leftJoin('seat.stacks', 'stack')
+        .where('stack.bus_id = :busId', { busId: trip.bus.id })
+        .andWhere('seat.is_active = true')
+        .getCount();
+
+      await this.tripRepository.update(tripId, {
+        available_seats: totalSeats - confirmedCount
+      });
+    }}
+
+    console.log(`✅ Liberados ${seatIds.length} asientos de ${tripIds.length} viajes`);
   }
 }

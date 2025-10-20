@@ -10,6 +10,7 @@ import { Trip } from './entities/trip.entity';
 import { UserProfile } from 'src/modules/admin/user-profile/entities/user-profile.entity';
 import { ScheduleModule } from '@nestjs/schedule';
 import { Seat } from '../seat/entities/seat.entity';
+import { TripStatusJob } from './trip-status.job';
 
 @Module({
   imports: [
@@ -18,7 +19,7 @@ import { Seat } from '../seat/entities/seat.entity';
     ScheduleModule.forRoot(),
   ],
   controllers: [TripController],
-  providers: [TripService],
+  providers: [TripService,TripStatusJob],
   exports: [TripService],
 })
 export class TripModule {}

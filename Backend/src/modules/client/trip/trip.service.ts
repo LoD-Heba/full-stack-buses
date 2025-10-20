@@ -166,6 +166,7 @@ export class TripService {
     const conflictingTrip = await this.tripRepository
       .createQueryBuilder('trip')
       .where('trip.bus = :busId', { busId })
+      .andWhere('trip.status != :cancelled', { cancelled: 'CANCELLED' })
       .andWhere('trip.is_active = :active', { active: true })
       .andWhere('trip.status != :cancelled', { cancelled: 'CANCELLED' })
       .andWhere(
@@ -189,6 +190,7 @@ export class TripService {
     const recentTrip = await this.tripRepository
       .createQueryBuilder('trip')
       .where('trip.bus = :busId', { busId })
+      .andWhere('trip.is_active = :active', { active: true })
       .andWhere('trip.is_active = :active', { active: true })
       .andWhere('trip.status != :cancelled', {
         cancelled: TripStatus.CANCELLED,
@@ -473,6 +475,7 @@ export class TripService {
       const conflictingTrip = await this.tripRepository
         .createQueryBuilder('trip')
         .where('trip.bus.id = :checkBusId', { checkBusId })
+        .andWhere('trip.is_active = :active', { active: true })
         .andWhere('trip.id != :currentTripId', { currentTripId: id })
         .andWhere('trip.is_active = :active', { active: true })
         .andWhere('trip.status != :cancelled', {
