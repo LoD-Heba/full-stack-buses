@@ -13,27 +13,21 @@ import {
   Bus,
   MapPin,
   Calendar,
-  Armchair,
   QrCode,
   Loader,
   CheckCircle,
   AlertCircle,
   Download,
   MessageCircle,
-  Copy,
+  CreditCard,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const API_BASE = "http://localhost:3001/api/v1";
 
-// Generar QR simulado (base64)
 const generateSimulatedQR = (paymentId, amount) => {
   const text = `PAGO|${paymentId}|${amount}|${new Date().toISOString()}`;
-  // En producción usarías qrcode.react o una librería QR
-  // Por ahora usamos data URL de un QR genérico
-  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
-    text
-  )}`;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(text)}`;
 };
 
 export default function PagoQRPage() {
@@ -51,94 +45,97 @@ export default function PagoQRPage() {
   const [createdTickets, setCreatedTickets] = useState([]);
   const [payment, setPayment] = useState(null);
   const [qrUrl, setQrUrl] = useState(null);
-  const [step, setStep] = useState("creating"); // "creating" -> "qr" -> "confirming" -> "success"
+  const [step, setStep] = useState("creating");
   const [error, setError] = useState(null);
-  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
-  const [countdownSeconds, setCountdownSeconds] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState("QR");
+  const [countdown, setCountdown] = useState(3);
 
   useEffect(() => {
-    const initializePayment = async () => {
-      try {
-        if (!tripId || !clientId) {
-          throw new Error("Parámetros inválidos");
-        }
-
-        const savedClient = sessionStorage.getItem("purchaseClient");
-        if (!savedClient) {
-          throw new Error("Cliente no encontrado");
-        }
-        setClient(JSON.parse(savedClient));
-
-        const savedSeats = sessionStorage.getItem("selectedSeats");
-        if (!savedSeats) {
-          throw new Error("No hay asientos seleccionados");
-        }
-        const seats = JSON.parse(savedSeats);
-        if (seats.length === 0) {
-          throw new Error("Debe seleccionar al menos un asiento");
-        }
-        setSelectedSeats(seats);
-
-        const tripRes = await fetch(`${API_BASE}/trips/${tripId}`);
-        if (!tripRes.ok) throw new Error("Error al cargar el viaje");
-        const tripData = await tripRes.json();
-        setTrip(tripData);
-
-        const layoutRes = await fetch(
-          `${API_BASE}/buses/${tripData.bus.id}/layout`
-        );
-        if (!layoutRes.ok) throw new Error("Error al cargar layout del bus");
-        const layoutData = await layoutRes.json();
-
-        let allSeats = [];
-        if (layoutData.decks && Array.isArray(layoutData.decks)) {
-          layoutData.decks.forEach((deck) => {
-            if (deck.layout && Array.isArray(deck.layout)) {
-              const deckSeats = deck.layout.filter(
-                (seat) =>
-                  seat.visual_type === "seat" &&
-                  seat.id &&
-                  seat.seat_code &&
-                  seat.seat_code.trim() !== ""
-              );
-              allSeats.push(...deckSeats);
-            }
-          });
-        }
-
-        allSeats = allSeats.map((seat) => ({
-          ...seat,
-          seat_code: seat.seat_code?.toUpperCase(),
-        }));
-
-        const mappedSeats = seats
-          .map((code) => {
-            const seat = allSeats.find(
-              (s) => s.seat_code?.toUpperCase() === code.toUpperCase()
-            );
-            return seat;
-          })
-          .filter(Boolean);
-
-        if (mappedSeats.length === 0) {
-          throw new Error("No se pudieron mapear los asientos");
-        }
-
-        setSelectedSeats(mappedSeats);
-
-        // Crear pago PRIMERO (sin tickets)
-        await createPaymentAndQR(mappedSeats, tripData);
-      } catch (err) {
-        console.error("Error:", err);
-        setError(err.message || "Error al inicializar");
-        toast.error(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     initializePayment();
   }, [tripId, clientId]);
+
+  // Countdown para simulación de pago
+  useEffect(() => {
+    if (confirmingPayment && countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [confirmingPayment, countdown]);
+
+  const initializePayment = async () => {
+    try {
+      if (!tripId || !clientId) {
+        throw new Error("Parámetros inválidos");
+      }
+
+      const savedClient = sessionStorage.getItem("purchaseClient");
+      if (!savedClient) {
+        throw new Error("Cliente no encontrado");
+      }
+      setClient(JSON.parse(savedClient));
+
+      const savedSeats = sessionStorage.getItem("selectedSeats");
+      if (!savedSeats) {
+        throw new Error("No hay asientos seleccionados");
+      }
+      const seats = JSON.parse(savedSeats);
+      if (seats.length === 0) {
+        throw new Error("Debe seleccionar al menos un asiento");
+      }
+
+      const tripRes = await fetch(`${API_BASE}/trips/${tripId}`);
+      if (!tripRes.ok) throw new Error("Error al cargar el viaje");
+      const tripData = await tripRes.json();
+      setTrip(tripData);
+
+      const layoutRes = await fetch(`${API_BASE}/buses/${tripData.bus.id}/layout`);
+      if (!layoutRes.ok) throw new Error("Error al cargar layout del bus");
+      const layoutData = await layoutRes.json();
+
+      let allSeats = [];
+      if (layoutData.decks && Array.isArray(layoutData.decks)) {
+        layoutData.decks.forEach((deck) => {
+          if (deck.layout && Array.isArray(deck.layout)) {
+            const deckSeats = deck.layout.filter(
+              (seat) =>
+                seat.visual_type === "seat" &&
+                seat.id &&
+                seat.seat_code &&
+                seat.seat_code.trim() !== ""
+            );
+            allSeats.push(...deckSeats);
+          }
+        });
+      }
+
+      allSeats = allSeats.map((seat) => ({
+        ...seat,
+        seat_code: seat.seat_code?.toUpperCase(),
+      }));
+
+      const mappedSeats = seats
+        .map((code) => {
+          const seat = allSeats.find(
+            (s) => s.seat_code?.toUpperCase() === code.toUpperCase()
+          );
+          return seat;
+        })
+        .filter(Boolean);
+
+      if (mappedSeats.length === 0) {
+        throw new Error("No se pudieron mapear los asientos");
+      }
+
+      setSelectedSeats(mappedSeats);
+      await createPaymentAndQR(mappedSeats, tripData);
+    } catch (err) {
+      console.error("Error:", err);
+      setError(err.message || "Error al inicializar");
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const createPaymentAndQR = async (seats, tripData) => {
     try {
@@ -151,7 +148,7 @@ export default function PagoQRPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: totalAmount,
-          method: "QR",
+          method: paymentMethod,
           category: "adulto",
           notes: `Compra web - ${seats.length} asientos: ${seats
             .map((s) => s.seat_code)
@@ -177,7 +174,7 @@ export default function PagoQRPage() {
     }
   };
 
-  const handleSendToWhatsApp = async () => {
+  const handleSendToWhatsApp = () => {
     if (!client || !payment) return;
 
     const message = `
@@ -192,16 +189,13 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
 📱 *Cómo Pagar*
 1. Escanea el código QR adjunto
 2. Realiza el pago según las instrucciones
-3. Tu reserva se confirmará automáticamente
+3. Confirma el pago en la app
 
 ❓ ¿Dudas? Responde este mensaje.
     `.trim();
 
     try {
-      // Simular envío a WhatsApp (en producción usarías API oficial)
-      const whatsappUrl = `https://wa.me/${client.phone.replace(/\D/g, "")}?text=${encodeURIComponent(
-        message
-      )}`;
+      const whatsappUrl = `https://wa.me/${client.phone.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, "_blank");
       toast.info("Se abrirá WhatsApp en una nueva ventana");
     } catch (err) {
@@ -210,7 +204,6 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
   };
 
   const handleDownloadQR = () => {
-    // Crear link de descarga
     const link = document.createElement("a");
     link.href = qrUrl;
     link.download = `qr-pago-${payment.id}.png`;
@@ -219,105 +212,110 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
   };
 
   const handleConfirmPayment = async () => {
-  try {
-    setConfirmingPayment(true);
+    try {
+      setConfirmingPayment(true);
+      setCountdown(3);
 
-    // Simular que llegó el pago (esperar 3 segundos)
-    console.log("⏳ Esperando confirmación de pago...");
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+      // SIMULACIÓN: Esperar 3 segundos
+      console.log("⏳ Simulando procesamiento de pago...");
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    // Confirmar el pago
-    console.log("✔️ Confirmando pago...");
-    const confirmResponse = await fetch(`${API_BASE}/payments/${payment.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        status: "COMPLETO",  // ✅ CAMBIO: "COMPLETED" → "COMPLETO"
-      }),
-    });
+      // 1. Confirmar el pago
+      console.log("✔️ Confirmando pago...");
+      const confirmResponse = await fetch(`${API_BASE}/payments/${payment.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "COMPLETO",
+        }),
+      });
 
-    if (!confirmResponse.ok) {
-      const errorData = await confirmResponse.json();
-      console.error("Error en respuesta:", errorData);
-      throw new Error(errorData.message || "Error al confirmar pago");
-    }
-
-    // AHORA crear los tickets (después del pago confirmado)
-    console.log("🎫 Creando tickets...");
-    const ticketsCreated = [];
-    const ticketErrors = [];
-
-    for (const seat of selectedSeats) {
-      try {
-        const ticketData = {
-          userProfileId: clientId,
-          trip_id: tripId,
-          seat_id: seat.id,
-          price: parseFloat(trip.price),
-          status: "CONFIRMED",  // ✅ Backend espera este valor
-        };
-
-        const response = await fetch(`${API_BASE}/tickets`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(ticketData),
-        });
-
-        const responseData = await response.json();
-
-        if (!response.ok) {
-          console.error(`❌ Error en ${seat.seat_code}:`, responseData);
-          ticketErrors.push(
-            `${seat.seat_code}: ${responseData.message || "Error"}`
-          );
-        } else {
-          console.log(`✅ Ticket creado: ${seat.seat_code}`);
-          ticketsCreated.push(responseData);
-        }
-      } catch (error) {
-        console.error(`❌ Error en ${seat.seat_code}:`, error);
-        ticketErrors.push(`${seat.seat_code}: ${error.message}`);
+      if (!confirmResponse.ok) {
+        const errorData = await confirmResponse.json();
+        throw new Error(errorData.message || "Error al confirmar pago");
       }
+
+      console.log("✅ Pago confirmado");
+
+      // 2. Crear los tickets con el pago confirmado
+      console.log("🎫 Creando tickets...");
+      const ticketsCreated = [];
+      const ticketErrors = [];
+
+      for (const seat of selectedSeats) {
+        try {
+          const ticketData = {
+            userProfileId: clientId,
+            tripId: tripId,
+            seatId: seat.id,
+            price: parseFloat(trip.price),
+            status: "CONFIRMADO",
+            paymentId: payment.id,
+          };
+
+          const response = await fetch(`${API_BASE}/tickets`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(ticketData),
+          });
+
+          const responseData = await response.json();
+
+          if (!response.ok) {
+            console.error(`❌ Error en ${seat.seat_code}:`, responseData);
+            ticketErrors.push(
+              `${seat.seat_code}: ${responseData.message || "Error"}`
+            );
+          } else {
+            console.log(`✅ Ticket creado: ${seat.seat_code}`);
+            ticketsCreated.push(responseData);
+          }
+        } catch (error) {
+          console.error(`❌ Error en ${seat.seat_code}:`, error);
+          ticketErrors.push(`${seat.seat_code}: ${error.message}`);
+        }
+      }
+
+      if (ticketsCreated.length === 0) {
+        throw new Error("No se pudieron crear los tickets");
+      }
+
+      if (ticketErrors.length > 0) {
+        console.warn("Algunos tickets tuvieron errores:", ticketErrors);
+        toast.warning(`${ticketErrors.length} asiento(s) no se pudieron procesar`);
+      }
+
+      setCreatedTickets(ticketsCreated);
+      setStep("success");
+
+      // Limpiar sessionStorage
+      sessionStorage.removeItem("purchaseClient");
+      sessionStorage.removeItem("selectedSeats");
+
+      toast.success("¡Pago confirmado y tickets creados!");
+
+      // Redirigir después de 3 segundos
+      setTimeout(() => {
+        const firstTicketId = ticketsCreated[0].ticket_id;
+        router.push(`/tickets/${firstTicketId}?payment=success`);
+      }, 3000);
+    } catch (error) {
+      console.error("Error:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Error al confirmar pago";
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setConfirmingPayment(false);
+      setCountdown(0);
     }
-
-    if (ticketsCreated.length === 0) {
-      throw new Error("No se pudieron crear los tickets");
-    }
-
-    if (ticketErrors.length > 0) {
-      console.warn("Algunos tickets tuvieron errores:", ticketErrors);
-    }
-
-    setCreatedTickets(ticketsCreated);
-    setPaymentConfirmed(true);
-    setStep("success");
-
-    // Limpiar sessionStorage
-    sessionStorage.removeItem("purchaseClient");
-    sessionStorage.removeItem("selectedSeats");
-
-    toast.success("¡Pago confirmado y tickets creados!");
-
-    setTimeout(() => {
-      const firstTicketId = ticketsCreated[0].ticket_id;
-      router.push(`/tickets/${firstTicketId}?payment=success`);
-    }, 3000);
-  } catch (error) {
-    console.error("Error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Error al confirmar pago";
-    setError(errorMessage);
-    toast.error(errorMessage);
-  } finally {
-    setConfirmingPayment(false);
-  }
-};
+  };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader className="animate-spin h-16 w-16 text-green-600 mx-auto" />
+          <Loader className="animate-spin h-16 w-16 text-orange-600 mx-auto" />
           <p className="mt-4 text-gray-600">Preparando tu compra...</p>
         </div>
       </div>
@@ -329,12 +327,12 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md border-red-300 bg-red-50">
           <CardContent className="pt-6 text-center">
-            <AlertCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-green-900 mb-2">Error</h2>
-            <p className="text-green-800 mb-6">{error}</p>
+            <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-red-900 mb-2">Error</h2>
+            <p className="text-red-800 mb-6">{error}</p>
             <Button
               onClick={() => router.push("/salidas")}
-              className="bg-green-600 hover:green-red-700"
+              className="bg-red-600 hover:bg-red-700"
             >
               Volver a Salidas
             </Button>
@@ -347,103 +345,103 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
   const totalPrice = selectedSeats.length * parseFloat(trip?.price || 0);
 
   if (step === "success") {
-  const handleDownloadInvoice = async () => {
-    try {
-      await generateInvoicePDF(
-        client,
-        trip,
-        createdTickets,
-        payment,
-        totalPrice
-      );
-      toast.success("Factura descargada correctamente");
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Error al descargar la factura");
-    }
-  };
+    const handleDownloadInvoice = async () => {
+      try {
+        await generateInvoicePDF(
+          client,
+          trip,
+          createdTickets,
+          payment,
+          totalPrice
+        );
+        toast.success("Factura descargada correctamente");
+      } catch (error) {
+        console.error("Error:", error);
+        toast.error("Error al descargar la factura");
+      }
+    };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg border-green-300 shadow-2xl">
-        <CardContent className="pt-8 text-center">
-          <div className="mb-6">
-            <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-              <CheckCircle className="h-12 w-12 text-white" />
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-lg border-green-300 shadow-2xl">
+          <CardContent className="pt-8 text-center">
+            <div className="mb-6">
+              <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                <CheckCircle className="h-12 w-12 text-white" />
+              </div>
+              <h2 className="text-3xl font-bold text-green-900 mb-2">
+                ¡Pago Exitoso!
+              </h2>
+              <p className="text-green-700 text-lg">
+                Tu compra se ha procesado correctamente
+              </p>
             </div>
-            <h2 className="text-3xl font-bold text-green-900 mb-2">
-              ¡Pago Exitoso!
-            </h2>
-            <p className="text-green-700 text-lg">
-              Tu compra se ha procesado correctamente
-            </p>
-          </div>
 
-          <Card className="bg-white mb-6">
-            <CardContent className="pt-4 text-left space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Tickets comprados:</span>
-                <span className="font-bold">{createdTickets.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Total pagado:</span>
-                <span className="font-bold text-green-600 text-xl">
-                  Bs. {totalPrice.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Método:</span>
-                <span className="font-medium">QR</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">ID Pago:</span>
-                <code className="bg-gray-200 px-2 py-1 rounded text-xs font-mono">
-                  {payment?.id.substring(0, 12)}...
-                </code>
-              </div>
-            </CardContent>
-          </Card>
+            <Card className="bg-white mb-6">
+              <CardContent className="pt-4 text-left space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Tickets comprados:</span>
+                  <span className="font-bold">{createdTickets.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Total pagado:</span>
+                  <span className="font-bold text-green-600 text-xl">
+                    Bs. {totalPrice.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Método:</span>
+                  <span className="font-medium">{paymentMethod}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">ID Pago:</span>
+                  <code className="bg-gray-200 px-2 py-1 rounded text-xs font-mono">
+                    {payment?.id.substring(0, 12)}...
+                  </code>
+                </div>
+              </CardContent>
+            </Card>
 
-          <Alert className="bg-blue-50 border-blue-200 mb-6">
-            <AlertCircle className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800 text-sm">
-              Serás redirigido a tus tickets en unos segundos...
-            </AlertDescription>
-          </Alert>
+            <Alert className="bg-blue-50 border-blue-200 mb-6">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800 text-sm">
+                Serás redirigido a tus tickets en unos segundos...
+              </AlertDescription>
+            </Alert>
 
-          <div className="flex flex-col gap-3 mb-6">
-            <Button
-              onClick={handleDownloadInvoice}
-              className="gap-2 bg-blue-600 hover:bg-blue-700 w-full"
-            >
-              <Download className="h-4 w-4" />
-              Descargar Factura PDF
-            </Button>
-          </div>
+            <div className="flex flex-col gap-3 mb-6">
+              <Button
+                onClick={handleDownloadInvoice}
+                className="gap-2 bg-blue-600 hover:bg-blue-700 w-full"
+              >
+                <Download className="h-4 w-4" />
+                Descargar Factura PDF
+              </Button>
+            </div>
 
-          <div className="flex gap-3">
-            <Button
-              onClick={() => router.push("/salidas")}
-              variant="outline"
-              className="flex-1"
-            >
-              Volver a Salidas
-            </Button>
-            <Button
-              onClick={() => {
-                const firstTicketId = createdTickets[0].ticket_id;
-                router.push(`/tickets/${firstTicketId}?payment=success`);
-              }}
-              className="flex-1 bg-green-600 hover:bg-green-700"
-            >
-              Ver Mi Ticket
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+            <div className="flex gap-3">
+              <Button
+                onClick={() => router.push("/salidas")}
+                variant="outline"
+                className="flex-1"
+              >
+                Volver a Salidas
+              </Button>
+              <Button
+                onClick={() => {
+                  const firstTicketId = createdTickets[0].ticket_id;
+                  router.push(`/tickets/${firstTicketId}?payment=success`);
+                }}
+                className="flex-1 bg-green-600 hover:bg-green-700"
+              >
+                Ver Mi Ticket
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -460,10 +458,12 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
           </Button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              Código QR de Pago
+              Proceso de Pago
             </h1>
             <p className="text-gray-600 mt-1">
-              Escanea el código QR para completar tu pago
+              {step === "qr" 
+                ? "Escanea el código QR o confirma tu pago" 
+                : "Preparando información de pago"}
             </p>
           </div>
         </div>
@@ -539,12 +539,41 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
           </Card>
         )}
 
+        {/* Método de Pago */}
+        {step === "qr" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Selecciona Método de Pago</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-3">
+                {["QR", "EFECTIVO", "TARJETA"].map((method) => (
+                  <button
+                    key={method}
+                    onClick={() => setPaymentMethod(method)}
+                    className={`p-4 rounded-lg border-2 transition flex flex-col items-center gap-2 ${
+                      paymentMethod === method
+                        ? "border-orange-500 bg-orange-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    {method === "QR" && <QrCode className="h-6 w-6" />}
+                    {method === "EFECTIVO" && <CreditCard className="h-6 w-6" />}
+                    {method === "TARJETA" && <CreditCard className="h-6 w-6" />}
+                    <span className="text-sm font-medium">{method}</span>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* QR Grande */}
-        {qrUrl && step === "qr" && (
+        {qrUrl && step === "qr" && paymentMethod === "QR" && (
           <Card className="bg-gradient-to-r from-orange-50 to-yellow-50 border-2 border-orange-300">
             <CardHeader>
               <CardTitle className="text-xl flex items-center justify-center gap-2">
-                <QrCode className="h-6 w-6 text-green-600" />
+                <QrCode className="h-6 w-6 text-orange-600" />
                 Tu Código QR
               </CardTitle>
             </CardHeader>
@@ -559,10 +588,16 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
 
               <div className="space-y-3">
                 <p className="text-gray-700 font-medium">
-                  Monto a pagar: <span className="text-2xl text-green-600 font-bold">Bs. {totalPrice.toFixed(2)}</span>
+                  Monto a pagar:{" "}
+                  <span className="text-2xl text-orange-600 font-bold">
+                    Bs. {totalPrice.toFixed(2)}
+                  </span>
                 </p>
                 <p className="text-sm text-gray-600">
-                  ID de Pago: <code className="bg-gray-200 px-2 py-1 rounded">{payment?.id}</code>
+                  ID de Pago:{" "}
+                  <code className="bg-gray-200 px-2 py-1 rounded">
+                    {payment?.id}
+                  </code>
                 </p>
               </div>
 
@@ -584,34 +619,55 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
                 </Button>
               </div>
 
-              {/* Alert */}
               <Alert className="bg-blue-50 border-blue-200">
                 <AlertCircle className="h-4 w-4 text-blue-600" />
                 <AlertDescription className="text-blue-800 text-sm">
-                  Descarga o envía el QR a WhatsApp. Una vez realizado el pago, click en "Confirmar Pago".
+                  Esta es una simulación. Al confirmar, se procesará el pago
+                  automáticamente.
                 </AlertDescription>
               </Alert>
-
-              {/* Botón Confirmar */}
-              <Button
-                onClick={handleConfirmPayment}
-                disabled={confirmingPayment}
-                className="w-full bg-green-600 hover:bg-green-700 text-lg py-6"
-                size="lg"
-              >
-                {confirmingPayment ? (
-                  <>
-                    <Loader className="animate-spin h-5 w-5 mr-2" />
-                    Esperando confirmación... (3 seg)
-                  </>
-                ) : (
-                  <>
-                    ✓ Confirmar que Pagué
-                  </>
-                )}
-              </Button>
             </CardContent>
           </Card>
+        )}
+
+        {/* Resumen y Confirmación */}
+        {step === "qr" && (
+          <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300">
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex justify-between text-lg">
+                <span className="text-gray-600">
+                  {selectedSeats.length} asiento(s) × Bs.{" "}
+                  {parseFloat(trip?.price || 0).toFixed(2)}
+                </span>
+                <span className="font-medium">Bs. {totalPrice.toFixed(2)}</span>
+              </div>
+              <div className="border-t-2 border-green-400 pt-4 flex justify-between">
+                <span className="text-xl font-bold">Total a Pagar:</span>
+                <span className="text-2xl font-bold text-green-600">
+                  Bs. {totalPrice.toFixed(2)}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Botón Confirmar */}
+        {step === "qr" && (
+          <Button
+            onClick={handleConfirmPayment}
+            disabled={confirmingPayment}
+            className="w-full bg-orange-600 hover:bg-orange-700 text-lg py-6"
+            size="lg"
+          >
+            {confirmingPayment ? (
+              <>
+                <Loader className="animate-spin h-5 w-5 mr-2" />
+                Procesando pago... ({countdown}s)
+              </>
+            ) : (
+              <>✓ Confirmar Pago</>
+            )}
+          </Button>
         )}
 
         {/* Error */}
