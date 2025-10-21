@@ -67,13 +67,18 @@ export default function ComprarAsientosPage() {
 
           if (ticketsRes.ok) {
             const ticketsData = await ticketsRes.json();
-            const confirmedTickets = ticketsData.filter(
-              (ticket) => ticket.status === "CONFIRMADO" && ticket.is_active
+            const occupiedTickets = ticketsData.filter(
+              (ticket) =>
+                (ticket.status === "CONFIRMADO" ||
+                  ticket.status === "PENDIENTE") &&
+                ticket.is_active
             );
-            const occupied = confirmedTickets
+
+            const occupied = occupiedTickets
               .map((ticket) => ticket.seat?.seat_code?.toUpperCase())
               .filter(Boolean);
 
+            console.log("🔴 Asientos ocupados/reservados:", occupied);
             setOccupiedSeats(occupied);
           }
         } catch (err) {
@@ -103,16 +108,14 @@ export default function ComprarAsientosPage() {
       return;
     }
 
-    // Guardar asientos seleccionados
-    sessionStorage.setItem("selectedSeats", JSON.stringify(selectedSeats));
+    // Guardar asientos seleccionados (solo los códigos)
+    const seatCodes = selectedSeats.map((s) => s.toUpperCase());
+    sessionStorage.setItem("selectedSeats", JSON.stringify(seatCodes));
 
     toast.success(`Has seleccionado ${selectedSeats.length} asiento(s)`);
-    
-    // Por ahora solo mostrar mensaje
-    toast.info("Próximamente: Proceder al pago");
-    
-    // TODO: Redirigir a página de pago
-    // router.push(`/comprar/pago?tripId=${tripId}&clientId=${clientId}`);
+
+    // Redirigir a página de pago
+    router.push(`/comprar/pago?tripId=${tripId}&clientId=${clientId}`);
   };
 
   if (loading) {
@@ -175,7 +178,8 @@ export default function ComprarAsientosPage() {
                 Selecciona tu Asiento
               </h1>
               <p className="text-gray-600 mt-1">
-                {trip.route?.originCity?.name || trip.route?.origin} → {trip.route?.destinationCity?.name || trip.route?.destination}
+                {trip.route?.originCity?.name || trip.route?.origin} →{" "}
+                {trip.route?.destinationCity?.name || trip.route?.destination}
               </p>
             </div>
           </div>
@@ -191,7 +195,9 @@ export default function ComprarAsientosPage() {
                   <p className="font-semibold text-blue-900">
                     {client.firstName} {client.lastName}
                   </p>
-                  <p className="text-sm text-blue-700">C.I.: {client.documentNumber}</p>
+                  <p className="text-sm text-blue-700">
+                    C.I.: {client.documentNumber}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -254,7 +260,8 @@ export default function ComprarAsientosPage() {
               <CardTitle className="flex items-center justify-between">
                 <span>Resumen de tu Compra</span>
                 <span className="text-sm font-normal text-gray-600">
-                  {selectedSeats.length} asiento{selectedSeats.length > 1 ? "s" : ""}
+                  {selectedSeats.length} asiento
+                  {selectedSeats.length > 1 ? "s" : ""}
                 </span>
               </CardTitle>
             </CardHeader>

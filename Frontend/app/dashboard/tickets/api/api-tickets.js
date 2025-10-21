@@ -214,7 +214,9 @@ export async function getAvailableSeatsForTrip(tripId) {
     console.log("✅ Viaje obtenido:", {
       id: trip.id,
       busId: trip.bus?.id,
-      route: `${trip.route?.originCity?.name || '?'} → ${trip.route?.destinationCity?.name || '?'}`
+      route: `${trip.route?.originCity?.name || "?"} → ${
+        trip.route?.destinationCity?.name || "?"
+      }`,
     });
 
     if (!trip.bus?.id) {
@@ -237,7 +239,7 @@ export async function getAvailableSeatsForTrip(tripId) {
     const layout = await handleApiResponse(layoutRes);
     console.log("✅ Layout del bus obtenido:", {
       busId: layout.bus_id,
-      decks: layout.decks?.length || 0
+      decks: layout.decks?.length || 0,
     });
 
     // 3. Extraer TODOS los asientos del bus
@@ -246,12 +248,12 @@ export async function getAvailableSeatsForTrip(tripId) {
       layout.decks.forEach((deck) => {
         if (deck.layout && Array.isArray(deck.layout)) {
           // ✅ Filtrar solo elementos tipo 'seat' con código válido
-          const deckSeats = deck.layout.filter(seat => {
-            const isSeat = seat.visual_type === 'seat' && seat.id;
-            const hasCode = seat.seat_code && seat.seat_code.trim() !== '';
+          const deckSeats = deck.layout.filter((seat) => {
+            const isSeat = seat.visual_type === "seat" && seat.id;
+            const hasCode = seat.seat_code && seat.seat_code.trim() !== "";
             return isSeat && hasCode;
           });
-          
+
           console.log(`✅ Asientos en deck ${deck.deck}:`, deckSeats.length);
           allSeats.push(...deckSeats);
         }
@@ -259,65 +261,82 @@ export async function getAvailableSeatsForTrip(tripId) {
     }
 
     // ✅ Normalizar códigos a MAYÚSCULAS
-    allSeats = allSeats.map(seat => ({
+    allSeats = allSeats.map((seat) => ({
       ...seat,
       seat_code: seat.seat_code?.toUpperCase(),
       // Asegurar que status existe (compatibilidad con versiones sin migración)
-      status: seat.status || 'disponible'
+      status: seat.status || "disponible",
     }));
 
     console.log("✅ Total de asientos en el bus:", allSeats.length);
-    console.log("📋 Primeros 3 asientos:", allSeats.slice(0, 3).map(s => ({
-      id: s.id,
-      seat_code: s.seat_code,
-      seat_number: s.seat_number,
-      status: s.status,
-      is_active: s.is_active
-    })));
+    console.log(
+      "📋 Primeros 3 asientos:",
+      allSeats.slice(0, 3).map((s) => ({
+        id: s.id,
+        seat_code: s.seat_code,
+        seat_number: s.seat_number,
+        status: s.status,
+        is_active: s.is_active,
+      }))
+    );
 
     if (allSeats.length === 0) {
       throw new Error("El bus no tiene asientos configurados");
     }
 
     // 4. Obtener tickets del viaje para marcar ocupados
-    const ticketsRes = await fetch(
-      `${BASE_URL}/trip/${tripId}`,
-      {
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-      }
-    );
+    const ticketsRes = await fetch(`${BASE_URL}/trip/${tripId}`, {
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+    });
 
     let occupiedSeatIds = [];
     if (ticketsRes.ok) {
       const tickets = await handleApiResponse(ticketsRes);
-      occupiedSeatIds = tickets
-        .filter(t => t.status === 'CONFIRMADO' || t.status === 'PENDIENTE')
-        .map(t => t.seat?.id)
-        .filter(Boolean);
-      
+
+      // Filtrar tickets confirmados O pendientes Y activos
+      const occupiedTickets = tickets.filter(
+        (t) =>
+          (t.status === "CONFIRMADO" || t.status === "PENDIENTE") && t.is_active
+      );
+
+      occupiedSeatIds = occupiedTickets.map((t) => t.seat?.id).filter(Boolean);
+
+      console.log(`🚫 Tickets ocupados/pendientes: ${occupiedTickets.length}`);
       console.log("🚫 IDs de asientos ocupados:", occupiedSeatIds);
     }
 
     // 5. Filtrar asientos disponibles
-    const availableSeats = allSeats.filter(seat => {
+    const availableSeats = allSeats.filter((seat) => {
       // ✅ Priorizar el campo status si existe
       if (seat.status) {
-        const statusDisponible = seat.status === 'disponible';
-        console.log(`🔍 ${seat.seat_code}: status=${seat.status}, disponible=${statusDisponible}`);
+        const statusDisponible = seat.status === "disponible";
+        console.log(
+          `🔍 ${seat.seat_code}: status=${seat.status}, disponible=${statusDisponible}`
+        );
         return statusDisponible;
       }
-      
+
       // ✅ Fallback: verificar si está ocupado por tickets
       const isNotOccupied = !occupiedSeatIds.includes(seat.id);
       const isActive = seat.is_active !== false;
-      
-      console.log(`🔍 ${seat.seat_code}: is_active=${seat.is_active}, ocupado=${!isNotOccupied}`);
+
+      console.log(
+        `🔍 ${seat.seat_code}: is_active=${
+          seat.is_active
+        }, ocupado=${!isNotOccupied}`
+      );
       return isActive && isNotOccupied;
     });
 
     console.log("✅ Asientos disponibles:", availableSeats.length);
-    console.log("📋 Códigos disponibles:", availableSeats.map(s => s.seat_code).slice(0, 10).join(', '));
+    console.log(
+      "📋 Códigos disponibles:",
+      availableSeats
+        .map((s) => s.seat_code)
+        .slice(0, 10)
+        .join(", ")
+    );
 
     return {
       trip,
