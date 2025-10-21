@@ -53,7 +53,7 @@ export default function LoginPage() {
       if (data.user.role === 'admin') {
         router.push('/dashboard');
       } else {
-        router.push('/comprar');
+        router.push('/');
       }
       
       router.refresh();

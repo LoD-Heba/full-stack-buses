@@ -110,46 +110,6 @@ export default function SalidasPage() {
           <p className="text-gray-600 capitalize">{today}</p>
         </div>
 
-        {/* Filtros */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                <Filter className="inline w-4 h-4 mr-2" />
-                Destino
-              </label>
-              <input
-                type="text"
-                placeholder="Buscar destino..."
-                value={filtroDestino}
-                onChange={(e) => setFiltroDestino(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Fecha
-              </label>
-              <input
-                type="date"
-                value={filtroFecha}
-                onChange={(e) => setFiltroFecha(e.target.value)}
-                min={new Date().toISOString().split("T")[0]}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-            <button
-              onClick={() => {
-                setFiltroDestino("");
-                setFiltroFecha("");
-              }}
-              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition"
-            >
-              Limpiar
-            </button>
-          </div>
-        </div>
-
         {/* Contador de resultados */}
         {!loading && (
           <p className="text-sm text-gray-600 mb-4">

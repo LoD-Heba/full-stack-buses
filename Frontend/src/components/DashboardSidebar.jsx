@@ -11,7 +11,7 @@ const menuItems = [
   { href: "/dashboard/roles", label: "Roles" },
   { href: "/dashboard/rutas", label: "Rutas" },
   { href: "/dashboard/ciudades", label: "Ciudades" },
-  { href: "/dashboard/tickets", label: "Tickeds" },
+  { href: "/dashboard/tickets", label: "Boletos" },
   { href: "/dashboard/buses", label: "Buses" },
   { href: "/dashboard/clientes", label: "Clientes" },
   { href: "/dashboard/viajes", label: "Viajes" },

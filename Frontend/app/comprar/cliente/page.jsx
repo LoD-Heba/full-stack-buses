@@ -120,15 +120,15 @@ export default function ClienteRegistroPage() {
             Volver a salidas
           </Button>
 
-          <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
+          <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-bold mb-2 flex items-center gap-2">
-                    <MapPinIcon className="h-6 w-6" />
-                    {trip.route?.originCity?.name || trip.route?.origin} → {trip.route?.destinationCity?.name || trip.route?.destination}
+                 
+                    {trip.route.name}
                   </h2>
-                  <div className="flex items-center gap-4 text-orange-100">
+                  <div className="flex items-center gap-4 text-slate-100">
                     <span className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
                       Salida: {new Date(trip.departure_time).toLocaleString("es-ES")}
@@ -156,12 +156,15 @@ export default function ClienteRegistroPage() {
             <form onSubmit={onSubmit} className="space-y-6">
               <div className="space-y-4">
                 <div className="flex items-center gap-2 mb-4 pb-2 border-b">
-                  <User className="h-5 w-5 text-orange-600" />
+                  <User className="h-5 w-5 text-green-600" />
                   <h3 className="text-lg font-semibold">Información Personal</h3>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Nombres */}
+                  {/* Añadir un  if en caso de haber iniciado sesion para autocompletar datos */}
+                  {/* Añadir fecha de nacimiento para evitar registro de menores de edad */}
+
                   <div>
                     <Label className="flex items-center gap-2">
                       <User className="h-4 w-4" />
@@ -177,7 +180,7 @@ export default function ClienteRegistroPage() {
                       className="mt-1"
                     />
                     {errors.firstName && (
-                      <p className="text-red-500 text-sm mt-1">
+                      <p className="text-green-500 text-sm mt-1">
                         {errors.firstName.message}
                       </p>
                     )}
@@ -199,7 +202,7 @@ export default function ClienteRegistroPage() {
                       className="mt-1"
                     />
                     {errors.lastName && (
-                      <p className="text-red-500 text-sm mt-1">
+                      <p className="text-green-500 text-sm mt-1">
                         {errors.lastName.message}
                       </p>
                     )}
@@ -209,7 +212,7 @@ export default function ClienteRegistroPage() {
                   <div>
                     <Label className="flex items-center gap-2">
                       <IdCard className="h-4 w-4" />
-                      Carnet de Identidad *
+                      CI *
                     </Label>
                     <Input
                       {...register("documentNumber", {
@@ -223,7 +226,7 @@ export default function ClienteRegistroPage() {
                       className="mt-1"
                     />
                     {errors.documentNumber && (
-                      <p className="text-red-500 text-sm mt-1">
+                      <p className="text-green-500 text-sm mt-1">
                         {errors.documentNumber.message}
                       </p>
                     )}
@@ -248,7 +251,7 @@ export default function ClienteRegistroPage() {
                       className="mt-1"
                     />
                     {errors.phone && (
-                      <p className="text-red-500 text-sm mt-1">
+                      <p className="text-green-500 text-sm mt-1">
                         {errors.phone.message}
                       </p>
                     )}
@@ -268,7 +271,7 @@ export default function ClienteRegistroPage() {
                       className="mt-1"
                     />
                     {errors.address && (
-                      <p className="text-red-500 text-sm mt-1">
+                      <p className="text-green-500 text-sm mt-1">
                         {errors.address.message}
                       </p>
                     )}
@@ -297,7 +300,7 @@ export default function ClienteRegistroPage() {
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 bg-orange-600 hover:bg-orange-700"
+                  className="flex-1 bg-green-600 hover:bg-green-700"
                 >
                   {loading ? (
                     "Procesando..."
