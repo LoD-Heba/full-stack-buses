@@ -1,73 +1,97 @@
+"use client";
 
-"use client"
-
-import React, { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import AsientoMapa from '../../../components/asientos/AsientoMapa';
-import AsientoLegend from '../../../components/asientos/AsientoLegend';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, AlertCircle } from 'lucide-react';
-import { toast } from 'sonner';
-
+import React, { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import AsientoMapa from "../../../components/asientos/AsientoMapa";
+import AsientoLegend from "../../../components/asientos/AsientoLegend";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 
 export default function BusLayoutPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
-  // ✅ Obtener parámetros de búsqueda
-  const tripId = searchParams.get('tripId');
-  const clientId = searchParams.get('clientId');
-  
+
+  const tripId = searchParams.get("tripId");
+  const clientId = searchParams.get("clientId");
+
   const [busLayout, setBusLayout] = useState(null);
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
-  
-  // Validar parámetros requeridos
+  const [occupiedSeats, setOccupiedSeats] = useState([]); // ✅ Estado para asientos ocupados
+
   useEffect(() => {
     if (!tripId || !clientId) {
-      setError('Parámetros inválidos. Debes seleccionar un viaje y un cliente.');
+      setError(
+        "Parámetros inválidos. Debes seleccionar un viaje y un cliente."
+      );
       setLoading(false);
       return;
     }
   }, [tripId, clientId]);
 
-  // ✅ Cargar datos del viaje y el layout del bus
+  // ✅ Cargar datos del viaje, layout y asientos ocupados
   useEffect(() => {
     const fetchData = async () => {
       if (!tripId) return;
-      
+
       try {
         setLoading(true);
         setError(null);
 
-        // Obtener datos del viaje
+        const API_URL =
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+
+        // 1. Obtener datos del viaje
         const tripRes = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/trips/${tripId}`
+          `${
+            process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1"
+          }/trips/${tripId}`
         );
 
-        if (!tripRes.ok) {
-          throw new Error('Error al cargar el viaje');
-        }
-
+        if (!tripRes.ok) throw new Error("Error al cargar el viaje");
         const tripData = await tripRes.json();
         setTrip(tripData);
 
-        // Obtener layout del bus
+        // 2. Obtener layout del bus
         const layoutRes = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/buses/${tripData.bus.id}/layout`
+          `${
+            process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1"
+          }/buses/${tripData.bus.id}/layout?tripId=${tripId}`
         );
 
         if (!layoutRes.ok) {
-          throw new Error('Error al cargar el layout del bus');
+          throw new Error("Error al cargar el layout del bus");
         }
-
         const layoutData = await layoutRes.json();
         setBusLayout(layoutData);
+        
+
+        // ✅ 3. Obtener tickets confirmados del viaje para saber qué asientos están ocupados
+        const ticketsRes = await fetch(
+          `${API_URL}/tickets?tripId=${tripId}&status=confirmed`
+        );
+        if (ticketsRes.ok) {
+          const ticketsData = await ticketsRes.json();
+
+          // Extraer los códigos de asientos ocupados
+          const occupied =
+            ticketsData.data
+              ?.map((ticket) => ticket.seat?.seat_code?.toUpperCase())
+              .filter(Boolean) || [];
+
+          console.log("🔴 Asientos ocupados:", occupied);
+          setOccupiedSeats(occupied);
+        } else {
+          console.warn("No se pudieron cargar los tickets del viaje");
+          setOccupiedSeats([]);
+        }
       } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+        const errorMessage =
+          err instanceof Error ? err.message : "Error desconocido";
         setError(errorMessage);
         toast.error(errorMessage);
       } finally {
@@ -78,28 +102,22 @@ export default function BusLayoutPage() {
     fetchData();
   }, [tripId]);
 
-  // ✅ Manejar selección de asientos (usando React state)
   const handleSeatSelection = (seats) => {
     setSelectedSeats(seats);
   };
 
-  // ✅ Manejar redirección a crear ticket
   const handleContinueBooking = () => {
     if (selectedSeats.length === 0) {
-      toast.error('Por favor selecciona al menos un asiento');
+      toast.error("Por favor selecciona al menos un asiento");
       return;
     }
 
-    // Convertir array de asientos a string separado por comas
-    const seatsParam = selectedSeats.join(',');
-
-    // ✅ REDIRECCIÓN CORREGIDA: Ir a crear ticket
+    const seatsParam = selectedSeats.join(",");
     router.push(
       `/dashboard/tickets/newTicket?tripId=${tripId}&clientId=${clientId}&seats=${seatsParam}`
     );
   };
 
-  // ✅ Manejar volver atrás
   const handleBack = () => {
     router.push(`/dashboard/viajes?clientId=${clientId}`);
   };
@@ -126,7 +144,7 @@ export default function BusLayoutPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Error</h2>
             <p className="text-gray-600 mb-6">{error}</p>
             <Button
-              onClick={() => router.push('/dashboard/viajes')}
+              onClick={() => router.push("/dashboard/viajes")}
               className="bg-blue-600 hover:bg-blue-700"
             >
               Volver a Viajes
@@ -137,11 +155,12 @@ export default function BusLayoutPage() {
     );
   }
 
-  // Validar que tenemos los datos necesarios
   if (!busLayout || !trip) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600">No se encontró información del viaje o del bus.</p>
+        <p className="text-gray-600">
+          No se encontró información del viaje o del bus.
+        </p>
       </div>
     );
   }
@@ -149,7 +168,6 @@ export default function BusLayoutPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        
         {/* Header con botón de volver */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -187,12 +205,12 @@ export default function BusLayoutPage() {
               <div>
                 <p className="text-sm text-gray-600">Salida</p>
                 <p className="font-semibold">
-                  {new Date(trip.departure_time).toLocaleDateString('es-ES')}
+                  {new Date(trip.departure_time).toLocaleDateString("es-ES")}
                 </p>
                 <p className="text-sm text-gray-500">
-                  {new Date(trip.departure_time).toLocaleTimeString('es-ES', {
-                    hour: '2-digit',
-                    minute: '2-digit'
+                  {new Date(trip.departure_time).toLocaleTimeString("es-ES", {
+                    hour: "2-digit",
+                    minute: "2-digit",
                   })}
                 </p>
               </div>
@@ -212,10 +230,11 @@ export default function BusLayoutPage() {
           </CardContent>
         </Card>
 
-        {/* Mapa de asientos */}
+        {/* ✅ Mapa de asientos con occupiedSeats */}
         <AsientoMapa
           busLayout={busLayout}
-          occupiedSeats={[]} // ← Obtener asientos ocupados del viaje si es necesario
+          tripInfo={trip}
+          occupiedSeats={occupiedSeats}
           onSeatSelect={handleSeatSelection}
           maxSelection={4}
         />
@@ -227,7 +246,8 @@ export default function BusLayoutPage() {
               <CardTitle className="flex items-center justify-between">
                 <span>Resumen de tu Compra</span>
                 <span className="text-sm font-normal text-gray-600">
-                  {selectedSeats.length} asiento{selectedSeats.length > 1 ? 's' : ''}
+                  {selectedSeats.length} asiento
+                  {selectedSeats.length > 1 ? "s" : ""}
                 </span>
               </CardTitle>
             </CardHeader>
@@ -235,21 +255,26 @@ export default function BusLayoutPage() {
               <div>
                 <p className="text-sm text-gray-600">Asientos Seleccionados:</p>
                 <p className="font-semibold text-lg text-blue-900 mt-1">
-                  {selectedSeats.join(', ')}
+                  {selectedSeats.join(", ")}
                 </p>
               </div>
-              
+
               <div className="bg-white rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal ({selectedSeats.length} × Bs. {parseFloat(trip.price).toFixed(2)}):</span>
+                  <span className="text-gray-600">
+                    Subtotal ({selectedSeats.length} × Bs.{" "}
+                    {parseFloat(trip.price).toFixed(2)}):
+                  </span>
                   <span className="font-medium">
-                    Bs. {(selectedSeats.length * parseFloat(trip.price)).toFixed(2)}
+                    Bs.{" "}
+                    {(selectedSeats.length * parseFloat(trip.price)).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-lg font-bold border-t pt-2">
                   <span>Total:</span>
                   <span className="text-green-600">
-                    Bs. {(selectedSeats.length * parseFloat(trip.price)).toFixed(2)}
+                    Bs.{" "}
+                    {(selectedSeats.length * parseFloat(trip.price)).toFixed(2)}
                   </span>
                 </div>
               </div>

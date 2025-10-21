@@ -5,7 +5,7 @@ import { MdAirlineSeatReclineExtra } from "react-icons/md";
 
 const AsientoItem = ({ data, selected, disabled, onSelect }) => {
   const handleClick = () => {
-    if (data.visual_type === 'seat' && !disabled && onSelect) {
+    if (data.visual_type === "seat" && !disabled && onSelect) {
       onSelect(data.seat_code?.toUpperCase() || data.seat_code);
     }
   };
@@ -13,19 +13,19 @@ const AsientoItem = ({ data, selected, disabled, onSelect }) => {
   // ✅ Obtener icono según tipo
   const getIcon = () => {
     switch (data.visual_type) {
-      case 'seat':
-        return data.type === 'cama' ? (
+      case "seat":
+        return data.type === "cama" ? (
           <MdAirlineSeatReclineExtra className="text-white" />
         ) : (
           <FaChair className="text-white" />
         );
-      case 'tv':
+      case "tv":
         return <FaTv className="text-blue-500 text-2xl" />;
-      case 'bathroom':
+      case "bathroom":
         return <FaToilet className="text-indigo-400 text-2xl" />;
-      case 'door':
+      case "door":
         return <FaDoorOpen className="text-amber-500 text-2xl" />;
-      case 'aisle':
+      case "aisle":
         return null;
       default:
         return null;
@@ -34,73 +34,79 @@ const AsientoItem = ({ data, selected, disabled, onSelect }) => {
 
   // ✅ Obtener color según status
   const getStatusColor = () => {
-    if (data.visual_type !== 'seat') return 'bg-transparent';
+    if (data.visual_type !== "seat") return "bg-transparent";
 
-    if (disabled) {
-      return "bg-red-400 border-red-600 cursor-not-allowed";
-    }
-    
     if (selected) {
       return "bg-blue-500 border-blue-700 shadow-lg scale-105";
     }
 
-    // ✅ Usar el campo status si existe
+    // ✅ Mapear status del backend a colores
     if (data.status) {
       switch (data.status) {
-        case 'disponible':
-          // Color según tipo de asiento
+        case "disponible":
+          // Color según tipo de asiento cuando está disponible
           switch (data.type) {
-            case 'cama':
-              return "bg-green-600 border-green-700 hover:bg-green-700";
-            case 'semi_cama':
-              return "bg-blue-600 border-blue-700 hover:bg-blue-700";
-            case 'normal':
+            case "cama":
+              return "bg-green-600 border-green-700 hover:bg-green-700 cursor-pointer";
+            case "semi_cama":
+              return "bg-blue-600 border-blue-700 hover:bg-blue-700 cursor-pointer";
+            case "normal":
             default:
-              return "bg-gray-500 border-gray-600 hover:bg-gray-600";
+              return "bg-gray-500 border-gray-600 hover:bg-gray-600 cursor-pointer";
           }
-        case 'reservado':
-          return "bg-yellow-400 border-yellow-600 cursor-not-allowed";
-        case 'ocupado':
-          return "bg-red-400 border-red-600 cursor-not-allowed";
-        case 'bloqueado':
-          return "bg-gray-400 border-gray-600 cursor-not-allowed";
+        case "reservado":
+          return "bg-yellow-400 border-yellow-600 cursor-not-allowed opacity-75";
+        case "ocupado":
+          return "bg-red-400 border-red-600 cursor-not-allowed opacity-75";
+        case "bloqueado":
+          return "bg-gray-400 border-gray-600 cursor-not-allowed opacity-60";
         default:
-          return "bg-gray-500 border-gray-600 hover:bg-gray-600";
+          return "bg-gray-500 border-gray-600 hover:bg-gray-600 cursor-pointer";
       }
     }
 
-    // Fallback: color por tipo de asiento
+    // Fallback: color por tipo de asiento (por si no viene status)
     switch (data.type) {
-      case 'cama':
-        return "bg-green-600 border-green-700 hover:bg-green-700";
-      case 'semi_cama':
-        return "bg-blue-600 border-blue-700 hover:bg-blue-700";
-      case 'normal':
+      case "cama":
+        return "bg-green-600 border-green-700 hover:bg-green-700 cursor-pointer";
+      case "semi_cama":
+        return "bg-blue-600 border-blue-700 hover:bg-blue-700 cursor-pointer";
+      case "normal":
       default:
-        return "bg-gray-500 border-gray-600 hover:bg-gray-600";
+        return "bg-gray-500 border-gray-600 hover:bg-gray-600 cursor-pointer";
     }
   };
 
   const baseClasses = "rounded-lg border-2 transition-all duration-200";
   const statusClasses = getStatusColor();
-  const isDisabled = disabled || 
-    data.status === 'reservado' || 
-    data.status === 'ocupado' || 
-    data.status === 'bloqueado';
+  const isDisabled =
+    data.status === "reservado" ||
+    data.status === "ocupado" ||
+    data.status === "bloqueado";
 
   return (
     <button
       onClick={handleClick}
       disabled={isDisabled}
       className={`${baseClasses} ${statusClasses} w-full h-full flex items-center justify-center ${
-        data.visual_type === 'seat' && !isDisabled ? 'cursor-pointer' : ''
+        data.visual_type === "seat" && !isDisabled ? "cursor-pointer" : ""
       }`}
-      title={`${data.seat_code} - ${data.status || 'disponible'}`}
+      title={`Asiento ${data.seat_number || data.seat_code} - ${
+        data.status === "disponible"
+          ? "Disponible"
+          : data.status === "reservado"
+          ? "Reservado"
+          : data.status === "ocupado"
+          ? "Ocupado"
+          : data.status === "bloqueado"
+          ? "Bloqueado"
+          : "Disponible"
+      }`}
       style={{
         transform: `rotate(${data.rotation || 0}deg)`,
       }}
     >
-      {data.visual_type === 'seat' ? (
+      {data.visual_type === "seat" ? (
         <div className="flex flex-col items-center">
           {getIcon()}
           <span className="text-white text-xs font-bold mt-1">
@@ -118,7 +124,7 @@ const AsientoItem = ({ data, selected, disabled, onSelect }) => {
 const StatusLegend = () => (
   <div className="bg-white rounded-lg shadow-md p-4 space-y-3">
     <h3 className="font-bold text-gray-800 mb-2">Estado de Asientos</h3>
-    
+
     <div className="flex items-center gap-2">
       <div className="w-8 h-8 bg-gray-500 rounded border-2 border-gray-600 flex items-center justify-center">
         <FaChair className="text-white text-xs" />
@@ -353,7 +359,7 @@ export default function AsientoMapa({
       <div className="col-span-2 space-y-4">
         <StatusLegend />
         <SeatTypeLegend />
-        
+
         {/* Resumen de selección */}
         {selectedSeats.length > 0 && (
           <div className="bg-blue-50 rounded-lg border-2 border-blue-300 p-4 shadow-md">
@@ -379,7 +385,7 @@ export default function AsientoMapa({
         {tripInfo && (
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 px-6 rounded-lg shadow-md">
             <p className="font-bold text-lg text-center">
-              🚌 {tripInfo.route?.originCity?.name || '?'} → {tripInfo.route?.destinationCity?.name || '?'}
+              {tripInfo.route.name || "?"}
             </p>
             <p className="text-sm text-center text-blue-100 mt-1">
               {busLayout.plate} - {busLayout.model}
