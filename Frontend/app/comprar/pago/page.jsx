@@ -146,10 +146,10 @@ export default function PagoPage() {
         try {
           const ticketData = {
             userProfileId: clientId,
-            tripId: tripId,
-            seatId: seat.id,
+            trip_id: tripId,
+            seat_id: seat.id,
             price: parseFloat(tripData.price),
-            status: "PENDIENTE",
+            status: "PENDING",
           };
 
           const response = await fetch(`${API_BASE}/tickets`, {
@@ -161,7 +161,10 @@ export default function PagoPage() {
           const responseData = await response.json();
 
           if (!response.ok) {
-            console.error(`❌ Error en asiento ${seat.seat_code}:`, responseData);
+            console.error(
+              `❌ Error en asiento ${seat.seat_code}:`,
+              responseData
+            );
             ticketErrors.push(
               `Asiento ${seat.seat_code}: ${
                 responseData.message || "Error desconocido"
@@ -226,9 +229,9 @@ export default function PagoPage() {
           amount: totalAmount,
           method: paymentMethod,
           category: "adulto",
-          notes: `Compra web - ${createdTickets.length} ticket(s): ${createdTickets
-            .map((t) => t.code)
-            .join(", ")}`,
+          notes: `Compra web - ${
+            createdTickets.length
+          } ticket(s): ${createdTickets.map((t) => t.code).join(", ")}`,
         }),
       });
 
@@ -246,13 +249,16 @@ export default function PagoPage() {
 
       // 3. Confirmar el pago
       console.log("✔️ Confirmando pago...");
-      const confirmResponse = await fetch(`${API_BASE}/payments/${payment.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "COMPLETO",
-        }),
-      });
+      const confirmResponse = await fetch(
+        `${API_BASE}/payments/${payment.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: "COMPLETO",
+          }),
+        }
+      );
 
       if (!confirmResponse.ok) {
         throw new Error("Error al confirmar el pago");
@@ -267,8 +273,8 @@ export default function PagoPage() {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            paymentId: payment.id,
-            status: "CONFIRMADO",
+            payment_id: payment.id, 
+            status: "CONFIRMED", 
           }),
         })
       );
@@ -424,9 +430,7 @@ export default function PagoPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Procesar Pago
-            </h1>
+            <h1 className="text-3xl font-bold text-gray-900">Procesar Pago</h1>
             <p className="text-gray-600 mt-1">
               Completa tu compra para confirmar tu viaje
             </p>
@@ -448,9 +452,7 @@ export default function PagoPage() {
             <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center font-bold">
               ✓
             </div>
-            <span className="text-green-600 font-medium text-sm">
-              Asientos
-            </span>
+            <span className="text-green-600 font-medium text-sm">Asientos</span>
           </div>
           <div className="flex-1 h-1 bg-green-600 mx-2" />
           <div className="flex items-center gap-2">
@@ -492,7 +494,9 @@ export default function PagoPage() {
               </div>
               <div>
                 <p className="text-gray-600">Teléfono</p>
-                <p className="font-medium">{client.phone || "No especificado"}</p>
+                <p className="font-medium">
+                  {client.phone || "No especificado"}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -627,9 +631,7 @@ export default function PagoPage() {
                 {createdTickets.length} ticket(s) × Bs.{" "}
                 {trip ? parseFloat(trip.price).toFixed(2) : "0.00"}
               </span>
-              <span className="font-medium">
-                Bs. {totalPrice.toFixed(2)}
-              </span>
+              <span className="font-medium">Bs. {totalPrice.toFixed(2)}</span>
             </div>
             <div className="border-t-2 border-orange-400 pt-4 flex justify-between items-center">
               <span className="text-xl font-bold text-gray-900">
@@ -681,9 +683,7 @@ export default function PagoPage() {
                 Procesando pago...
               </>
             ) : (
-              <>
-                Confirmar Pago de Bs. {totalPrice.toFixed(2)}
-              </>
+              <>Confirmar Pago de Bs. {totalPrice.toFixed(2)}</>
             )}
           </Button>
         </div>

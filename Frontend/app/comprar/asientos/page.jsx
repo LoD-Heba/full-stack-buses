@@ -63,26 +63,28 @@ export default function ComprarAsientosPage() {
 
         // 3. Obtener tickets del viaje
         try {
-          const ticketsRes = await fetch(`${API_BASE}/tickets/trip/${tripId}`);
+          const seatsStatusRes = await fetch(
+            `${API_BASE}/seat/trip/${tripId}/seats-status`
+          );
 
-          if (ticketsRes.ok) {
-            const ticketsData = await ticketsRes.json();
-            const occupiedTickets = ticketsData.filter(
-              (ticket) =>
-                (ticket.status === "CONFIRMADO" ||
-                  ticket.status === "PENDIENTE") &&
-                ticket.is_active
-            );
+          if (seatsStatusRes.ok) {
+            const seatsWithStatus = await seatsStatusRes.json();
+            console.log("✅ Asientos con estado cargados:", seatsWithStatus);
 
-            const occupied = occupiedTickets
-              .map((ticket) => ticket.seat?.seat_code?.toUpperCase())
-              .filter(Boolean);
-
-            console.log("🔴 Asientos ocupados/reservados:", occupied);
-            setOccupiedSeats(occupied);
+            // ✅ Ahora recibe ARRAY DE OBJETOS con todos los datos
+            // No necesita transformar, solo pasar directamente
+            if (Array.isArray(seatsWithStatus) && seatsWithStatus.length > 0) {
+              setOccupiedSeats(seatsWithStatus);
+            } else {
+              console.warn("No hay datos de asientos");
+              setOccupiedSeats([]);
+            }
+          } else {
+            console.warn("No se pudieron cargar los estados de asientos");
+            setOccupiedSeats([]);
           }
         } catch (err) {
-          console.warn("Error al cargar tickets:", err);
+          console.warn("Error al cargar asientos:", err);
           setOccupiedSeats([]);
         }
       } catch (err) {
@@ -115,7 +117,7 @@ export default function ComprarAsientosPage() {
     toast.success(`Has seleccionado ${selectedSeats.length} asiento(s)`);
 
     // Redirigir a página de pago
-    router.push(`/comprar/pago?tripId=${tripId}&clientId=${clientId}`);
+    router.push(`/comprar/pago-qr?tripId=${tripId}&clientId=${clientId}`);
   };
 
   if (loading) {

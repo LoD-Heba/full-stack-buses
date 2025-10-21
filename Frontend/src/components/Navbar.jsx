@@ -17,8 +17,6 @@ export default function Navbar() {
   const navLinks = [
     { href: "/salidas", label: "Salidas Hoy" },
     { href: "/rutas", label: "Rutas" },
-    { href: "/reglas", label: "Reglas" },
-    { href: "/comprar", label: "Comprar Pasaje" },
   ];
   const isActive = (path) => pathname === path;
 

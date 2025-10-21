@@ -47,7 +47,7 @@ export default function RutasPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-indigo-100 py-12 px-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-12 text-center">
@@ -69,39 +69,8 @@ export default function RutasPage() {
               >
                 {/* Imágenes de Ciudades */}
                 <div className="relative h-48 bg-gradient-to-r from-indigo-100 to-blue-100 overflow-hidden flex items-center justify-between">
-                  {/* Ciudad Origen */}
-                  <div className="flex-1 h-full relative overflow-hidden">
-                    {ruta.originCity?.image_url ? (
-                      <>
-                        <img
-                          src={`http://localhost:3001${ruta.originCity.image_url}`}
-                          alt={ruta.originCity.city}
-                          className="w-full h-full object-cover opacity-80"
-                          onError={(e) => {
-                            console.error('Error cargando imagen origen:', e.target.src);
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
-                      </>
-                    ) : (
-                      <>
-                        <div className="w-full h-full bg-gradient-to-br from-indigo-300 to-indigo-400 flex items-center justify-center">
-                          <MapPin className="w-12 h-12 text-white opacity-50" />
-                        </div>
-                        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
-                      </>
-                    )}
-                  </div>
-
-                  {/* Separador con ícono */}
-                  <div className="w-16 h-full bg-white/10 backdrop-blur-sm flex items-center justify-center border-l border-r border-white/20">
-                    <div className="flex flex-col items-center gap-1">
-                      <MapPin className="w-6 h-6 text-white" />
-                      <span className="text-white text-xs font-bold">→</span>
-                    </div>
-                  </div>
-
+              
+                  
                   {/* Ciudad Destino */}
                   <div className="flex-1 h-full relative overflow-hidden">
                     {ruta.destinationCity?.image_url ? (

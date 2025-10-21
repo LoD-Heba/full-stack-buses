@@ -47,14 +47,14 @@ export default function Home() {
             src="/buses.webp"
             alt="Buses"
             fill
-            className="object-cover z-0 opacity-60 absolute"
+            className="object-cover z-0 opacity-185 absolute"
             priority
           />
           <div className="relative z-20 flex flex-col items-start justify-center h-full px-10 text-white">
             <h1 className="text-5xl font-bold mb-4">
               Bienvenido a Trans Sacaba
             </h1>
-            <p className="text-xl mb-8 text-gray-200 font-semibold text-shadow-lg">
+            <p className="text-xl mb-8 text-gray-100 font-semibold text-shadow-lg ">
               Conectando los 9 departamentos de Bolivia con seguridad, comodidad
               y puntualidad. Tu viaje comienza aquí.
             </p>
@@ -229,7 +229,7 @@ export default function Home() {
           }}
         >
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
-            <div className="relative h-48 bg-gradient-to-br from-orange-400 to-orange-600">
+            <div className="relative h-48 bg-gradient-to-br from-green-400 to-green-600">
               {selectedCity.image_url ? (
                 <Image
                   src={`http://localhost:3001${selectedCity.image_url}`}
@@ -263,7 +263,7 @@ export default function Home() {
               )}
 
               <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <Clock size={24} className="text-orange-600" />
+                <Clock size={24} className="text-green-600" />
                 Horarios de Salida
               </h3>
 
@@ -272,9 +272,9 @@ export default function Home() {
                   {selectedCity.schedule.map((horario, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-4 p-4 bg-orange-50 border-l-4 border-orange-500 rounded-r-lg hover:bg-orange-100 transition"
+                      className="flex items-center gap-4 p-4 bg-orange-50 border-l-4 border-green-500 rounded-r-lg hover:bg-orange-100 transition"
                     >
-                      <div className="flex-shrink-0 w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center">
+                      <div className="flex-shrink-0 w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
                         <Clock size={24} className="text-white" />
                       </div>
                       <div className="flex-1">
@@ -298,7 +298,7 @@ export default function Home() {
                   Cerrar
                 </button>
                 <Link href="/comprar" className="flex-1">
-                  <button className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition">
+                  <button className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition">
                     Comprar Pasaje
                   </button>
                 </Link>

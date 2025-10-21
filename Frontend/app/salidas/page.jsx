@@ -123,7 +123,7 @@ export default function SalidasPage() {
                 placeholder="Buscar destino..."
                 value={filtroDestino}
                 onChange={(e) => setFiltroDestino(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
             </div>
             <div className="flex-1">
@@ -135,7 +135,7 @@ export default function SalidasPage() {
                 value={filtroFecha}
                 onChange={(e) => setFiltroFecha(e.target.value)}
                 min={new Date().toISOString().split("T")[0]}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
             </div>
             <button
@@ -163,7 +163,7 @@ export default function SalidasPage() {
         {loading && (
           <div className="text-center py-12">
             <div className="inline-block">
-              <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
             </div>
             <p className="text-gray-500 mt-3">Cargando viajes...</p>
           </div>
@@ -178,7 +178,7 @@ export default function SalidasPage() {
                 className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
               >
                 {/* Header del viaje */}
-                <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4 text-white">
+                <div className="bg-gradient-to-r from-green-500 to-green-600 p-4 text-white">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-semibold bg-white/20 px-3 py-1 rounded-full">
                       {viaje.route?.name || "Ruta"}
@@ -259,7 +259,7 @@ export default function SalidasPage() {
                     </div>
                     <button
                       onClick={() => abrirDetalles(viaje)}
-                      className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg transition flex items-center gap-2"
+                      className="px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg transition flex items-center gap-2"
                     >
                       Ver más
                       <ArrowRight className="w-4 h-4" />
@@ -295,7 +295,7 @@ export default function SalidasPage() {
                     setFiltroDestino("");
                     setFiltroFecha("");
                   }}
-                  className="mt-3 text-orange-600 hover:text-orange-700 font-medium"
+                  className="mt-3 text-green-600 hover:text-green-700 font-medium"
                 >
                   Limpiar filtros
                 </button>
@@ -310,7 +310,7 @@ export default function SalidasPage() {
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
             {/* Header */}
-            <div className="relative h-40 bg-gradient-to-r from-orange-500 to-orange-600">
+            <div className="relative h-40 bg-gradient-to-r from-green-500 to-green-600">
               <button
                 onClick={() => setShowTripModal(false)}
                 className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm p-2 rounded-full hover:bg-white/30 transition"
@@ -368,7 +368,7 @@ export default function SalidasPage() {
               {/* Detalles del bus */}
               <div className="border rounded-lg p-4">
                 <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <Bus className="w-5 h-5 text-orange-600" />
+                  <Bus className="w-5 h-5 text-green-600" />
                   Información del Bus
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -388,15 +388,15 @@ export default function SalidasPage() {
               </div>
 
               {/* Disponibilidad */}
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <div className="bg-orange-50 border border-green-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Users className="w-6 h-6 text-orange-600" />
+                    <Users className="w-6 h-6 text-green-600" />
                     <div>
                       <p className="text-sm text-gray-600">
                         Asientos Disponibles
                       </p>
-                      <p className="text-2xl font-bold text-orange-600">
+                      <p className="text-2xl font-bold text-green-600">
                         {selectedTrip.available_seats}
                       </p>
                     </div>
@@ -428,7 +428,7 @@ export default function SalidasPage() {
                     // Redirigir a la página de registro del cliente
                     router.push(`/comprar/cliente?tripId=${selectedTrip.id}`);
                   }}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2"
+                  className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2"
                 >
                   <Bus className="w-5 h-5" />
                   Comprar Pasaje

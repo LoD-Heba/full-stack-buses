@@ -305,18 +305,30 @@ export default function AsientoMapa({
   const renderDeckLayout = (deckData) => {
     let layout = deckData.layout || [];
 
-    // ✅ NUEVO: Actualizar layout con estados reales si hay occupiedSeats con status
+    console.log("📊 renderDeckLayout - Estado actual:");
+    console.log("  - occupiedSeats:", occupiedSeats);
+    console.log("  - layout original:", layout);
+
+    // ✅ Actualizar layout con estados reales
     if (
       Array.isArray(occupiedSeats) &&
       occupiedSeats.length > 0 &&
       typeof occupiedSeats[0] === "object"
     ) {
+      console.log("✅ Aplicando estados del backend...");
       layout = layout.map((seat) => {
         const seatWithStatus = occupiedSeats.find(
           (os) => os.seat_code?.toUpperCase() === seat.seat_code?.toUpperCase()
         );
+
+        if (seatWithStatus) {
+          console.log(`  - ${seat.seat_code}: ${seatWithStatus.status}`);
+        }
+
         return seatWithStatus || seat;
       });
+    } else {
+      console.warn("⚠️ occupiedSeats no está disponible o está vacío");
     }
 
     if (layout.length === 0) {

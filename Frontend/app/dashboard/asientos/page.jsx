@@ -67,15 +67,25 @@ export default function BusLayoutPage() {
 
           if (seatsStatusRes.ok) {
             const seatsWithStatus = await seatsStatusRes.json();
-            console.log("🔴 Asientos con estado:", seatsWithStatus);
-            setOccupiedSeats(seatsWithStatus); // Ahora es array de objetos
+            console.log("✅ Asientos con estado cargados:", seatsWithStatus);
+
+            // ✅ VALIDAR que sea array y no esté vacío
+            if (Array.isArray(seatsWithStatus) && seatsWithStatus.length > 0) {
+              setOccupiedSeats(seatsWithStatus);
+            } else {
+              console.warn("El servidor devolvió datos vacíos");
+              setOccupiedSeats([]);
+            }
           } else {
-            console.warn("No se pudieron cargar los estados de asientos");
+            const errorText = await seatsStatusRes.text();
+            console.error(`Error HTTP ${seatsStatusRes.status}:`, errorText);
             setOccupiedSeats([]);
+            toast.warning("No se pudo cargar el estado de asientos");
           }
         } catch (ticketError) {
-          console.warn("Error al cargar tickets:", ticketError);
+          console.error("Error al cargar asientos:", ticketError);
           setOccupiedSeats([]);
+          toast.error("Error de conexión al cargar asientos");
         }
       } catch (err) {
         const errorMessage =

@@ -211,13 +211,13 @@ export default function CiudadesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-green-300 to-blue-300 py-12 px-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-12 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <MapPin className="w-10 h-10 text-indigo-600" />
+              <MapPin className="w-10 h-10 text-black" />
               <h1 className="text-5xl font-bold text-gray-900">Ciudades</h1>
             </div>
             <p className="text-lg text-gray-600 ml-13">Gestiona las ciudades de servicio</p>
@@ -236,7 +236,7 @@ export default function CiudadesPage() {
                 setFormData({ city: '', department: '', description: '', schedule: '' });
                 setShowForm(!showForm);
               }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2 transition-colors"
+              className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2 transition-colors"
             >
               <Plus className="w-5 h-5" />
               Nueva Ciudad
@@ -273,7 +273,7 @@ export default function CiudadesPage() {
                   <>
                     {selectedCityRoutes.originRoutes.length > 0 && (
                       <div>
-                        <h3 className="font-bold text-lg mb-2 text-indigo-600">Como Origen:</h3>
+                        <h3 className="font-bold text-lg mb-2 text-green-600">Como Origen:</h3>
                         {selectedCityRoutes.originRoutes.map(route => (
                           <div key={route.id} className="p-2 bg-blue-50 rounded mb-2">
                             {selectedCityRoutes.city.city} → {route.destinationCity.city}
@@ -283,7 +283,7 @@ export default function CiudadesPage() {
                     )}
                     {selectedCityRoutes.destinationRoutes.length > 0 && (
                       <div>
-                        <h3 className="font-bold text-lg mb-2 text-indigo-600">Como Destino:</h3>
+                        <h3 className="font-bold text-lg mb-2 text-green-600">Como Destino:</h3>
                         {selectedCityRoutes.destinationRoutes.map(route => (
                           <div key={route.id} className="p-2 bg-blue-50 rounded mb-2">
                             {route.originCity.city} → {selectedCityRoutes.city.city}
@@ -323,7 +323,7 @@ export default function CiudadesPage() {
                       name="city"
                       value={formData.city}
                       onChange={handleFormChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring- focus:ring-green-500 focus:border-transparent"
                       placeholder="Ej: La Paz"
                     />
                   </div>
@@ -336,7 +336,7 @@ export default function CiudadesPage() {
                       name="department"
                       value={formData.department}
                       onChange={handleFormChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                       placeholder="Ej: La Paz"
                     />
                   </div>
@@ -350,7 +350,7 @@ export default function CiudadesPage() {
                     name="description"
                     value={formData.description}
                     onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
                     placeholder="Descripción de la ciudad"
                     rows="3"
                   />
@@ -365,7 +365,7 @@ export default function CiudadesPage() {
                     name="schedule"
                     value={formData.schedule}
                     onChange={handleFormChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     placeholder="Ej: 08:00, 14:00, 20:00"
                   />
                 </div>
@@ -373,7 +373,7 @@ export default function CiudadesPage() {
                 <div className="flex gap-3 pt-4">
                   <button
                     onClick={handleSubmit}
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
                   >
                     {editingId ? 'Actualizar' : 'Crear'}
                   </button>
@@ -475,9 +475,9 @@ export default function CiudadesPage() {
                   <div className="flex gap-2 pt-4">
                     <button
                       onClick={() => handleCheckRoutes(ciudad.id)}
-                      className="flex-1 bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm"
+                      className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm"
                     >
-                      🔗 Rutas
+                      Rutas
                     </button>
                     <button
                       onClick={() => handleEdit(ciudad)}
@@ -503,7 +503,7 @@ export default function CiudadesPage() {
               <p className="text-gray-600 text-lg mb-6">No hay ciudades registradas</p>
               <button
                 onClick={() => setShowForm(true)}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2 mx-auto transition-colors"
+                className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2 mx-auto transition-colors"
               >
                 <Plus className="w-5 h-5" />
                 Crear Primera Ciudad

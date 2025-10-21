@@ -9,12 +9,7 @@ export default function AsientoLegend() {
       <div>
         <h3 className="font-bold text-gray-800 mb-3 text-sm">Estado de Asientos</h3>
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gray-500 rounded border-2 border-gray-600 flex items-center justify-center">
-              <FaChair className="text-white text-xs" />
-            </div>
-            <span className="text-sm text-gray-700">Disponible</span>
-          </div>
+          
 
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-500 rounded border-2 border-blue-700 flex items-center justify-center shadow-lg">
