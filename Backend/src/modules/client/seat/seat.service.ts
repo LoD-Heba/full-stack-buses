@@ -739,55 +739,55 @@ export class SeatService {
   }
 
   async getSeatsByTripWithStatus(tripId: string): Promise<any[]> {
-    // Obtener el trip con su bus
-    const trip = await this.tripRepository.findOne({
-      where: { id: tripId, is_active: true },
-      relations: ['bus'],
-    });
+  const trip = await this.tripRepository.findOne({
+    where: { id: tripId, is_active: true },
+    relations: ['bus'],
+  });
 
-    if (!trip) {
-      throw new NotFoundException(`El viaje ${tripId} no existe`);
+  if (!trip) {
+    throw new NotFoundException(`El viaje ${tripId} no existe`);
+  }
+
+  // ✅ CORRECCIÓN: Usar QueryBuilder y selectRawAndEntities
+  const result = await this.seatRepository
+    .createQueryBuilder('seat')
+    .leftJoinAndSelect('seat.stacks', 'stack')
+    .leftJoinAndSelect(
+      'seat.tickets',
+      'ticket',
+      'ticket.trip_id = :tripId AND ticket.is_active = true',
+      { tripId },
+    )
+    .where('stack.bus_id = :busId', { busId: trip.bus.id })
+    .andWhere('seat.is_active = true')
+    .getMany();
+
+  // ✅ Mapear correctamente
+  return result.map((seat) => {
+    // Ahora seat.tickets TENDRÁ solo los tickets del viaje gracias a leftJoinAndSelect
+    const ticket = seat.tickets?.[0]; // Debería haber 0 o 1
+
+    let status = SeatStatus.AVAILABLE;
+    if (ticket) {
+      if (ticket.status === TicketStatus.CONFIRMED) {
+        status = SeatStatus.OCCUPIED;
+      } else if (ticket.status === TicketStatus.PENDING) {
+        status = SeatStatus.RESERVED;
+      }
     }
 
-    // Obtener todos los asientos del bus con sus tickets del viaje
-    const seats = await this.seatRepository
-      .createQueryBuilder('seat')
-      .leftJoinAndSelect('seat.stacks', 'stack')
-      .leftJoin(
-        'seat.tickets',
-        'ticket',
-        'ticket.trip_id = :tripId AND ticket.is_active = true',
-        { tripId },
-      )
-      .where('stack.bus_id = :busId', { busId: trip.bus.id })
-      .andWhere('seat.is_active = true')
-      .getMany();
-
-    // Mapear asientos con su estado real según tickets
-    return seats.map((seat) => {
-      const ticket = seat.tickets?.find((t) => t.trip.id === tripId);
-
-      let status = SeatStatus.AVAILABLE;
-      if (ticket) {
-        if (ticket.status === TicketStatus.CONFIRMED) {
-          status = SeatStatus.OCCUPIED;
-        } else if (ticket.status === TicketStatus.PENDING) {
-          status = SeatStatus.RESERVED;
-        }
-      }
-
-      return {
-        id: seat.id,
-        seat_code: seat.seat_code,
-        seat_number: seat.seat_number,
-        type: seat.type,
-        position_x: seat.position_x,
-        position_y: seat.position_y,
-        visual_type: seat.visual_type,
-        rotation: seat.rotation,
-        deck: seat.deck,
-        status, // ← Estado real basado en tickets
-      };
-    });
-  }
+    return {
+      id: seat.id,
+      seat_code: seat.seat_code,
+      seat_number: seat.seat_number,
+      type: seat.type,
+      position_x: seat.position_x,
+      position_y: seat.position_y,
+      visual_type: seat.visual_type,
+      rotation: seat.rotation,
+      deck: seat.deck,
+      status,
+    };
+  });
+}
 }

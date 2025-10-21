@@ -20,7 +20,7 @@ export class SeatCleanupJob {
     private readonly tripRepository: Repository<Trip>,
   ) {}
 
-  @Cron('*/1 * * * *') // Cada 1 minutos
+  @Cron('*/5 * * * *') // Cada 5 minutos
   async releaseExpiredReservations() {
     const expirationTime = new Date();
     expirationTime.setMinutes(expirationTime.getMinutes() - 15); // 15 minutos
@@ -86,7 +86,7 @@ export class SeatCleanupJob {
    * Libera asientos de viajes finalizados
    * Se ejecuta cada hora
    */
-  @Cron('*/1 * * * *') // Cada hora
+  @Cron('0 * * * *') // Cada hora
   async releaseCompletedTripSeats() {
     const now = new Date();
 
@@ -148,7 +148,7 @@ export class SeatCleanupJob {
    * Desactiva tickets de viajes finalizados hace más de 30 días
    * Se ejecuta diariamente a las 2:00 AM
    */
-  @Cron('*/1 * * * *')
+  @Cron('0 2 * * *')
   async archiveOldTickets() {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
