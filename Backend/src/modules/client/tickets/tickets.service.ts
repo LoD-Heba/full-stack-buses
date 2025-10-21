@@ -18,6 +18,7 @@ import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
 import { TripService } from '../trip/trip.service';
 import {
   PaymentStatus,
+  SeatStatus,
   TicketStatus,
   TripStatus,
 } from 'src/common/enums/status.enum';
@@ -49,8 +50,6 @@ export class TicketService {
   ) {}
 
   async create(createTicketDto: CreateTicketDto): Promise<Ticket> {
-
-    
     const { tripId, seatId, userId, userProfileId, paymentId, ...ticketData } =
       createTicketDto;
 
@@ -168,7 +167,7 @@ export class TicketService {
       );
     }
 
-    if (seat.status !== 'disponible') {
+    if (seat.status !== SeatStatus.AVAILABLE) {
       throw new BadRequestException(
         `El asiento ${seat.seat_code} no está disponible`,
       );
@@ -226,7 +225,9 @@ export class TicketService {
 
     // Cambiar estado del asiento según el status del ticket
     const newSeatStatus =
-      savedTicket.status === TicketStatus.CONFIRMED ? 'ocupado' : 'reservado';
+      savedTicket.status === TicketStatus.CONFIRMED
+        ? SeatStatus.OCCUPIED
+        : SeatStatus.RESERVED;
     await this.seatRepository.update(seatId, { status: newSeatStatus });
 
     await this.tripService.updateAvailableSeats(tripId);
@@ -398,39 +399,41 @@ export class TicketService {
   }
 
   async cancelTicket(id: string): Promise<Ticket> {
-  const ticket = await this.findOne(id);
+    const ticket = await this.findOne(id);
 
-  if (ticket.status === TicketStatus.CANCELLED) {
-    throw new BadRequestException('El ticket ya está cancelado');
+    if (ticket.status === TicketStatus.CANCELLED) {
+      throw new BadRequestException('El ticket ya está cancelado');
+    }
+
+    // ✅ CAMBIAR ORDEN: Primero verificar si el viaje ya comenzó
+    if (new Date(ticket.trip.departure_time) <= new Date()) {
+      throw new BadRequestException(
+        'No se puede cancelar un ticket de un viaje que ya comenzó',
+      );
+    }
+
+    // ✅ DESPUÉS: Verificar tiempo mínimo de cancelación
+    const horasAntesDeSalida =
+      (new Date(ticket.trip.departure_time).getTime() - new Date().getTime()) /
+      (1000 * 60 * 60);
+
+    if (horasAntesDeSalida < 2) {
+      throw new BadRequestException(
+        'No se pueden cancelar tickets con menos de 2 horas antes de la salida',
+      );
+    }
+
+    await this.ticketRepository.update(id, {
+      status: TicketStatus.CANCELLED,
+    });
+
+    await this.seatRepository.update(ticket.seat.id, {
+      status: SeatStatus.AVAILABLE,
+    });
+    await this.tripService.updateAvailableSeats(ticket.trip.id);
+
+    return this.findOne(id);
   }
-
-  // ✅ CAMBIAR ORDEN: Primero verificar si el viaje ya comenzó
-  if (new Date(ticket.trip.departure_time) <= new Date()) {
-    throw new BadRequestException(
-      'No se puede cancelar un ticket de un viaje que ya comenzó'
-    );
-  }
-
-  // ✅ DESPUÉS: Verificar tiempo mínimo de cancelación
-  const horasAntesDeSalida =
-    (new Date(ticket.trip.departure_time).getTime() - new Date().getTime()) /
-    (1000 * 60 * 60);
-
-  if (horasAntesDeSalida < 2) {
-    throw new BadRequestException(
-      'No se pueden cancelar tickets con menos de 2 horas antes de la salida'
-    );
-  }
-
-  await this.ticketRepository.update(id, {
-    status: TicketStatus.CANCELLED,
-  });
-
-  await this.seatRepository.update(ticket.seat.id, { status: 'disponible' });
-  await this.tripService.updateAvailableSeats(ticket.trip.id);
-
-  return this.findOne(id);
-}
 
   async confirmTicket(id: string): Promise<Ticket> {
     // Usar queryRunner para manejar la transacción manualmente
@@ -477,7 +480,7 @@ export class TicketService {
 
       // 6. Actualizar el asiento
       await queryRunner.manager.update(Seat, ticket.seat.id, {
-        status: 'ocupado',
+        status: SeatStatus.OCCUPIED,
       });
 
       // 7. Actualizar asientos disponibles del viaje

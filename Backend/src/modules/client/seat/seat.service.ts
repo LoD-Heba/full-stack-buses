@@ -99,7 +99,7 @@ export class SeatService {
         rotation: seatData.rotation || 0,
         meta: seatData.meta || {},
         is_active: seatData.is_active !== undefined ? seatData.is_active : true,
-        status: 'disponible',
+        status: SeatStatus.AVAILABLE,
         stacks: stack,
       });
 
@@ -254,7 +254,7 @@ export class SeatService {
       where: {
         stacks: { id: stackId },
         is_active: true,
-        status: 'disponible',
+        status: SeatStatus.AVAILABLE,
       },
       relations: { stacks: true },
       order: { seat_number: 'ASC' },
@@ -663,7 +663,7 @@ export class SeatService {
           rotation: seatData.rotation || 0,
           meta: seatData.meta || {},
           is_active: true,
-          status: 'disponible',
+          status: SeatStatus.AVAILABLE,
           stacks: stack,
         });
         seats.push(seat);

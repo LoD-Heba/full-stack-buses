@@ -21,7 +21,11 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
 import { User } from 'src/modules/admin/user/entities/user.entity';
 import { UserProfile } from 'src/modules/admin/user-profile/entities/user-profile.entity';
-import { TripStatus, TicketStatus } from 'src/common/enums/status.enum';
+import {
+  TripStatus,
+  TicketStatus,
+  SeatStatus,
+} from 'src/common/enums/status.enum';
 import { Ticket } from '../tickets/entities/ticket.entity';
 import { Seat } from '../seat/entities/seat.entity';
 @Injectable()
@@ -577,44 +581,46 @@ export class TripService {
   }
 
   async permanentRemove(id: string): Promise<{ message: string }> {
-  // Buscar el viaje sin filtro is_active para poder eliminar desactivados
-  const trip = await this.tripRepository.findOne({
-    where: { id },
-    relations: {
-      tickets: true,
-    },
-  });
+    // Buscar el viaje sin filtro is_active para poder eliminar desactivados
+    const trip = await this.tripRepository.findOne({
+      where: { id },
+      relations: {
+        tickets: true,
+      },
+    });
 
-  if (!trip) {
-    throw new NotFoundException(`El viaje con ID ${id} no existe`);
+    if (!trip) {
+      throw new NotFoundException(`El viaje con ID ${id} no existe`);
+    }
+
+    // Solo permitir eliminación permanente de viajes inactivos
+    if (trip.is_active) {
+      throw new BadRequestException(
+        'Solo se pueden eliminar permanentemente viajes desactivados. Use el soft delete primero.',
+      );
+    }
+
+    // Verificar que no tenga tickets confirmados activos
+    const activeConfirmedTickets =
+      trip.tickets?.filter(
+        (ticket) =>
+          ticket.is_active && ticket.status === TicketStatus.CONFIRMED,
+      ).length || 0;
+
+    if (activeConfirmedTickets > 0) {
+      throw new BadRequestException(
+        `No se puede eliminar permanentemente un viaje con ${activeConfirmedTickets} tickets confirmados activos`,
+      );
+    }
+
+    // Hard delete
+    await this.tripRepository.remove(trip);
+
+    return {
+      message: `Viaje ${id} eliminado permanentemente`,
+    };
   }
-
-  // Solo permitir eliminación permanente de viajes inactivos
-  if (trip.is_active) {
-    throw new BadRequestException(
-      'Solo se pueden eliminar permanentemente viajes desactivados. Use el soft delete primero.',
-    );
-  }
-
-  // Verificar que no tenga tickets confirmados activos
-  const activeConfirmedTickets = trip.tickets?.filter(
-    (ticket) => ticket.is_active && ticket.status === TicketStatus.CONFIRMED
-  ).length || 0;
-
-  if (activeConfirmedTickets > 0) {
-    throw new BadRequestException(
-      `No se puede eliminar permanentemente un viaje con ${activeConfirmedTickets} tickets confirmados activos`,
-    );
-  }
-
-  // Hard delete
-  await this.tripRepository.remove(trip);
-
-  return {
-    message: `Viaje ${id} eliminado permanentemente`,
-  };
-}
-////////////////////
+  ////////////////////
 
   async cancelTrip(id: string): Promise<Trip> {
     const trip = await this.findOne(id);
@@ -687,7 +693,7 @@ export class TripService {
       const seatIds = trip.tickets.map((t) => t.seat.id);
       await this.seatRepository.update(
         { id: In(seatIds) },
-        { status: 'disponible' },
+        { status: SeatStatus.AVAILABLE },
       );
     }
 
