@@ -121,14 +121,12 @@ export class TicketService {
     // Validar Trip
     const trip = await this.findTrip(tripId);
 
-    // ✅ CRÍTICO: Validar que el asiento no esté ya ocupado/reservado en este viaje
-    // Esta validación debe hacerse ANTES de validar el estado del trip
     const existingTicket = await this.ticketRepository.findOne({
       where: {
         trip: { id: tripId },
         seat: { id: seatId },
         status: In([TicketStatus.CONFIRMED, TicketStatus.PENDING]),
-        is_active: true,
+        is_active: true, // ← Solo tickets activos
       },
       relations: ['seat'],
     });
@@ -237,7 +235,7 @@ export class TicketService {
     await this.tripService.updateAvailableSeats(tripId);
     return this.findOne(savedTicket.ticket_id);
   }
-  
+
   async findAll(
     paginationDto: PaginationDto,
   ): Promise<PaginatedResponse<Ticket>> {
@@ -543,8 +541,56 @@ export class TicketService {
   ///////////////////////////////////////////////////
   private async generateTicketCode(): Promise<string> {
     const year = new Date().getFullYear();
-    const count = (await this.ticketRepository.count()) + 1;
-    return `TCK-${year}-${count.toString().padStart(6, '0')}`;
+
+    // ✅ Contar solo tickets activos del año actual
+    const count = await this.ticketRepository
+      .createQueryBuilder('ticket')
+      .where('EXTRACT(YEAR FROM ticket.created_at) = :year', { year })
+      .getCount();
+
+    const nextNumber = count + 1;
+    const code = `TCK-${year}-${nextNumber.toString().padStart(6, '0')}`;
+
+    // ✅ Verificar que el código no exista (por seguridad)
+    const existingCode = await this.ticketRepository.findOne({
+      where: { code },
+    });
+
+    if (existingCode) {
+      // Si ya existe, buscar el último código usado y sumar 1
+      const lastTicket = await this.ticketRepository
+        .createQueryBuilder('ticket')
+        .where('EXTRACT(YEAR FROM ticket.created_at) = :year', { year })
+        .orderBy('ticket.created_at', 'DESC')
+        .getOne();
+
+      if (lastTicket) {
+        const lastNumber = parseInt(lastTicket.code.split('-')[2]);
+        return `TCK-${year}-${(lastNumber + 1).toString().padStart(6, '0')}`;
+      }
+    }
+
+    return code;
+  }
+
+  async releaseSeatsFromInactiveTickets(): Promise<void> {
+    const inactiveTickets = await this.ticketRepository.find({
+      where: { is_active: false },
+      relations: ['seat'],
+    });
+
+    const seatIds = inactiveTickets.filter((t) => t.seat).map((t) => t.seat.id);
+
+    if (seatIds.length > 0) {
+      await this.seatRepository.update(
+        { id: In(seatIds) },
+        { status: SeatStatus.AVAILABLE },
+      );
+
+      console.log(
+        `✅ Liberados ${seatIds.length} asientos de tickets desactivados`,
+      );
+    }
   }
 
   private async findUser(userId: string): Promise<User> {
@@ -607,17 +653,17 @@ export class TicketService {
   }
 
   async getOccupiedSeatsByTrip(tripId: string): Promise<string[]> {
-  const tickets = await this.ticketRepository.find({
-    where: {
-      trip: { id: tripId },
-      status: TicketStatus.CONFIRMED,
-      is_active: true,
-    },
-    relations: { seat: true },
-  });
+    const tickets = await this.ticketRepository.find({
+      where: {
+        trip: { id: tripId },
+        status: TicketStatus.CONFIRMED,
+        is_active: true,
+      },
+      relations: { seat: true },
+    });
 
-  return tickets
-    .map(ticket => ticket.seat?.seat_code?.toUpperCase())
-    .filter(Boolean);
-}
+    return tickets
+      .map((ticket) => ticket.seat?.seat_code?.toUpperCase())
+      .filter(Boolean);
+  }
 }

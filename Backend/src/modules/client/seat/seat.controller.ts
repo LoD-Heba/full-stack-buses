@@ -52,4 +52,9 @@ export class SeatController {
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.seatService.remove(id);
   }
+
+  @Get('trip/:tripId/seats-status')
+getSeatsByTripWithStatus(@Param('tripId', ParseUUIDPipe) tripId: string) {
+  return this.seatService.getSeatsByTripWithStatus(tripId);
+}
 }

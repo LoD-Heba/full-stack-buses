@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, In } from 'typeorm';
 import { Ticket } from '../tickets/entities/ticket.entity';
 import { Seat } from './entities/seat.entity';
-import { TicketStatus, SeatStatus } from 'src/common/enums/status.enum';
+import { TicketStatus, SeatStatus, TripStatus } from 'src/common/enums/status.enum';
 import { Trip } from '../trip/entities/trip.entity';
 
 @Injectable()
@@ -20,7 +20,7 @@ export class SeatCleanupJob {
     private readonly tripRepository: Repository<Trip>,
   ) {}
 
-  @Cron('*/5 * * * *') // Cada 5 minutos
+  @Cron('*/1 * * * *') // Cada 1 minutos
   async releaseExpiredReservations() {
     const expirationTime = new Date();
     expirationTime.setMinutes(expirationTime.getMinutes() - 15); // 15 minutos
@@ -81,4 +81,108 @@ export class SeatCleanupJob {
       `✅ Liberados ${seatIds.length} asientos de ${tripIds.length} viajes`,
     );
   }
-}
+
+  /**
+   * Libera asientos de viajes finalizados
+   * Se ejecuta cada hora
+   */
+  @Cron('*/1 * * * *') // Cada hora
+  async releaseCompletedTripSeats() {
+    const now = new Date();
+
+    // Buscar viajes completados o cancelados que aún tienen asientos ocupados
+    const completedTrips = await this.tripRepository.find({
+      where: [
+        { status: TripStatus.COMPLETED, is_active: true },
+        { status: TripStatus.CANCELLED, is_active: true },
+      ],
+      relations: ['tickets', 'tickets.seat', 'bus'],
+    });
+
+    let totalSeatsReleased = 0;
+    let tripsProcessed = 0;
+
+    for (const trip of completedTrips) {
+      // Obtener todos los asientos ocupados/reservados de este viaje
+      const occupiedSeats = trip.tickets
+        .filter((ticket) => 
+          ticket.is_active && 
+          ticket.seat &&
+          (ticket.seat.status === SeatStatus.OCCUPIED || 
+           ticket.seat.status === SeatStatus.RESERVED)
+        )
+        .map((ticket) => ticket.seat.id);
+
+      if (occupiedSeats.length > 0) {
+        // Liberar asientos
+        await this.seatRepository.update(
+          { id: In(occupiedSeats) },
+          { status: SeatStatus.AVAILABLE }
+        );
+
+        totalSeatsReleased += occupiedSeats.length;
+        tripsProcessed++;
+
+        // Actualizar available_seats del viaje a la capacidad total
+        const totalSeats = await this.seatRepository.count({
+          where: {
+            stacks: { bus: { id: trip.bus.id } },
+            is_active: true,
+          },
+        });
+
+        await this.tripRepository.update(trip.id, {
+          available_seats: totalSeats,
+        });
+      }
+    }
+
+    if (tripsProcessed > 0) {
+      console.log(
+        `✅ Liberados ${totalSeatsReleased} asientos de ${tripsProcessed} viajes finalizados`,
+      );
+    }
+  }
+
+  /**
+   * Desactiva tickets de viajes finalizados hace más de 30 días
+   * Se ejecuta diariamente a las 2:00 AM
+   */
+  @Cron('*/1 * * * *')
+  async archiveOldTickets() {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Buscar viajes completados hace más de 30 días
+    const oldTrips = await this.tripRepository.find({
+      where: {
+        status: TripStatus.COMPLETED,
+        departure_time: LessThan(thirtyDaysAgo),
+        is_active: true,
+      },
+      relations: ['tickets'],
+    });
+
+    let ticketsArchived = 0;
+
+    for (const trip of oldTrips) {
+      const activeTicketIds = trip.tickets
+        .filter((t) => t.is_active)
+        .map((t) => t.ticket_id);
+
+      if (activeTicketIds.length > 0) {
+        await this.ticketRepository.update(
+          { ticket_id: In(activeTicketIds) },
+          { is_active: false }
+        );
+        ticketsArchived += activeTicketIds.length;
+      }
+    }
+
+    if (ticketsArchived > 0) {
+      console.log(
+        `📦 Archivados ${ticketsArchived} tickets de viajes antiguos`,
+      );
+    }
+  }
+} 

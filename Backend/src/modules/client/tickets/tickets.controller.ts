@@ -27,7 +27,7 @@ export class TicketController {
   findAll(@Query() paginationDto: PaginationDto) {
     return this.ticketService.findAll(paginationDto);
   }
- /**
+  /**
    * Valida un ticket por código y retorna su QR
    * GET /tickets/qr/validate/:code
    */
@@ -68,7 +68,7 @@ export class TicketController {
     return this.ticketService.remove(id);
   }
 
-    /**
+  /**
    * Obtiene un ticket con su QR generado
    * GET /tickets/:id/qr
    */
@@ -76,8 +76,13 @@ export class TicketController {
   getTicketQR(@Param('id', ParseUUIDPipe) id: string) {
     return this.ticketService.getTicketWithQR(id);
   }
-@Get('trip/:tripId/occupied-seats')
-getOccupiedSeats(@Param('tripId', ParseUUIDPipe) tripId: string) {
-  return this.ticketService.getOccupiedSeatsByTrip(tripId);
-}
+  @Get('trip/:tripId/occupied-seats')
+  getOccupiedSeats(@Param('tripId', ParseUUIDPipe) tripId: string) {
+    return this.ticketService.getOccupiedSeatsByTrip(tripId);
+  }
+
+  @Patch('cleanup/inactive-seats')
+  releaseInactiveSeats() {
+    return this.ticketService.releaseSeatsFromInactiveTickets();
+  }
 }

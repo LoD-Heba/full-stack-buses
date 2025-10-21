@@ -87,4 +87,5 @@ export class TripController {
 permanentRemove(@Param('id', ParseUUIDPipe) id: string) {
   return this.tripService.permanentRemove(id);
 }
+
 }
