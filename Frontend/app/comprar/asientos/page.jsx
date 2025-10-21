@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import AsientoMapa from "../../../components/asientos/AsientoMapa";
-import AsientoLegend from "../../../components/asientos/AsientoLegend";
+import AsientoMapa from "@/components/asientos/AsientoMapa";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, AlertCircle } from "lucide-react";
+import { ArrowLeft, AlertCircle, User } from "lucide-react";
 import { toast } from "sonner";
 
-export default function BusLayoutPage() {
+const API_BASE = "http://localhost:3001/api/v1";
+
+export default function ComprarAsientosPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -18,120 +19,113 @@ export default function BusLayoutPage() {
 
   const [busLayout, setBusLayout] = useState(null);
   const [trip, setTrip] = useState(null);
+  const [client, setClient] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
-  const [occupiedSeats, setOccupiedSeats] = useState([]); // ✅ Estado para asientos ocupados
+  const [occupiedSeats, setOccupiedSeats] = useState([]);
 
   useEffect(() => {
     if (!tripId || !clientId) {
-      setError(
-        "Parámetros inválidos. Debes seleccionar un viaje y un cliente."
-      );
+      setError("Parámetros inválidos. Debes seleccionar un viaje.");
       setLoading(false);
       return;
     }
+
+    // Cargar cliente de sessionStorage
+    const savedClient = sessionStorage.getItem("purchaseClient");
+    if (savedClient) {
+      setClient(JSON.parse(savedClient));
+    }
   }, [tripId, clientId]);
 
-  // ✅ Cargar datos del viaje, layout y asientos ocupados
   useEffect(() => {
-  const fetchData = async () => {
-    if (!tripId) return;
+    const fetchData = async () => {
+      if (!tripId) return;
 
-    try {
-      setLoading(true);
-      setError(null);
-
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
-
-      // 1. Obtener datos del viaje
-      const tripRes = await fetch(`${API_URL}/trips/${tripId}`);
-      if (!tripRes.ok) throw new Error("Error al cargar el viaje");
-      const tripData = await tripRes.json();
-      setTrip(tripData);
-
-      // 2. Obtener layout del bus
-      const layoutRes = await fetch(
-        `${API_URL}/buses/${tripData.bus.id}/layout`
-      );
-      if (!layoutRes.ok) throw new Error("Error al cargar el layout del bus");
-      const layoutData = await layoutRes.json();
-      setBusLayout(layoutData);
-
-      // 3. Obtener tickets del viaje y filtrar confirmados
       try {
-        const ticketsRes = await fetch(`${API_URL}/tickets/trip/${tripId}`);
-        
-        if (ticketsRes.ok) {
-          const ticketsData = await ticketsRes.json();
+        setLoading(true);
+        setError(null);
 
-          // Filtrar solo tickets confirmados y activos
-          const confirmedTickets = ticketsData.filter(
-            ticket => ticket.status === 'CONFIRMADO' && ticket.is_active
-          );
+        // 1. Obtener datos del viaje
+        const tripRes = await fetch(`${API_BASE}/trips/${tripId}`);
+        if (!tripRes.ok) throw new Error("Error al cargar el viaje");
+        const tripData = await tripRes.json();
+        setTrip(tripData);
 
-          // Extraer códigos de asientos
-          const occupied = confirmedTickets
-            .map((ticket) => ticket.seat?.seat_code?.toUpperCase())
-            .filter(Boolean);
+        // 2. Obtener layout del bus
+        const layoutRes = await fetch(
+          `${API_BASE}/buses/${tripData.bus.id}/layout`
+        );
+        if (!layoutRes.ok) throw new Error("Error al cargar el layout del bus");
+        const layoutData = await layoutRes.json();
+        setBusLayout(layoutData);
 
-          console.log("🔴 Asientos ocupados:", occupied);
-          setOccupiedSeats(occupied);
-        } else {
-          console.warn("No se pudieron cargar los tickets del viaje");
+        // 3. Obtener tickets del viaje
+        try {
+          const ticketsRes = await fetch(`${API_BASE}/tickets/trip/${tripId}`);
+
+          if (ticketsRes.ok) {
+            const ticketsData = await ticketsRes.json();
+            const confirmedTickets = ticketsData.filter(
+              (ticket) => ticket.status === "CONFIRMADO" && ticket.is_active
+            );
+            const occupied = confirmedTickets
+              .map((ticket) => ticket.seat?.seat_code?.toUpperCase())
+              .filter(Boolean);
+
+            setOccupiedSeats(occupied);
+          }
+        } catch (err) {
+          console.warn("Error al cargar tickets:", err);
           setOccupiedSeats([]);
         }
-      } catch (ticketError) {
-        console.warn("Error al cargar tickets:", ticketError);
-        setOccupiedSeats([]);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Error desconocido";
+        setError(errorMessage);
+        toast.error(errorMessage);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Error desconocido";
-      setError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  fetchData();
-}, [tripId]);
+    fetchData();
+  }, [tripId]);
 
   const handleSeatSelection = (seats) => {
     setSelectedSeats(seats);
   };
 
-  const handleContinueBooking = () => {
+  const handleContinue = () => {
     if (selectedSeats.length === 0) {
       toast.error("Por favor selecciona al menos un asiento");
       return;
     }
 
-    const seatsParam = selectedSeats.join(",");
-    router.push(
-      `/dashboard/tickets/newTicket?tripId=${tripId}&clientId=${clientId}&seats=${seatsParam}`
-    );
+    // Guardar asientos seleccionados
+    sessionStorage.setItem("selectedSeats", JSON.stringify(selectedSeats));
+
+    toast.success(`Has seleccionado ${selectedSeats.length} asiento(s)`);
+    
+    // Por ahora solo mostrar mensaje
+    toast.info("Próximamente: Proceder al pago");
+    
+    // TODO: Redirigir a página de pago
+    // router.push(`/comprar/pago?tripId=${tripId}&clientId=${clientId}`);
   };
 
-  const handleBack = () => {
-    router.push(`/dashboard/viajes?clientId=${clientId}`);
-  };
-
-  // Pantalla de carga
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Cargando mapa de asientos...</p>
         </div>
       </div>
     );
   }
 
-  // Pantalla de error
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -141,10 +135,10 @@ export default function BusLayoutPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Error</h2>
             <p className="text-gray-600 mb-6">{error}</p>
             <Button
-              onClick={() => router.push("/dashboard/viajes")}
-              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => router.push("/salidas")}
+              className="bg-orange-600 hover:bg-orange-700"
             >
-              Volver a Viajes
+              Volver a Salidas
             </Button>
           </CardContent>
         </Card>
@@ -165,27 +159,44 @@ export default function BusLayoutPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        {/* Header con botón de volver */}
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
               size="icon"
-              onClick={handleBack}
+              onClick={() => router.push("/salidas")}
               className="hover:bg-gray-200"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                Selección de Asientos
+                Selecciona tu Asiento
               </h1>
               <p className="text-gray-600 mt-1">
-                {trip.route.originCity} → {trip.route.destinationCity}
+                {trip.route?.originCity?.name || trip.route?.origin} → {trip.route?.destinationCity?.name || trip.route?.destination}
               </p>
             </div>
           </div>
         </div>
+
+        {/* Info del cliente */}
+        {client && (
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-3">
+                <User className="h-5 w-5 text-blue-600" />
+                <div>
+                  <p className="font-semibold text-blue-900">
+                    {client.firstName} {client.lastName}
+                  </p>
+                  <p className="text-sm text-blue-700">C.I.: {client.documentNumber}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Información del viaje */}
         <Card>
@@ -227,7 +238,7 @@ export default function BusLayoutPage() {
           </CardContent>
         </Card>
 
-        {/* ✅ Mapa de asientos con occupiedSeats */}
+        {/* Mapa de asientos */}
         <AsientoMapa
           busLayout={busLayout}
           tripInfo={trip}
@@ -238,20 +249,19 @@ export default function BusLayoutPage() {
 
         {/* Resumen de selección */}
         {selectedSeats.length > 0 && (
-          <Card className="bg-blue-50 border-blue-300">
+          <Card className="bg-orange-50 border-orange-300">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>Resumen de tu Compra</span>
                 <span className="text-sm font-normal text-gray-600">
-                  {selectedSeats.length} asiento
-                  {selectedSeats.length > 1 ? "s" : ""}
+                  {selectedSeats.length} asiento{selectedSeats.length > 1 ? "s" : ""}
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <p className="text-sm text-gray-600">Asientos Seleccionados:</p>
-                <p className="font-semibold text-lg text-blue-900 mt-1">
+                <p className="font-semibold text-lg text-orange-900 mt-1">
                   {selectedSeats.join(", ")}
                 </p>
               </div>
@@ -285,10 +295,10 @@ export default function BusLayoutPage() {
                   Limpiar Selección
                 </Button>
                 <Button
-                  onClick={handleContinueBooking}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  onClick={handleContinue}
+                  className="flex-1 bg-orange-600 hover:bg-orange-700"
                 >
-                  Continuar con la Compra →
+                  Confirmar Selección →
                 </Button>
               </div>
             </CardContent>

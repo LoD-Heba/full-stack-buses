@@ -1,22 +1,24 @@
-"use client"
-import { useState, useEffect } from 'react';
-import { MapPin, Clock, ArrowRight, X, Bus, Users, Filter } from 'lucide-react';
+"use client";
+import { useState, useEffect } from "react";
+import { MapPin, Clock, ArrowRight, X, Bus, Users, Filter } from "lucide-react";
+import { useRouter } from 'next/navigation';
 
 export default function SalidasPage() {
+  const router = useRouter();
   const [viajes, setViajes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState(null);
   const [showTripModal, setShowTripModal] = useState(false);
-  const [filtroDestino, setFiltroDestino] = useState('');
-  const [filtroFecha, setFiltroFecha] = useState('');
+  const [filtroDestino, setFiltroDestino] = useState("");
+  const [filtroFecha, setFiltroFecha] = useState("");
   const [destinos, setDestinos] = useState([]);
 
-  const API_URL = 'http://localhost:3001/api/v1';
-  const today = new Date().toLocaleDateString('es-BO', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
+  const API_URL = "http://localhost:3001/api/v1";
+  const today = new Date().toLocaleDateString("es-BO", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
 
   // Cargar viajes disponibles
@@ -29,10 +31,10 @@ export default function SalidasPage() {
     try {
       const res = await fetch(`${API_URL}/city`);
       const data = await res.json();
-      const uniqueDestinos = [...new Set(data.map(c => c.city))];
+      const uniqueDestinos = [...new Set(data.map((c) => c.city))];
       setDestinos(uniqueDestinos);
     } catch (error) {
-      console.error('Error al cargar destinos:', error);
+      console.error("Error al cargar destinos:", error);
     }
   };
 
@@ -42,28 +44,31 @@ export default function SalidasPage() {
       // Obtener viajes disponibles (estado SCHEDULED)
       const res = await fetch(`${API_URL}/trips?limit=100`);
       const data = await res.json();
-      
+
       // Filtrar solo viajes programados con asientos disponibles
-      const viajesDisponibles = (data.data || []).filter(viaje => 
-        viaje.status === 'SCHEDULED' && 
-        viaje.available_seats > 0 &&
-        new Date(viaje.departure_time) > new Date()
+      const viajesDisponibles = (data.data || []).filter(
+        (viaje) =>
+          viaje.status === "SCHEDULED" &&
+          viaje.available_seats > 0 &&
+          new Date(viaje.departure_time) > new Date()
       );
-      
+
       setViajes(viajesDisponibles);
     } catch (error) {
-      console.error('Error al cargar viajes:', error);
+      console.error("Error al cargar viajes:", error);
     } finally {
       setLoading(false);
     }
   };
 
   // Filtrar viajes
-  const viajesFiltrados = viajes.filter(viaje => {
-    const destino = viaje.route?.destination || '';
-    const fecha = new Date(viaje.departure_time).toLocaleDateString('es-BO');
+  const viajesFiltrados = viajes.filter((viaje) => {
+    const destino = viaje.route?.destination || "";
+    const fecha = new Date(viaje.departure_time).toLocaleDateString("es-BO");
     const cumpleFecha = !filtroFecha || fecha === filtroFecha;
-    const cumpleDestino = !filtroDestino || destino.toLowerCase().includes(filtroDestino.toLowerCase());
+    const cumpleDestino =
+      !filtroDestino ||
+      destino.toLowerCase().includes(filtroDestino.toLowerCase());
     return cumpleFecha && cumpleDestino;
   });
 
@@ -73,17 +78,17 @@ export default function SalidasPage() {
   };
 
   const formatearFecha = (date) => {
-    return new Date(date).toLocaleDateString('es-BO', {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short'
+    return new Date(date).toLocaleDateString("es-BO", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
     });
   };
 
   const formatearHora = (date) => {
-    return new Date(date).toLocaleTimeString('es-BO', {
-      hour: '2-digit',
-      minute: '2-digit'
+    return new Date(date).toLocaleTimeString("es-BO", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -99,7 +104,9 @@ export default function SalidasPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2 text-gray-800">Salidas Disponibles</h1>
+          <h1 className="text-4xl font-bold mb-2 text-gray-800">
+            Salidas Disponibles
+          </h1>
           <p className="text-gray-600 capitalize">{today}</p>
         </div>
 
@@ -120,19 +127,21 @@ export default function SalidasPage() {
               />
             </div>
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Fecha</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Fecha
+              </label>
               <input
                 type="date"
                 value={filtroFecha}
                 onChange={(e) => setFiltroFecha(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
+                min={new Date().toISOString().split("T")[0]}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               />
             </div>
             <button
               onClick={() => {
-                setFiltroDestino('');
-                setFiltroFecha('');
+                setFiltroDestino("");
+                setFiltroFecha("");
               }}
               className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition"
             >
@@ -144,7 +153,9 @@ export default function SalidasPage() {
         {/* Contador de resultados */}
         {!loading && (
           <p className="text-sm text-gray-600 mb-4">
-            {viajesFiltrados.length} viaje{viajesFiltrados.length !== 1 ? 's' : ''} disponible{viajesFiltrados.length !== 1 ? 's' : ''}
+            {viajesFiltrados.length} viaje
+            {viajesFiltrados.length !== 1 ? "s" : ""} disponible
+            {viajesFiltrados.length !== 1 ? "s" : ""}
           </p>
         )}
 
@@ -170,7 +181,7 @@ export default function SalidasPage() {
                 <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-4 text-white">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-semibold bg-white/20 px-3 py-1 rounded-full">
-                      {viaje.route?.name || 'Ruta'}
+                      {viaje.route?.name || "Ruta"}
                     </span>
                     <span className="text-xs bg-green-400/30 text-green-900 font-bold px-2 py-1 rounded">
                       {viaje.available_seats} asientos
@@ -178,11 +189,11 @@ export default function SalidasPage() {
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <MapPin className="w-4 h-4" />
-                    <span>{viaje.route?.origin || 'Origen'}</span>
+                    <span>{viaje.route?.origin || "Origen"}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm mt-1">
                     <ArrowRight className="w-4 h-4" />
-                    <span>{viaje.route?.destination || 'Destino'}</span>
+                    <span>{viaje.route?.destination || "Destino"}</span>
                   </div>
                 </div>
 
@@ -192,7 +203,9 @@ export default function SalidasPage() {
                   <div className="space-y-3 mb-4 pb-4 border-b">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-xs text-gray-500 font-medium">Salida</p>
+                        <p className="text-xs text-gray-500 font-medium">
+                          Salida
+                        </p>
                         <p className="text-lg font-bold text-gray-800">
                           {formatearHora(viaje.departure_time)}
                         </p>
@@ -203,11 +216,16 @@ export default function SalidasPage() {
                       <div className="text-center">
                         <Clock className="w-4 h-4 text-gray-400 mx-auto mb-1" />
                         <p className="text-xs text-gray-600 font-medium">
-                          {calcularDuracion(viaje.departure_time, viaje.arrival_time)}
+                          {calcularDuracion(
+                            viaje.departure_time,
+                            viaje.arrival_time
+                          )}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500 font-medium">Llegada</p>
+                        <p className="text-xs text-gray-500 font-medium">
+                          Llegada
+                        </p>
                         <p className="text-lg font-bold text-gray-800">
                           {formatearHora(viaje.arrival_time)}
                         </p>
@@ -222,17 +240,19 @@ export default function SalidasPage() {
                   <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center gap-2 text-gray-700 font-medium text-sm">
                       <Bus className="w-4 h-4" />
-                      {viaje.bus?.model || 'Bus'}
+                      {viaje.bus?.model || "Bus"}
                     </div>
                     <p className="text-xs text-gray-600 mt-1">
-                      Placa: {viaje.bus?.license_plate || 'N/A'}
+                      Placa: {viaje.bus?.license_plate || "N/A"}
                     </p>
                   </div>
 
                   {/* Precio y botón */}
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-gray-500">Precio por asiento</p>
+                      <p className="text-xs text-gray-500">
+                        Precio por asiento
+                      </p>
                       <p className="text-2xl font-bold text-green-600">
                         Bs. {parseFloat(viaje.price).toFixed(2)}
                       </p>
@@ -257,17 +277,23 @@ export default function SalidasPage() {
             {viajes.length === 0 ? (
               <>
                 <MapPin className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500 text-lg">No hay viajes disponibles en este momento</p>
-                <p className="text-gray-400 text-sm mt-1">Por favor, intenta más tarde</p>
+                <p className="text-gray-500 text-lg">
+                  No hay viajes disponibles en este momento
+                </p>
+                <p className="text-gray-400 text-sm mt-1">
+                  Por favor, intenta más tarde
+                </p>
               </>
             ) : (
               <>
                 <Filter className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500 text-lg">No se encontraron viajes con estos filtros</p>
+                <p className="text-gray-500 text-lg">
+                  No se encontraron viajes con estos filtros
+                </p>
                 <button
                   onClick={() => {
-                    setFiltroDestino('');
-                    setFiltroFecha('');
+                    setFiltroDestino("");
+                    setFiltroFecha("");
                   }}
                   className="mt-3 text-orange-600 hover:text-orange-700 font-medium"
                 >
@@ -293,7 +319,8 @@ export default function SalidasPage() {
               </button>
               <div className="h-full flex flex-col justify-end p-6 text-white">
                 <h2 className="text-3xl font-bold mb-2">
-                  {selectedTrip.route?.origin} → {selectedTrip.route?.destination}
+                  {selectedTrip.route?.origin} →{" "}
+                  {selectedTrip.route?.destination}
                 </h2>
                 <p className="text-orange-100">{selectedTrip.route?.name}</p>
               </div>
@@ -304,7 +331,9 @@ export default function SalidasPage() {
               {/* Información de horarios */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
-                  <p className="text-xs text-gray-600 font-medium mb-1">Salida</p>
+                  <p className="text-xs text-gray-600 font-medium mb-1">
+                    Salida
+                  </p>
                   <p className="text-2xl font-bold text-blue-600">
                     {formatearHora(selectedTrip.departure_time)}
                   </p>
@@ -313,13 +342,20 @@ export default function SalidasPage() {
                   </p>
                 </div>
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-600 font-medium mb-1">Duración</p>
+                  <p className="text-xs text-gray-600 font-medium mb-1">
+                    Duración
+                  </p>
                   <p className="text-2xl font-bold text-gray-800">
-                    {calcularDuracion(selectedTrip.departure_time, selectedTrip.arrival_time)}
+                    {calcularDuracion(
+                      selectedTrip.departure_time,
+                      selectedTrip.arrival_time
+                    )}
                   </p>
                 </div>
                 <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <p className="text-xs text-gray-600 font-medium mb-1">Llegada</p>
+                  <p className="text-xs text-gray-600 font-medium mb-1">
+                    Llegada
+                  </p>
                   <p className="text-2xl font-bold text-green-600">
                     {formatearHora(selectedTrip.arrival_time)}
                   </p>
@@ -338,11 +374,15 @@ export default function SalidasPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Modelo</p>
-                    <p className="font-semibold text-gray-800">{selectedTrip.bus?.model}</p>
+                    <p className="font-semibold text-gray-800">
+                      {selectedTrip.bus?.model}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Placa</p>
-                    <p className="font-semibold text-gray-800">{selectedTrip.bus?.license_plate}</p>
+                    <p className="font-semibold text-gray-800">
+                      {selectedTrip.bus?.license_plate}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -353,7 +393,9 @@ export default function SalidasPage() {
                   <div className="flex items-center gap-3">
                     <Users className="w-6 h-6 text-orange-600" />
                     <div>
-                      <p className="text-sm text-gray-600">Asientos Disponibles</p>
+                      <p className="text-sm text-gray-600">
+                        Asientos Disponibles
+                      </p>
                       <p className="text-2xl font-bold text-orange-600">
                         {selectedTrip.available_seats}
                       </p>
@@ -376,7 +418,18 @@ export default function SalidasPage() {
                 >
                   Cerrar
                 </button>
-                <button className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2">
+                <button
+                  onClick={() => {
+                    // Guardar el viaje seleccionado en sessionStorage
+                    sessionStorage.setItem(
+                      "selectedTrip",
+                      JSON.stringify(selectedTrip)
+                    );
+                    // Redirigir a la página de registro del cliente
+                    router.push(`/comprar/cliente?tripId=${selectedTrip.id}`);
+                  }}
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2"
+                >
                   <Bus className="w-5 h-5" />
                   Comprar Pasaje
                 </button>

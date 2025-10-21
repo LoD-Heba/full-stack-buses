@@ -59,15 +59,7 @@ export default function Home() {
               y puntualidad. Tu viaje comienza aquí.
             </p>
             <div className="flex flex-wrap gap-4">
-              <Link href="/comprar">
-                <Button
-                  size="lg"
-                  className="bg-orange-500 hover:bg-orange-600 text-white"
-                >
-                  <Bus className="w-5 h-5 mr-2" />
-                  Comprar Pasaje
-                </Button>
-              </Link>
+              
               <Link href="/salidas">
                 <Button
                   size="lg"

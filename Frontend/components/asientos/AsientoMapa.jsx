@@ -303,55 +303,62 @@ export default function AsientoMapa({
   };
 
   const renderDeckLayout = (deckData) => {
-    const layout = deckData.layout || [];
+  const layout = deckData.layout || [];
 
-    if (layout.length === 0) {
-      return (
-        <div className="text-center py-8">
-          <p className="text-gray-500">
-            No hay asientos en {deckData.stack_name}
-          </p>
-        </div>
-      );
-    }
-
-    const maxX = Math.max(...layout.map((s) => s.position_x), 0);
-    const maxY = Math.max(...layout.map((s) => s.position_y), 0);
-
+  if (layout.length === 0) {
     return (
-      <div className="flex-1">
-        <div
-          className="grid gap-2 mx-auto"
-          style={{
-            gridTemplateColumns: `repeat(${Math.max(maxX, 1)}, 60px)`,
-            gridTemplateRows: `repeat(${Math.max(maxY, 1)}, 60px)`,
-            width: "fit-content",
-          }}
-        >
-          {layout.map((seat, index) => {
-            const seatCode = seat.seat_code?.toUpperCase();
-            return (
-              <div
-                key={seat.id || `seat-${index}`}
-                style={{
-                  gridColumn: seat.position_x || 1,
-                  gridRow: seat.position_y || 1,
-                }}
-                className="w-[60px] h-[60px]"
-              >
-                <AsientoItem
-                  data={seat}
-                  selected={selectedSeats.includes(seatCode)}
-                  disabled={occupiedSeats.includes(seatCode)}
-                  onSelect={toggleSeat}
-                />
-              </div>
-            );
-          })}
-        </div>
+      <div className="text-center py-8">
+        <p className="text-gray-500">
+          No hay asientos en {deckData.stack_name}
+        </p>
       </div>
     );
-  };
+  }
+
+  const maxX = Math.max(...layout.map((s) => s.position_x), 0);
+  const maxY = Math.max(...layout.map((s) => s.position_y), 0);
+
+  return (
+    <div className="flex-1">
+      <div
+        className="grid gap-2 mx-auto"
+        style={{
+          gridTemplateColumns: `repeat(${Math.max(maxX, 1)}, 60px)`,
+          gridTemplateRows: `repeat(${Math.max(maxY, 1)}, 60px)`,
+          width: "fit-content",
+        }}
+      >
+        {layout.map((seat, index) => {
+          const seatCode = seat.seat_code?.toUpperCase();
+          
+          // ✅ CRÍTICO: Si el asiento está en occupiedSeats, forzar status a 'ocupado'
+          const seatWithStatus = {
+            ...seat,
+            status: occupiedSeats.includes(seatCode) ? 'ocupado' : seat.status
+          };
+
+          return (
+            <div
+              key={seat.id || `seat-${index}`}
+              style={{
+                gridColumn: seat.position_x || 1,
+                gridRow: seat.position_y || 1,
+              }}
+              className="w-[60px] h-[60px]"
+            >
+              <AsientoItem
+                data={seatWithStatus}
+                selected={selectedSeats.includes(seatCode)}
+                disabled={occupiedSeats.includes(seatCode)}
+                onSelect={toggleSeat}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
   return (
     <div className="grid grid-cols-12 gap-6">
