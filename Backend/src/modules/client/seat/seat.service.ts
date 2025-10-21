@@ -14,7 +14,11 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 import { PaginatedResponse } from 'src/modules/auth/interfaces/auth.interfaces';
 import { Bus } from '../bus/entities/bus.entity';
 import { Trip } from '../trip/entities/trip.entity';
-import { TicketStatus, TripStatus } from 'src/common/enums/status.enum';
+import {
+  SeatStatus,
+  TicketStatus,
+  TripStatus,
+} from 'src/common/enums/status.enum';
 import { CreateBulkSeatsDto } from './dto/create-bulk-seats.dto';
 
 @Injectable()
@@ -246,20 +250,15 @@ export class SeatService {
   }
 
   async findAvailableByStack(stackId: string): Promise<Seat[]> {
-    // Asientos sin tickets confirmados para viajes futuros
-    return this.seatRepository
-      .createQueryBuilder('seat')
-      .leftJoinAndSelect('seat.stacks', 'stacks')
-      .leftJoin('seat.tickets', 'tickets')
-      .leftJoin('tickets.trip', 'trip')
-      .where('seat.is_active = :active', { active: true })
-      .andWhere('stacks.id = :stackId', { stackId })
-      .andWhere(
-        '(tickets.id IS NULL OR (tickets.status != :confirmed OR trip.departure_time < :now))',
-        { confirmed: TicketStatus.CONFIRMED, now: new Date() },
-      )
-      .orderBy('seat.seat_number', 'ASC')
-      .getMany();
+    return this.seatRepository.find({
+      where: {
+        stacks: { id: stackId },
+        is_active: true,
+        status: 'disponible',
+      },
+      relations: { stacks: true },
+      order: { seat_number: 'ASC' },
+    });
   }
 
   async findByType(type: SeatType): Promise<Seat[]> {
@@ -689,7 +688,22 @@ export class SeatService {
 
     return seatStack;
   }
-
+  async findAvailableForTrip(tripId: string, stackId: string): Promise<Seat[]> {
+    return this.seatRepository
+      .createQueryBuilder('seat')
+      .leftJoinAndSelect('seat.stacks', 'stacks')
+      .leftJoin('seat.tickets', 'ticket', 'ticket.trip_id = :tripId', {
+        tripId,
+      })
+      .where('seat.stacks.id = :stackId', { stackId })
+      .andWhere('seat.is_active = true')
+      .andWhere('seat.status IN (:...statuses)', {
+        statuses: [SeatStatus.AVAILABLE, SeatStatus.RESERVED],
+      })
+      .andWhere('ticket.id IS NULL')
+      .orderBy('seat.seat_number', 'ASC')
+      .getMany();
+  }
   private async updateBusCapacity(stackId: string): Promise<void> {
     // Contar asientos activos en el stack
     const activeSeatsCount = await this.seatRepository.count({

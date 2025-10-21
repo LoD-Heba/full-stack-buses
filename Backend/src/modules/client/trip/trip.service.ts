@@ -576,6 +576,46 @@ export class TripService {
     return { ...trip, is_active: false };
   }
 
+  async permanentRemove(id: string): Promise<{ message: string }> {
+  // Buscar el viaje sin filtro is_active para poder eliminar desactivados
+  const trip = await this.tripRepository.findOne({
+    where: { id },
+    relations: {
+      tickets: true,
+    },
+  });
+
+  if (!trip) {
+    throw new NotFoundException(`El viaje con ID ${id} no existe`);
+  }
+
+  // Solo permitir eliminación permanente de viajes inactivos
+  if (trip.is_active) {
+    throw new BadRequestException(
+      'Solo se pueden eliminar permanentemente viajes desactivados. Use el soft delete primero.',
+    );
+  }
+
+  // Verificar que no tenga tickets confirmados activos
+  const activeConfirmedTickets = trip.tickets?.filter(
+    (ticket) => ticket.is_active && ticket.status === TicketStatus.CONFIRMED
+  ).length || 0;
+
+  if (activeConfirmedTickets > 0) {
+    throw new BadRequestException(
+      `No se puede eliminar permanentemente un viaje con ${activeConfirmedTickets} tickets confirmados activos`,
+    );
+  }
+
+  // Hard delete
+  await this.tripRepository.remove(trip);
+
+  return {
+    message: `Viaje ${id} eliminado permanentemente`,
+  };
+}
+////////////////////
+
   async cancelTrip(id: string): Promise<Trip> {
     const trip = await this.findOne(id);
 

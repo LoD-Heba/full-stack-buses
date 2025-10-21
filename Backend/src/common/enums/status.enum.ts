@@ -31,3 +31,10 @@ export enum PaymentCategory {
   SENIOR = 'adulto_mayor',
   STUDENT = 'estudiante',
 }
+
+export enum SeatStatus {
+  AVAILABLE = 'disponible',
+  RESERVED = 'reservado',
+  OCCUPIED = 'ocupado',
+  BLOCKED = 'bloqueado',
+}

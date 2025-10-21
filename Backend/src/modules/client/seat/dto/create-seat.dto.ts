@@ -13,6 +13,7 @@ import {
 } from 'class-validator';
 
 import { Transform } from 'class-transformer';
+import { SeatStatus } from 'src/common/enums/status.enum';
 
 export enum SeatType {
   NORMAL = 'normal',
@@ -59,8 +60,8 @@ export class CreateSeatDto {
   meta?: Record<string, any>;
 
   @IsOptional()
-  @IsEnum(['disponible', 'reservado', 'ocupado', 'bloqueado'])
-  status?: string;
+@IsEnum(SeatStatus)
+status?: SeatStatus;
 
   @IsEnum(SeatType, {
     message: 'El tipo debe ser: normal, semi_cama o cama',

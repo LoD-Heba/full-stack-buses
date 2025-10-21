@@ -11,6 +11,7 @@ import {
 import { Bus } from '../../bus/entities/bus.entity';
 import { Ticket } from '../../tickets/entities/ticket.entity';
 import { SeatStack } from '../../seat-stacks/entities/seat-stack.entity';
+import { SeatStatus } from 'src/common/enums/status.enum';
 
 @Entity('seats')
 export class Seat {
@@ -37,11 +38,11 @@ export class Seat {
   position_y?: number;
 
   @Column({
-    type: 'enum',
-    enum: ['disponible', 'reservado', 'ocupado', 'bloqueado'],
-    default: 'disponible',
-  })
-  status: string;
+  type: 'enum',
+  enum: ['disponible', 'reservado', 'ocupado', 'bloqueado'],
+  default: 'disponible',
+})
+status: SeatStatus;
 
   @Column({ type: 'varchar', default: 'seat', nullable: true })
   visual_type?: string;
