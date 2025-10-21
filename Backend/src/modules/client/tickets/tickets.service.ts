@@ -121,6 +121,26 @@ export class TicketService {
     // Validar Trip
     const trip = await this.findTrip(tripId);
 
+    // ✅ CRÍTICO: Validar que el asiento no esté ya ocupado/reservado en este viaje
+    // Esta validación debe hacerse ANTES de validar el estado del trip
+    const existingTicket = await this.ticketRepository.findOne({
+      where: {
+        trip: { id: tripId },
+        seat: { id: seatId },
+        status: In([TicketStatus.CONFIRMED, TicketStatus.PENDING]),
+        is_active: true,
+      },
+      relations: ['seat'],
+    });
+
+    if (existingTicket) {
+      const seat = await this.findSeat(seatId);
+      throw new BadRequestException(
+        `El asiento ${seat.seat_code} ya está ocupado o reservado en este viaje`,
+      );
+    }
+
+    // Continuar con el resto de validaciones...
     if (trip.status !== TripStatus.SCHEDULED) {
       throw new BadRequestException(
         'Solo se pueden comprar tickets para viajes programados',
@@ -173,22 +193,6 @@ export class TicketService {
       );
     }
 
-    // Verificar que el cliente no tenga ya un ticket confirmado para este viaje
-    const userTicketInTrip = await this.ticketRepository.findOne({
-      where: {
-        trip: { id: tripId },
-        userProfile: { id: userProfileId },
-        status: TicketStatus.CONFIRMED,
-        is_active: true,
-      },
-    });
-
-    if (userTicketInTrip) {
-      throw new BadRequestException(
-        'El cliente ya tiene un ticket confirmado para este viaje',
-      );
-    }
-
     // Validar Payment si se proporciona
     let payment: Payment | undefined;
     if (paymentId) {
@@ -233,7 +237,7 @@ export class TicketService {
     await this.tripService.updateAvailableSeats(tripId);
     return this.findOne(savedTicket.ticket_id);
   }
-
+  
   async findAll(
     paginationDto: PaginationDto,
   ): Promise<PaginatedResponse<Ticket>> {
@@ -601,4 +605,19 @@ export class TicketService {
     await this.tripService.updateAvailableSeats(ticket.trip.id);
     return this.findOne(id);
   }
+
+  async getOccupiedSeatsByTrip(tripId: string): Promise<string[]> {
+  const tickets = await this.ticketRepository.find({
+    where: {
+      trip: { id: tripId },
+      status: TicketStatus.CONFIRMED,
+      is_active: true,
+    },
+    relations: { seat: true },
+  });
+
+  return tickets
+    .map(ticket => ticket.seat?.seat_code?.toUpperCase())
+    .filter(Boolean);
+}
 }

@@ -76,5 +76,8 @@ export class TicketController {
   getTicketQR(@Param('id', ParseUUIDPipe) id: string) {
     return this.ticketService.getTicketWithQR(id);
   }
-
+@Get('trip/:tripId/occupied-seats')
+getOccupiedSeats(@Param('tripId', ParseUUIDPipe) tripId: string) {
+  return this.ticketService.getOccupiedSeatsByTrip(tripId);
+}
 }
