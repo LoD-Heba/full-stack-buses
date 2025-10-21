@@ -35,69 +35,60 @@ export default function BusLayoutPage() {
 
   // ✅ Cargar datos del viaje, layout y asientos ocupados
   useEffect(() => {
-  const fetchData = async () => {
-    if (!tripId) return;
+    const fetchData = async () => {
+      if (!tripId) return;
 
-    try {
-      setLoading(true);
-      setError(null);
-
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
-
-      // 1. Obtener datos del viaje
-      const tripRes = await fetch(`${API_URL}/trips/${tripId}`);
-      if (!tripRes.ok) throw new Error("Error al cargar el viaje");
-      const tripData = await tripRes.json();
-      setTrip(tripData);
-
-      // 2. Obtener layout del bus
-      const layoutRes = await fetch(
-        `${API_URL}/buses/${tripData.bus.id}/layout`
-      );
-      if (!layoutRes.ok) throw new Error("Error al cargar el layout del bus");
-      const layoutData = await layoutRes.json();
-      setBusLayout(layoutData);
-
-      // 3. Obtener tickets del viaje y filtrar confirmados
       try {
-        const ticketsRes = await fetch(`${API_URL}/tickets/trip/${tripId}`);
-        
-        if (ticketsRes.ok) {
-          const ticketsData = await ticketsRes.json();
+        setLoading(true);
+        setError(null);
 
-          // Filtrar solo tickets confirmados y activos
-          const confirmedTickets = ticketsData.filter(
-            ticket => ticket.status === 'CONFIRMADO' && ticket.is_active
+        const API_URL =
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+
+        // 1. Obtener datos del viaje
+        const tripRes = await fetch(`${API_URL}/trips/${tripId}`);
+        if (!tripRes.ok) throw new Error("Error al cargar el viaje");
+        const tripData = await tripRes.json();
+        setTrip(tripData);
+
+        // 2. Obtener layout del bus
+        const layoutRes = await fetch(
+          `${API_URL}/buses/${tripData.bus.id}/layout`
+        );
+        if (!layoutRes.ok) throw new Error("Error al cargar el layout del bus");
+        const layoutData = await layoutRes.json();
+        setBusLayout(layoutData);
+
+        // 3. Obtener tickets del viaje y filtrar confirmados
+        try {
+          const seatsStatusRes = await fetch(
+            `${API_URL}/seat/trip/${tripId}/seats-status`
           );
 
-          // Extraer códigos de asientos
-          const occupied = confirmedTickets
-            .map((ticket) => ticket.seat?.seat_code?.toUpperCase())
-            .filter(Boolean);
-
-          console.log("🔴 Asientos ocupados:", occupied);
-          setOccupiedSeats(occupied);
-        } else {
-          console.warn("No se pudieron cargar los tickets del viaje");
+          if (seatsStatusRes.ok) {
+            const seatsWithStatus = await seatsStatusRes.json();
+            console.log("🔴 Asientos con estado:", seatsWithStatus);
+            setOccupiedSeats(seatsWithStatus); // Ahora es array de objetos
+          } else {
+            console.warn("No se pudieron cargar los estados de asientos");
+            setOccupiedSeats([]);
+          }
+        } catch (ticketError) {
+          console.warn("Error al cargar tickets:", ticketError);
           setOccupiedSeats([]);
         }
-      } catch (ticketError) {
-        console.warn("Error al cargar tickets:", ticketError);
-        setOccupiedSeats([]);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Error desconocido";
+        setError(errorMessage);
+        toast.error(errorMessage);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Error desconocido";
-      setError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  fetchData();
-}, [tripId]);
+    fetchData();
+  }, [tripId]);
 
   const handleSeatSelection = (seats) => {
     setSelectedSeats(seats);
