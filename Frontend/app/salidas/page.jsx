@@ -147,14 +147,6 @@ export default function SalidasPage() {
                       {viaje.available_seats} asientos
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <MapPin className="w-4 h-4" />
-                    <span>{viaje.route?.origin || "Origen"}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm mt-1">
-                    <ArrowRight className="w-4 h-4" />
-                    <span>{viaje.route?.destination || "Destino"}</span>
-                  </div>
                 </div>
 
                 {/* Contenido */}
@@ -202,9 +194,6 @@ export default function SalidasPage() {
                       <Bus className="w-4 h-4" />
                       {viaje.bus?.model || "Bus"}
                     </div>
-                    <p className="text-xs text-gray-600 mt-1">
-                      Placa: {viaje.bus?.license_plate || "N/A"}
-                    </p>
                   </div>
 
                   {/* Precio y botón */}
@@ -279,10 +268,8 @@ export default function SalidasPage() {
               </button>
               <div className="h-full flex flex-col justify-end p-6 text-white">
                 <h2 className="text-3xl font-bold mb-2">
-                  {selectedTrip.route?.origin} →{" "}
-                  {selectedTrip.route?.destination}
+                  {selectedTrip.route?.name}
                 </h2>
-                <p className="text-orange-100">{selectedTrip.route?.name}</p>
               </div>
             </div>
 
@@ -336,12 +323,6 @@ export default function SalidasPage() {
                     <p className="text-sm text-gray-600">Modelo</p>
                     <p className="font-semibold text-gray-800">
                       {selectedTrip.bus?.model}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Placa</p>
-                    <p className="font-semibold text-gray-800">
-                      {selectedTrip.bus?.license_plate}
                     </p>
                   </div>
                 </div>

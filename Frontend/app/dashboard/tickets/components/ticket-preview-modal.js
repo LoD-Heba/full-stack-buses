@@ -25,30 +25,18 @@ export function TicketPreviewModal({ ticket, open, onClose }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>Vista Previa del Ticket</span>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogTitle>
-        </DialogHeader>
-
+    <Dialog open={open} onOpenChange={onClose} className="">
+      <DialogContent className="mx-auto">
         {/* Ticket Preview */}
         <div
           id="ticket-preview"
-          className="space-y-4 p-6 border-2 border-dashed border-orange-300 rounded-lg bg-gradient-to-br from-orange-50 to-white"
+          className="space-y-4 p-6 border-2 border-dashed border-orange-300 rounded-lg bg-gradient-to-br from-green-500 to-white "
         >
           {/* Header con logo */}
           <div className="text-center border-b-2 border-orange-200 pb-4">
-            <h2 className="text-2xl font-bold text-orange-600">
-              🚌 Mi Empresa
-            </h2>
+            <h2 className="text-2xl font-bold text-orange-600">Mi Empresa</h2>
             <p className="text-sm text-gray-600">Viajes Seguros y Cómodos</p>
           </div>
-
           {/* QR Code */}
           <div className="flex justify-center py-4">
             <div className="p-4 bg-white rounded-lg shadow-md">
