@@ -156,6 +156,7 @@ export default function PublicTicketPage() {
         {/* Header */}
         <div className="flex justify-between items-center print:hidden">
           <div>
+            {/* Agregar redirección a dashboard en caso de ser admin ##### */}
             <Link href="/">
               <Button variant="outline" size="sm" className="mb-4">
                 ← Volver
