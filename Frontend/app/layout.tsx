@@ -3,8 +3,8 @@
 import "./globals.css";
 import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
-import Navbar from "@/src/components/Navbar";
-import Footer from "@/src/components/Footer";
+import Navbar from "@/components/common/navbar";
+import Footer from "@/components/common/footer";
 import { clsx } from "clsx";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -35,10 +35,10 @@ export default function RootLayout({
       >
         <div className="flex flex-col min-h-screen z-40">
           {/* {!isDashboard && !isLogin && <Navbar />} */}
-          <Navbar></Navbar>
+          <Navbar />
           <main className="flex-1">{children}</main>
           {/* {!isDashboard && !isLogin && <Footer />} */}
-          <Footer></Footer>
+          <Footer />
         </div>
         <Toaster />
       </body>

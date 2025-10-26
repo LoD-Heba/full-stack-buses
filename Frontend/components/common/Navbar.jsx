@@ -3,7 +3,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Bus, Menu, X } from "lucide-react";
 import { useState } from "react";
-import UserMenu from "../../components/UserMenu";
+import UserMenu from "../UserMenu";
 
 export default function Navbar() {
   const pathname = usePathname();

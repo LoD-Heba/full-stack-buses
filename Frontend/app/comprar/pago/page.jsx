@@ -598,7 +598,7 @@ export default function PagoPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-3 gap-3">
-              {["QR", "EFECTIVO", "TARJETA"].map((method) => (
+              {["QR", "TARJETA"].map((method) => (
                 <button
                   key={method}
                   onClick={() => setPaymentMethod(method)}
@@ -612,7 +612,6 @@ export default function PagoPage() {
                   <div className="text-center">
                     <div className="text-2xl mb-2">
                       {method === "QR" && "📱"}
-                      {method === "EFECTIVO" && "💵"}
                       {method === "TARJETA" && "💳"}
                     </div>
                     <div className="text-sm font-medium">{method}</div>

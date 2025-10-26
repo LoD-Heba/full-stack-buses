@@ -547,7 +547,7 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-3">
-                {["QR", "EFECTIVO", "TARJETA"].map((method) => (
+                {["QR", "TARJETA"].map((method) => (
                   <button
                     key={method}
                     onClick={() => setPaymentMethod(method)}
@@ -558,7 +558,6 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
                     }`}
                   >
                     {method === "QR" && <QrCode className="h-6 w-6" />}
-                    {method === "EFECTIVO" && <CreditCard className="h-6 w-6" />}
                     {method === "TARJETA" && <CreditCard className="h-6 w-6" />}
                     <span className="text-sm font-medium">{method}</span>
                   </button>
