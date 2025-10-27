@@ -50,105 +50,106 @@ export class StripeService {
   /**
    * Crear sesión de pago para tickets
    */
-  async createCheckoutSession(data: {
-    tickets: Array<{
-      tripId: string;
-      seatId: string;
-      price: number;
-      category: string;
-    }>;
-    userProfileId: string;
-    successUrl: string;
-    cancelUrl: string;
-  }) {
-    const { tickets, userProfileId, successUrl, cancelUrl } = data;
+  // REEMPLAZAR desde la línea 52 hasta la 88:
 
-    // Validar usuario con relación User
-    const userProfile = await this.userProfileRepository.findOne({
-      where: { id: userProfileId, isActive: true },
-      relations: ['user'], // ✅ AGREGAR relación user
-    });
+async createCheckoutSession(data: {
+  tickets: Array<{
+    tripId: string;
+    seatId: string;
+    price: number;
+    category: string;
+  }>;
+  userProfileId: string;
+  successUrl: string;
+  cancelUrl: string;
+}) {
+  const { tickets, userProfileId, successUrl, cancelUrl } = data;
 
-    if (!userProfile) {
-      throw new NotFoundException('Usuario no encontrado');
-    }
-    if (
-      !userProfile.email &&
-      !userProfile.phone &&
-      !userProfile.documentNumber
-    ) {
-      throw new BadRequestException(
-        'El perfil debe tener al menos email, teléfono o documento para procesar el pago',
-      );
-    }
+  // ✅ CORRECCIÓN: Validar usuario CON relación User
+  const userProfile = await this.userProfileRepository.findOne({
+    where: { id: userProfileId, isActive: true },
+    // NO necesitas relación 'user' aquí, solo accedes a campos del profile
+  });
 
-    // Validar que los viajes y asientos existan
-    for (const ticket of tickets) {
-      const trip = await this.tripRepository.findOne({
-        where: { id: ticket.tripId, is_active: true },
-        relations: ['route', 'bus'],
-      });
-
-      if (!trip) {
-        throw new NotFoundException(`Viaje ${ticket.tripId} no encontrado`);
-      }
-
-      if (trip.available_seats <= 0) {
-        throw new BadRequestException(`El viaje no tiene asientos disponibles`);
-      }
-    }
-
-    // Crear line items para Stripe
-    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] =
-      tickets.map((ticket) => ({
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: `Boleto de Bus`,
-            description: `Pasajero: ${userProfile.firstName} ${userProfile.lastName} - Categoría: ${ticket.category}`,
-          },
-          unit_amount: Math.round(ticket.price * 100),
-        },
-        quantity: 1,
-      }));
-
-    // Crear metadata para recuperar info después
-    const metadata = {
-      userProfileId,
-      ticketData: JSON.stringify(tickets),
-    };
-
-    // ✅ CORRECCIÓN: Generar email para Stripe
-    let customerEmail: string | undefined = undefined;
-
-    if (userProfile.email) {
-      // Usar email del perfil directamente
-      customerEmail = userProfile.email;
-    } else if (userProfile.phone) {
-      // Si solo tiene teléfono, generar email temporal
-      customerEmail = `guest.${userProfile.phone.replace(/[^0-9]/g, '')}@transarka.local`;
-    } else if (userProfile.documentNumber) {
-      // Si solo tiene documento, usar eso
-      customerEmail = `guest.${userProfile.documentNumber.replace(/[^0-9A-Za-z]/g, '')}@transarka.local`;
-    }
-    // Crear sesión de Stripe
-    const session = await this.stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: lineItems,
-      mode: 'payment',
-      success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl,
-      metadata,
-      customer_email: customerEmail, // Puede ser undefined si no hay datos
-      expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
-    });
-
-    return {
-      sessionId: session.id,
-      url: session.url,
-      expiresAt: new Date(session.expires_at * 1000),
-    };
+  if (!userProfile) {
+    throw new NotFoundException('Usuario no encontrado');
   }
+
+  // ✅ CORRECCIÓN: Validar que tenga al menos UN dato de contacto
+  if (!userProfile.email && !userProfile.phone && !userProfile.documentNumber) {
+    throw new BadRequestException(
+      'El perfil debe tener al menos email, teléfono o documento para procesar el pago',
+    );
+  }
+
+  // Validar que los viajes y asientos existan
+  for (const ticket of tickets) {
+    const trip = await this.tripRepository.findOne({
+      where: { id: ticket.tripId, is_active: true },
+      relations: ['route', 'bus'],
+    });
+
+    if (!trip) {
+      throw new NotFoundException(`Viaje ${ticket.tripId} no encontrado`);
+    }
+
+    if (trip.available_seats <= 0) {
+      throw new BadRequestException(`El viaje no tiene asientos disponibles`);
+    }
+  }
+
+  // Crear line items para Stripe
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] =
+    tickets.map((ticket) => ({
+      price_data: {
+        currency: 'usd',
+        product_data: {
+          name: `Boleto de Bus`,
+          description: `Pasajero: ${userProfile.firstName || 'Invitado'} ${userProfile.lastName || ''} - Categoría: ${ticket.category}`,
+        },
+        unit_amount: Math.round(ticket.price * 100),
+      },
+      quantity: 1,
+    }));
+
+  // Crear metadata para recuperar info después
+  const metadata = {
+    userProfileId,
+    ticketData: JSON.stringify(tickets),
+  };
+
+  // ✅ CORRECCIÓN: Generar email para Stripe
+  let customerEmail: string | undefined = undefined;
+
+  if (userProfile.email) {
+    // Usar email del perfil directamente
+    customerEmail = userProfile.email;
+  } else if (userProfile.phone) {
+    // Si solo tiene teléfono, generar email temporal
+    customerEmail = `guest.${userProfile.phone.replace(/[^0-9]/g, '')}@transarka.local`;
+  } else if (userProfile.documentNumber) {
+    // Si solo tiene documento, usar eso
+    customerEmail = `guest.${userProfile.documentNumber.replace(/[^0-9A-Za-z]/g, '')}@transarka.local`;
+  }
+
+  // Crear sesión de Stripe
+  const session = await this.stripe.checkout.sessions.create({
+    payment_method_types: ['card'],
+    line_items: lineItems,
+    mode: 'payment',
+    success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: cancelUrl,
+    metadata,
+    customer_email: customerEmail, // Puede ser undefined si no hay datos
+    expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+  });
+
+  return {
+    sessionId: session.id,
+    url: session.url,
+    expiresAt: new Date(session.expires_at * 1000),
+  };
+}
 
   /**
    * Crear Payment Intent para formulario embebido
