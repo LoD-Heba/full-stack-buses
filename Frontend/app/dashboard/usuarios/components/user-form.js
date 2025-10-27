@@ -43,8 +43,6 @@ export function UserForm({ user }) {
   } = useForm({
     defaultValues: {
       name: "",
-      email: "",
-      phone: "",
       password: "",
       roleId: "",
     },
@@ -81,8 +79,6 @@ export function UserForm({ user }) {
     if (user && !loadingRoles) {
       reset({
         name: user.name || "",
-        email: user.profile?.email || "",
-        phone: user.profile?.phone || "",
         password: "",
         roleId: userRoleId,
       });
@@ -90,78 +86,74 @@ export function UserForm({ user }) {
   }, [user, userRoleId, loadingRoles, reset]);
 
   const onSubmit = handleSubmit(async (data) => {
-    try {
-      setBackendError(null);
+  try {
+    setBackendError(null);
+    if (!data.roleId) {
+      setBackendError("Debe seleccionar un rol");
+      return;
+    }
 
-      if (!data.email && !data.phone) {
-        setBackendError("Debe proporcionar al menos un correo o teléfono");
+    const dataToSend = {
+      name: data.name,
+      roleId: data.roleId,
+    };
+
+    if (isEditing) {
+      if (data.password && data.password.trim() !== "") {
+        dataToSend.password = data.password;
+      }
+
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(params.id)) {
+        setBackendError("ID de usuario inválido");
         return;
       }
 
-      if (!data.roleId) {
-        setBackendError("Debe seleccionar un rol");
-        return;
-      }
+      const res = await updateUser(params.id, dataToSend);
 
-      const dataToSend = {
-        name: data.name,
-        email: data.email || undefined,
-        phone: data.phone || undefined,
-        roleId: data.roleId,
-      };
-
-      // ✅ Validar que params.id exista antes de actualizar
-      if (isEditing) {
-        if (data.password && data.password.trim() !== "") {
-          dataToSend.password = data.password;
-        }
-
-        // ✅ Validación adicional del UUID
-        const uuidRegex =
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(params.id)) {
-          setBackendError("ID de usuario inválido");
+      if (res?.message) {
+        if (Array.isArray(res.message)) {
+          setBackendError(res.message[0]);
+          return;
+        } else if (typeof res.message === "string") {
+          setBackendError(res.message);
           return;
         }
-
-        const res = await updateUser(params.id, dataToSend);
-
-        if (res?.message) {
-          if (Array.isArray(res.message)) {
-            setBackendError(res.message[0]);
-            return;
-          } else if (typeof res.message === "string") {
-            setBackendError(res.message);
-            return;
-          }
-        }
-      } else {
-        dataToSend.password = data.password;
-        const res = await createUser(dataToSend);
-
-        if (res?.message) {
-          if (Array.isArray(res.message)) {
-            setBackendError(res.message[0]);
-            return;
-          } else if (typeof res.message === "string") {
-            setBackendError(res.message);
-            return;
-          }
-        }
       }
+    } else {
+      // Validación: contraseña es obligatoria al crear
+      if (!data.password) {
+        setBackendError("La contraseña es obligatoria");
+        return;
+      }
+      
+      dataToSend.password = data.password;
+      const res = await createUser(dataToSend);
 
-      router.push("/dashboard/usuarios");
-      router.refresh();
-    } catch (err) {
-      console.error("Error en onSubmit:", err);
-
-      if (err.message) {
-        setBackendError(err.message);
-      } else {
-        setBackendError("Error al procesar el usuario. Intenta nuevamente.");
+      if (res?.message) {
+        if (Array.isArray(res.message)) {
+          setBackendError(res.message[0]);
+          return;
+        } else if (typeof res.message === "string") {
+          setBackendError(res.message);
+          return;
+        }
       }
     }
-  });
+
+    router.push("/dashboard/usuarios");
+    router.refresh();
+  } catch (err) {
+    console.error("Error en onSubmit:", err);
+
+    if (err.message) {
+      setBackendError(err.message);
+    } else {
+      setBackendError("Error al procesar el usuario. Intenta nuevamente.");
+    }
+  }
+});
 
   if (loadingRoles) {
     return (
@@ -191,41 +183,7 @@ export function UserForm({ user }) {
             <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
           )}
         </div>
-
-        <div>
-          <Label>Correo electrónico (opcional)</Label>
-          <Input
-            type="email"
-            {...register("email", {
-              validate: (value) => {
-                if (value || phone) return true;
-                return "Debe ingresar un correo o teléfono";
-              },
-            })}
-            placeholder="Ej: ejemplo@gmail.com"
-          />
-          {errors.email && (
-            <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
-          )}
-        </div>
-
-        <div>
-          <Label>Teléfono (opcional)</Label>
-          <Input
-            type="tel"
-            {...register("phone", {
-              validate: (value) => {
-                if (value || email) return true;
-                return "Debe ingresar un teléfono o correo";
-              },
-            })}
-            placeholder="Ej: +59170000000"
-          />
-          {errors.phone && (
-            <p className="text-red-500 text-sm mt-1">{errors.phone.message}</p>
-          )}
-        </div>
-
+        
         <div>
           <Label>
             Contraseña {isEditing ? "(dejar en blanco para mantener)" : ""}

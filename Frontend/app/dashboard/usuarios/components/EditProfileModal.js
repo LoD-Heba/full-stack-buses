@@ -15,14 +15,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { updateUserProfile, createUserProfile } from "@/app/dashboard/usuarios/api/api-profile";
+import {
+  updateUserProfile,
+  createUserProfile,
+} from "@/app/dashboard/usuarios/api/api-profile";
 
 export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
   const [backendError, setBackendError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const hasProfile = !!user?.profile;
-  
+
   const {
     register,
     handleSubmit,
@@ -34,6 +37,7 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
       lastName: "",
       documentNumber: "",
       phone: "",
+      email: "",
       address: "",
     },
   });
@@ -45,6 +49,7 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
         lastName: user.profile.lastName || "",
         documentNumber: user.profile.documentNumber || "",
         phone: user.profile.phone || "",
+        email: user.profile.email || "",
         address: user.profile.address || "",
       });
     } else {
@@ -52,7 +57,8 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
         firstName: "",
         lastName: "",
         documentNumber: "",
-        phone: user?.phone || "",
+        phone: "",
+        email: "",
         address: "",
       });
     }
@@ -68,6 +74,7 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
         lastName: data.lastName || undefined,
         documentNumber: data.documentNumber || undefined,
         phone: data.phone || undefined,
+        email: data.email || undefined, // AGREGAR
         address: data.address || undefined,
       };
 
@@ -104,8 +111,8 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
         </DialogHeader>
 
         <form onSubmit={onSubmit} className="space-y-4 mt-4">
+          {/* Nombres y Apellidos */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Nombre */}
             <div>
               <Label>Nombre(s)</Label>
               <Input
@@ -121,7 +128,6 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
               )}
             </div>
 
-            {/* Apellido */}
             <div>
               <Label>Apellido(s)</Label>
               <Input
@@ -138,16 +144,16 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
             </div>
           </div>
 
+          {/* Documento y Teléfono */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Documento */}
             <div>
               <Label>Número de Documento</Label>
               <Input
                 {...register("documentNumber", {
                   maxLength: { value: 20, message: "Máximo 20 caracteres" },
                   pattern: {
-                    value: /^[0-9]+$/,
-                    message: "Solo se permiten números",
+                    value: /^\d{7,10}(-[0-9A-Za-z]{1,3})?$/,
+                    message: "Formato inválido. Ej: 12345678 o 12345678-1A",
                   },
                 })}
                 placeholder="Ej: 12345678"
@@ -159,13 +165,16 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
               )}
             </div>
 
-            {/* Teléfono */}
             <div>
               <Label>Teléfono</Label>
               <Input
                 type="tel"
                 {...register("phone", {
                   maxLength: { value: 20, message: "Máximo 20 caracteres" },
+                  pattern: {
+                    value: /^(\+\d{1,4})?[\s\-]?\d{6,15}$/,
+                    message: "Formato inválido. Ej: +59170123456",
+                  },
                 })}
                 placeholder="Ej: +59162984081"
               />
@@ -177,9 +186,32 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
             </div>
           </div>
 
+          {/* Email */}
+          <div>
+            <Label>Correo Electrónico (opcional)</Label>
+            <Input
+              type="email"
+              {...register("email", {
+                pattern: {
+                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                  message: "Formato de email inválido",
+                },
+              })}
+              placeholder="Ej: usuario@ejemplo.com"
+            />
+            {errors.email && (
+              <p className="text-red-500 text-sm mt-1">
+                {errors.email.message}
+              </p>
+            )}
+            <p className="text-xs text-gray-500 mt-1">
+              El email es opcional y puede agregarse más tarde
+            </p>
+          </div>
+
           {/* Dirección */}
           <div>
-            <Label>Dirección</Label>
+            <Label>Dirección (opcional)</Label>
             <Textarea
               {...register("address", {
                 maxLength: { value: 150, message: "Máximo 150 caracteres" },

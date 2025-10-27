@@ -3,235 +3,294 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 
 /**
- * Exportar lista de tickets a PDF
- */
-export function exportTicketsToPDF(tickets) {
-  const doc = new jsPDF();
-  
-  // Configurar el documento
-  const pageWidth = doc.internal.pageSize.getWidth();
-  
-  // Título
-  doc.setFontSize(20);
-  doc.setTextColor(234, 88, 12); // Color naranja
-  doc.text("Reporte de Tickets", pageWidth / 2, 15, { align: "center" });
-  
-  // Fecha del reporte
-  doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text(
-    `Generado el: ${new Date().toLocaleString("es-ES")}`,
-    pageWidth / 2,
-    22,
-    { align: "center" }
-  );
-  
-  // Línea decorativa
-  doc.setDrawColor(234, 88, 12);
-  doc.setLineWidth(0.5);
-  doc.line(14, 25, pageWidth - 14, 25);
-  
-  // Estadísticas rápidas
-  const totalTickets = tickets.length;
-  const pendientes = tickets.filter((t) => t.status === "PENDIENTE").length;
-  const confirmados = tickets.filter((t) => t.status === "CONFIRMADO").length;
-  const cancelados = tickets.filter((t) => t.status === "CANCELADO").length;
-  const totalIngresos = tickets
-    .filter((t) => t.status === "CONFIRMADO")
-    .reduce((sum, t) => sum + parseFloat(t.price), 0);
-  
-  doc.setFontSize(9);
-  doc.setTextColor(60);
-  const statsY = 32;
-  doc.text(`Total: ${totalTickets}`, 14, statsY);
-  doc.text(`Pendientes: ${pendientes}`, 50, statsY);
-  doc.text(`Confirmados: ${confirmados}`, 90, statsY);
-  doc.text(`Cancelados: ${cancelados}`, 135, statsY);
-  doc.setTextColor(34, 197, 94); // Verde
-  doc.text(`Ingresos: Bs. ${totalIngresos.toFixed(2)}`, 170, statsY);
-  
-  // Preparar datos para la tabla
-  const tableData = tickets.map((ticket) => [
-    ticket.code,
-    ticket.passenger,
-    ticket.trip_route,
-    ticket.seat,
-    `Bs. ${parseFloat(ticket.price).toFixed(2)}`,
-    ticket.status,
-    ticket.booking_date,
-  ]);
-  
-  // Configurar tabla
-  doc.autoTable({
-    startY: 40,
-    head: [
-      ["Código", "Pasajero", "Ruta", "Asiento", "Precio", "Estado", "Fecha"],
-    ],
-    body: tableData,
-    theme: "grid",
-    headStyles: {
-      fillColor: [234, 88, 12], // Naranja
-      textColor: 255,
-      fontSize: 9,
-      fontStyle: "bold",
-      halign: "center",
-    },
-    bodyStyles: {
-      fontSize: 8,
-      textColor: 50,
-    },
-    alternateRowStyles: {
-      fillColor: [251, 243, 232], // Naranja muy claro
-    },
-    columnStyles: {
-      0: { cellWidth: 30 }, // Código
-      1: { cellWidth: 35 }, // Pasajero
-      2: { cellWidth: 40 }, // Ruta
-      3: { cellWidth: 15, halign: "center" }, // Asiento
-      4: { cellWidth: 25, halign: "right" }, // Precio
-      5: { cellWidth: 25, halign: "center" }, // Estado
-      6: { cellWidth: 25 }, // Fecha
-    },
-    didParseCell: function (data) {
-      // Colorear estados
-      if (data.section === "body" && data.column.index === 5) {
-        const status = data.cell.raw;
-        if (status === "CONFIRMADO") {
-          data.cell.styles.textColor = [34, 197, 94]; // Verde
-          data.cell.styles.fontStyle = "bold";
-        } else if (status === "PENDIENTE") {
-          data.cell.styles.textColor = [234, 179, 8]; // Amarillo
-          data.cell.styles.fontStyle = "bold";
-        } else if (status === "CANCELADO") {
-          data.cell.styles.textColor = [239, 68, 68]; // Rojo
-          data.cell.styles.fontStyle = "bold";
-        }
-      }
-    },
-    margin: { top: 40, left: 14, right: 14 },
-  });
-  
-  // Pie de página
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(150);
-    doc.text(
-      `Página ${i} de ${pageCount}`,
-      pageWidth / 2,
-      doc.internal.pageSize.getHeight() - 10,
-      { align: "center" }
-    );
-  }
-  
-  // Guardar el PDF
-  const filename = `tickets-${new Date().toISOString().split("T")[0]}.pdf`;
-  doc.save(filename);
-}
-
-/**
- * Exportar un ticket individual a PDF
+ * Exportar un ticket individual a PDF como factura profesional
  */
 export function exportSingleTicketToPDF(ticket) {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
-  
-  // Encabezado
-  doc.setFillColor(234, 88, 12);
-  doc.rect(0, 0, pageWidth, 30, "F");
-  
-  doc.setTextColor(255);
-  doc.setFontSize(24);
-  doc.text("🚌 TICKET DE VIAJE", pageWidth / 2, 15, { align: "center" });
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // ENCABEZADO DE LA EMPRESA
+  doc.setFillColor(234, 88, 12); // Naranja
+  doc.rect(0, 0, pageWidth, 35, "F");
+
+  // Logo/Nombre de empresa
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(28);
+  doc.setFont(undefined, "bold");
+  doc.text("TRANSARKA", 15, 15);
+
   doc.setFontSize(10);
-  doc.text("Mi Empresa de Transporte", pageWidth / 2, 22, { align: "center" });
-  
-  // Código del ticket
-  doc.setTextColor(0);
+  doc.setFont(undefined, "normal");
+  doc.text("Empresa de Transporte", 15, 22);
+
+  // Datos de la empresa
+  doc.setFontSize(8);
+  doc.text("NIT: 123456789", 15, 27);
+  doc.text("Av. Principal #123, Cochabamba", 15, 31);
+
+  // FACTURA - Lado derecho
+  doc.setFillColor(255, 255, 255);
+  doc.roundedRect(pageWidth - 65, 8, 50, 20, 2, 2, "F");
+
+  doc.setTextColor(234, 88, 12);
   doc.setFontSize(16);
-  doc.text(`Código: ${ticket.code}`, pageWidth / 2, 45, { align: "center" });
-  
-  // Estado
-  let statusColor = [234, 179, 8]; // Amarillo por defecto
-  if (ticket.status === "CONFIRMADO") statusColor = [34, 197, 94];
-  if (ticket.status === "CANCELADO") statusColor = [239, 68, 68];
-  
-  doc.setFillColor(...statusColor);
-  doc.roundedRect(pageWidth / 2 - 20, 50, 40, 8, 2, 2, "F");
-  doc.setTextColor(255);
-  doc.setFontSize(10);
-  doc.text(ticket.status, pageWidth / 2, 55, { align: "center" });
-  
-  // Información del pasajero
-  let yPos = 70;
+  doc.setFont(undefined, "bold");
+  doc.text("FACTURA", pageWidth - 40, 15, { align: "center" });
+
   doc.setTextColor(0);
-  doc.setFontSize(12);
-  doc.setFont(undefined, "bold");
-  doc.text("INFORMACIÓN DEL PASAJERO", 20, yPos);
-  
+  doc.setFontSize(8);
   doc.setFont(undefined, "normal");
-  doc.setFontSize(10);
-  yPos += 8;
-  doc.text(`Nombre: ${ticket.passenger}`, 20, yPos);
-  yPos += 6;
-  doc.text(`Documento: ${ticket.document}`, 20, yPos);
-  
-  // Información del viaje
-  yPos += 15;
-  doc.setFontSize(12);
-  doc.setFont(undefined, "bold");
-  doc.text("DETALLES DEL VIAJE", 20, yPos);
-  
-  doc.setFont(undefined, "normal");
-  doc.setFontSize(10);
-  yPos += 8;
-  doc.text(`Ruta: ${ticket.trip_route}`, 20, yPos);
-  yPos += 6;
-  doc.text(`Salida: ${ticket.departure_time}`, 20, yPos);
-  yPos += 6;
-  doc.text(`Bus: ${ticket.bus_plate}`, 20, yPos);
-  yPos += 6;
-  doc.text(`Asiento: ${ticket.seat}`, 20, yPos);
-  
-  // Precio
-  yPos += 15;
-  doc.setFillColor(220, 252, 231);
-  doc.roundedRect(15, yPos - 5, pageWidth - 30, 15, 3, 3, "F");
-  doc.setFontSize(14);
-  doc.setFont(undefined, "bold");
-  doc.setTextColor(34, 197, 94);
+  doc.text(`N°: ${ticket.code}`, pageWidth - 40, 20, { align: "center" });
   doc.text(
-    `Total: Bs. ${parseFloat(ticket.price).toFixed(2)}`,
-    pageWidth / 2,
-    yPos + 4,
+    `Fecha: ${new Date().toLocaleDateString("es-ES")}`,
+    pageWidth - 40,
+    24,
     { align: "center" }
   );
-  
-  // Fecha de reserva
-  yPos += 25;
-  doc.setTextColor(100);
+
+  // ESTADO DEL TICKET
+  let yPos = 42;
+  let statusColor = [234, 179, 8]; // Amarillo
+  if (ticket.status === "CONFIRMADO") statusColor = [34, 197, 94]; // Verde
+  if (ticket.status === "CANCELADO") statusColor = [239, 68, 68]; // Rojo
+
+  doc.setFillColor(...statusColor);
+  doc.roundedRect(pageWidth - 45, yPos - 5, 30, 8, 2, 2, "F");
+  doc.setTextColor(255);
+  doc.setFontSize(9);
+  doc.setFont(undefined, "bold");
+  doc.text(ticket.status, pageWidth - 30, yPos, { align: "center" });
+
+  // DATOS DEL PASAJERO
+  yPos = 55;
+  doc.setDrawColor(200);
+  doc.setLineWidth(0.5);
+  doc.rect(15, yPos, pageWidth - 30, 20);
+
+  doc.setTextColor(0);
+  doc.setFontSize(10);
+  doc.setFont(undefined, "bold");
+  doc.text("DATOS DEL PASAJERO", 18, yPos + 6);
+
   doc.setFontSize(9);
   doc.setFont(undefined, "normal");
-  doc.text(`Reservado el: ${ticket.booking_date}`, pageWidth / 2, yPos, {
+  doc.text("Nombre Completo:", 18, yPos + 12);
+  doc.setFont(undefined, "bold");
+  doc.text(ticket.passenger, 52, yPos + 12);
+
+  doc.setFont(undefined, "normal");
+  doc.text("Documento:", 18, yPos + 17);
+  doc.setFont(undefined, "bold");
+  doc.text(ticket.document, 52, yPos + 17);
+
+  // DETALLES DEL SERVICIO - Encabezado de tabla
+  yPos = 82;
+  doc.setFillColor(240, 240, 240);
+  doc.rect(15, yPos, pageWidth - 30, 8, "F");
+
+  doc.setFontSize(8);
+  doc.setFont(undefined, "bold");
+  doc.setTextColor(60);
+  doc.text("DESCRIPCIÓN", 18, yPos + 5);
+  doc.text("CANT.", pageWidth / 2 + 20, yPos + 5, { align: "center" });
+  doc.text("PRECIO UNIT.", pageWidth / 2 + 50, yPos + 5, { align: "right" });
+  doc.text("TOTAL", pageWidth - 20, yPos + 5, { align: "right" });
+
+  // Contenido de la tabla
+  yPos += 10;
+  doc.setDrawColor(220);
+  doc.line(15, yPos, pageWidth - 15, yPos);
+
+  yPos += 6;
+  doc.setFontSize(9);
+  doc.setFont(undefined, "bold");
+  doc.setTextColor(0);
+  doc.text(`Pasaje de Bus - ${ticket.trip_route}`, 18, yPos);
+
+  yPos += 4;
+  doc.setFontSize(8);
+  doc.setFont(undefined, "normal");
+  doc.setTextColor(100);
+  doc.text(`Salida: ${ticket.departure_time}`, 18, yPos);
+
+  yPos += 4;
+  doc.text(`Bus: ${ticket.bus_plate} | Asiento: ${ticket.seat}`, 18, yPos);
+
+  // Cantidad, precio unitario y total
+  doc.setTextColor(0);
+  doc.setFont(undefined, "bold");
+  doc.text("1", pageWidth / 2 + 20, yPos - 4, { align: "center" });
+  doc.text(
+    `Bs. ${parseFloat(ticket.price).toFixed(2)}`,
+    pageWidth / 2 + 50,
+    yPos - 4,
+    { align: "right" }
+  );
+  doc.setFontSize(10);
+  doc.text(
+    `Bs. ${parseFloat(ticket.price).toFixed(2)}`,
+    pageWidth - 20,
+    yPos - 4,
+    { align: "right" }
+  );
+
+  yPos += 5;
+  doc.setDrawColor(220);
+  doc.line(15, yPos, pageWidth - 15, yPos);
+
+  // RESUMEN DE TOTALES
+  yPos += 10;
+  const boxX = pageWidth - 70;
+  const boxWidth = 55;
+
+  // Subtotal
+  doc.setFontSize(9);
+  doc.setFont(undefined, "normal");
+  doc.text("Subtotal:", boxX, yPos);
+  doc.setFont(undefined, "bold");
+  doc.text(
+    `Bs. ${parseFloat(ticket.price).toFixed(2)}`,
+    boxX + boxWidth,
+    yPos,
+    { align: "right" }
+  );
+
+  yPos += 6;
+  doc.setFont(undefined, "normal");
+  doc.text("IVA (0%):", boxX, yPos);
+  doc.setFont(undefined, "bold");
+  doc.text("Bs. 0.00", boxX + boxWidth, yPos, { align: "right" });
+
+  // Total - destacado
+  yPos += 10;
+  doc.setFillColor(220, 252, 231); // Verde claro
+  doc.setDrawColor(34, 197, 94); // Verde
+  doc.setLineWidth(1);
+  doc.roundedRect(boxX - 5, yPos - 6, boxWidth + 10, 12, 2, 2, "FD");
+
+  doc.setFontSize(11);
+  doc.setFont(undefined, "bold");
+  doc.setTextColor(0);
+  doc.text("TOTAL A PAGAR:", boxX, yPos);
+  doc.setFontSize(14);
+  doc.setTextColor(34, 197, 94);
+  doc.text(
+    `Bs. ${parseFloat(ticket.price).toFixed(2)}`,
+    boxX + boxWidth,
+    yPos + 1,
+    { align: "right" }
+  );
+
+  // CÓDIGO QR Y VERIFICACIÓN
+  yPos += 20;
+  doc.setDrawColor(200);
+  doc.setLineWidth(0.5);
+  doc.line(15, yPos, pageWidth - 15, yPos);
+  yPos += 8;
+
+  // Código de verificación
+  doc.setFontSize(9);
+  doc.setTextColor(100);
+  doc.setFont(undefined, "normal");
+  doc.text("Código de Verificación:", 18, yPos);
+
+  yPos += 5;
+  doc.setFontSize(12);
+  doc.setFont(undefined, "bold");
+  doc.setTextColor(234, 88, 12);
+  doc.text(ticket.code, 18, yPos);
+
+  yPos += 6;
+  doc.setFontSize(8);
+  doc.setTextColor(150);
+  doc.setFont(undefined, "normal");
+  doc.text(`Fecha de emisión: ${ticket.booking_date}`, 18, yPos);
+
+  // QR Code (simulado con texto)
+  const qrX = pageWidth - 45;
+  const qrY = yPos - 18;
+  doc.setDrawColor(100);
+  doc.setLineWidth(1);
+  doc.rect(qrX, qrY, 25, 25);
+  doc.setFontSize(7);
+  doc.setTextColor(0);
+  doc.text("QR", qrX + 12.5, qrY + 13, { align: "center" });
+  doc.text("CODE", qrX + 12.5, qrY + 16, { align: "center" });
+
+  doc.setFontSize(7);
+  doc.setTextColor(100);
+  doc.text("CÓDIGO QR", qrX + 12.5, qrY - 2, { align: "center" });
+  doc.text("Escanear al abordar", qrX + 12.5, qrY + 28, { align: "center" });
+
+  // TÉRMINOS Y CONDICIONES
+  yPos += 18;
+  doc.setFillColor(250, 250, 250);
+  doc.rect(15, yPos, pageWidth - 30, 35, "F");
+
+  doc.setDrawColor(220);
+  doc.setLineWidth(0.3);
+  doc.rect(15, yPos, pageWidth - 30, 35);
+
+  yPos += 5;
+  doc.setFontSize(8);
+  doc.setFont(undefined, "bold");
+  doc.setTextColor(0);
+  doc.text("Términos y Condiciones:", 18, yPos);
+
+  yPos += 5;
+  doc.setFont(undefined, "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(80);
+
+  const terms = [
+    "• El pasajero debe presentarse 15 minutos antes de la hora de salida",
+    "• Es obligatorio presentar documento de identidad al momento de abordar",
+    "• Las cancelaciones deben realizarse con 24 horas de anticipación",
+    "• El ticket es personal e intransferible",
+    "• Conserve este documento como comprobante de pago",
+  ];
+
+  terms.forEach((term) => {
+    doc.text(term, 18, yPos);
+    yPos += 4;
+  });
+
+  // PIE DE PÁGINA
+  yPos = pageHeight - 25;
+  doc.setDrawColor(234, 88, 12);
+  doc.setLineWidth(0.5);
+  doc.line(15, yPos, pageWidth - 15, yPos);
+
+  yPos += 5;
+  doc.setFontSize(9);
+  doc.setTextColor(234, 88, 12);
+  doc.setFont(undefined, "bold");
+  doc.text("¡Gracias por viajar con TRANSARKA!", pageWidth / 2, yPos, {
     align: "center",
   });
-  
-  // Pie de página
+
+  yPos += 5;
   doc.setFontSize(8);
+  doc.setTextColor(100);
+  doc.setFont(undefined, "normal");
   doc.text(
-    "¡Gracias por viajar con nosotros!",
+    "Este documento es válido como comprobante de compra",
     pageWidth / 2,
-    doc.internal.pageSize.getHeight() - 20,
+    yPos,
     { align: "center" }
   );
+
+  yPos += 4;
+  doc.setFontSize(7);
+  doc.setTextColor(150);
   doc.text(
-    "Presente este ticket al abordar",
+    "Generado electrónicamente - No requiere firma ni sello",
     pageWidth / 2,
-    doc.internal.pageSize.getHeight() - 15,
+    yPos,
     { align: "center" }
   );
-  
+
   // Guardar
-  doc.save(`ticket-${ticket.code}.pdf`);
+  doc.save(`factura-${ticket.code}.pdf`);
 }

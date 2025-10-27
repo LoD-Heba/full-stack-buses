@@ -25,6 +25,7 @@ import {
   Eye,
   FileText,
   IdCard,
+  Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getClientWithTickets } from "../../api/api-clients";
@@ -199,6 +200,12 @@ export default function ClientProfilePage() {
                   {client.firstName} {client.lastName}
                 </h1>
                 <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
+                  {client.email && (
+                    <div className="flex items-center gap-1">
+                      <Mail className="h-4 w-4" />
+                      {client.email}
+                    </div>
+                  )}
                   <div className="flex items-center gap-1">
                     <IdCard className="h-4 w-4" />
                     C.I.: {client.documentNumber}
@@ -239,6 +246,7 @@ export default function ClientProfilePage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Información Personal */}
+        {/* Información Personal */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -259,6 +267,19 @@ export default function ClientProfilePage() {
               <p className="font-medium">{client.documentNumber}</p>
             </div>
             <Separator />
+            {/* AGREGAR campo de email */}
+            {client.email && (
+              <>
+                <div>
+                  <p className="text-sm text-gray-500 flex items-center gap-1">
+                    <Mail className="h-4 w-4" />
+                    Correo Electrónico
+                  </p>
+                  <p className="font-medium">{client.email}</p>
+                </div>
+                <Separator />
+              </>
+            )}
             <div>
               <p className="text-sm text-gray-500">Teléfono</p>
               <p className="font-medium">{client.phone}</p>

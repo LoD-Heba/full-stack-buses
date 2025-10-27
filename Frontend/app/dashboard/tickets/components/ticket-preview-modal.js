@@ -3,8 +3,6 @@
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,9 +10,9 @@ import { QRCodeSVG } from "qrcode.react";
 import { Printer, Download, X } from "lucide-react";
 
 const STATUS_COLORS = {
-  PENDIENTE: "bg-yellow-100 text-yellow-800",
-  CONFIRMADO: "bg-green-100 text-green-800",
-  CANCELADO: "bg-red-100 text-red-800",
+  PENDIENTE: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  CONFIRMADO: "bg-green-100 text-green-800 border-green-300",
+  CANCELADO: "bg-red-100 text-red-800 border-red-300",
 };
 
 export function TicketPreviewModal({ ticket, open, onClose }) {
@@ -24,144 +22,237 @@ export function TicketPreviewModal({ ticket, open, onClose }) {
     window.print();
   };
 
+  const currentDate = new Date().toLocaleDateString("es-ES", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="mx-auto max-w-2xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-        {/* Ticket Preview */}
+      <DialogContent className="max-w-4xl w-full max-h-[90vh] overflow-y-auto p-0">
+        {/* Factura Preview */}
         <div
-          id="ticket-preview"
-          className="space-y-3 sm:space-y-4 p-4 sm:p-6 border-2 border-dashed border-orange-300 rounded-lg bg-gradient-to-br from-green-500 to-white"
+          id="invoice-preview"
+          className="bg-white p-8 space-y-6"
+          style={{ fontFamily: "Arial, sans-serif" }}
         >
-          {/* Header con logo */}
-          <div className="text-center border-b-2 border-orange-200 pb-3 sm:pb-4">
-            <h2 className="text-xl sm:text-2xl font-bold text-orange-600">
-              Mi Empresa
-            </h2>
-            <p className="text-xs sm:text-sm text-gray-600">
-              Viajes Seguros y Cómodos
-            </p>
-          </div>
-
-          {/* QR Code */}
-          <div className="flex justify-center py-3 sm:py-4">
-            <div className="p-3 sm:p-4 bg-white rounded-lg shadow-md">
-              <QRCodeSVG
-                value={JSON.stringify({
-                  code: ticket.code,
-                  passenger: ticket.passenger,
-                  seat: ticket.seat,
-                  trip: ticket.trip_route,
-                  price: ticket.price,
-                })}
-                size={window.innerWidth < 640 ? 100 : 120}
-                level="H"
-                includeMargin={true}
-              />
+          {/* Encabezado con logo y datos de empresa */}
+          <div className="flex justify-between items-start border-b-4 border-orange-600 pb-6">
+            <div>
+              <h1 className="text-4xl font-bold text-orange-600 mb-2">
+                TRANSARKA
+              </h1>
+              <p className="text-sm text-gray-600">Empresa de Transporte</p>
+              <p className="text-xs text-gray-500 mt-1">NIT: 123456789</p>
+              <p className="text-xs text-gray-500">
+                Av. Principal #123, Cochabamba
+              </p>
+              <p className="text-xs text-gray-500">Tel: +591 4-1234567</p>
+              <p className="text-xs text-gray-500">
+                Email: info@transarka.com
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="bg-orange-600 text-white px-6 py-3 rounded-lg mb-3">
+                <p className="text-2xl font-bold">FACTURA</p>
+              </div>
+              <p className="text-sm text-gray-600">
+                <span className="font-semibold">N°:</span> {ticket.code}
+              </p>
+              <p className="text-sm text-gray-600">
+                <span className="font-semibold">Fecha:</span> {currentDate}
+              </p>
+              <Badge
+                className={`mt-2 ${STATUS_COLORS[ticket.status]}`}
+              >
+                {ticket.status}
+              </Badge>
             </div>
           </div>
 
-          {/* Código del ticket */}
-          <div className="text-center">
-            <p className="text-xs sm:text-sm text-gray-600">Código de Ticket</p>
-            <p className="text-xl sm:text-2xl font-bold text-gray-800 break-all">
-              {ticket.code}
-            </p>
-            <Badge className={`mt-2 text-xs sm:text-sm ${STATUS_COLORS[ticket.status]}`}>
-              {ticket.status}
-            </Badge>
-          </div>
-
-          {/* Información del pasajero */}
-          <div className="bg-white rounded-lg p-3 sm:p-4 space-y-2 shadow-sm">
-            <h3 className="font-semibold text-orange-600 mb-2 text-sm sm:text-base">
-              👤 Pasajero
+          {/* Información del Cliente */}
+          <div className="border-2 border-gray-200 rounded-lg p-4">
+            <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide">
+              Datos del Pasajero
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
-              <div className="flex flex-col sm:contents">
-                <span className="text-gray-600">Nombre:</span>
-                <span className="font-medium break-words">{ticket.passenger}</span>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+              <div>
+                <span className="text-gray-600">Nombre Completo:</span>
+                <p className="font-semibold">{ticket.passenger}</p>
               </div>
-
-              <div className="flex flex-col sm:contents">
+              <div>
                 <span className="text-gray-600">Documento:</span>
-                <span className="font-medium">{ticket.document}</span>
+                <p className="font-semibold">{ticket.document}</p>
               </div>
             </div>
           </div>
 
-          {/* Información del viaje */}
-          <div className="bg-white rounded-lg p-3 sm:p-4 space-y-2 shadow-sm">
-            <h3 className="font-semibold text-orange-600 mb-2 text-sm sm:text-base">
-              🚍 Detalles del Viaje
+          {/* Detalles del Servicio */}
+          <div>
+            <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wide bg-gray-100 px-3 py-2 rounded">
+              Detalles del Servicio
             </h3>
-            <div className="space-y-2 text-xs sm:text-sm">
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                <span className="text-gray-600">Ruta:</span>
-                <span className="font-medium sm:text-right break-words">
-                  {ticket.trip_route}
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b-2 border-gray-300">
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-700 uppercase">
+                    Descripción
+                  </th>
+                  <th className="text-center py-3 px-4 text-xs font-semibold text-gray-700 uppercase">
+                    Cantidad
+                  </th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-gray-700 uppercase">
+                    Precio Unit.
+                  </th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-gray-700 uppercase">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-gray-200">
+                  <td className="py-4 px-4">
+                    <p className="font-semibold text-sm">
+                      Pasaje de Bus - {ticket.trip_route}
+                    </p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Salida: {ticket.departure_time}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      Bus: {ticket.bus_plate} | Asiento: {ticket.seat}
+                    </p>
+                  </td>
+                  <td className="py-4 px-4 text-center">
+                    <span className="font-semibold">1</span>
+                  </td>
+                  <td className="py-4 px-4 text-right">
+                    <span className="font-semibold">
+                      Bs. {parseFloat(ticket.price).toFixed(2)}
+                    </span>
+                  </td>
+                  <td className="py-4 px-4 text-right">
+                    <span className="font-semibold text-lg">
+                      Bs. {parseFloat(ticket.price).toFixed(2)}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Totales */}
+          <div className="flex justify-end">
+            <div className="w-80 space-y-3">
+              <div className="flex justify-between text-sm py-2 border-b border-gray-200">
+                <span className="text-gray-600">Subtotal:</span>
+                <span className="font-semibold">
+                  Bs. {parseFloat(ticket.price).toFixed(2)}
                 </span>
               </div>
-
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                <span className="text-gray-600">Salida:</span>
-                <span className="font-medium">{ticket.departure_time}</span>
+              <div className="flex justify-between text-sm py-2 border-b border-gray-200">
+                <span className="text-gray-600">IVA (0%):</span>
+                <span className="font-semibold">Bs. 0.00</span>
               </div>
-
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                <span className="text-gray-600">Bus:</span>
-                <span className="font-medium">{ticket.bus_plate}</span>
-              </div>
-
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-1">
-                <span className="text-gray-600">Asiento:</span>
-                <span className="font-medium text-base sm:text-lg text-orange-600">
-                  {ticket.seat}
+              <div className="flex justify-between bg-green-50 px-4 py-3 rounded-lg border-2 border-green-200">
+                <span className="text-lg font-bold text-gray-800">
+                  TOTAL A PAGAR:
+                </span>
+                <span className="text-2xl font-bold text-green-600">
+                  Bs. {parseFloat(ticket.price).toFixed(2)}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Precio */}
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 sm:p-4 border-2 border-green-200">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-              <span className="text-gray-700 font-medium text-sm sm:text-base">
-                Total Pagado:
-              </span>
-              <span className="text-xl sm:text-2xl font-bold text-green-600">
-                Bs. {parseFloat(ticket.price).toFixed(2)}
-              </span>
+          {/* QR y Código */}
+          <div className="flex justify-between items-center border-t-2 border-gray-200 pt-6">
+            <div>
+              <p className="text-sm text-gray-600 mb-2">
+                <span className="font-semibold">Código de Verificación:</span>
+              </p>
+              <p className="font-mono text-lg font-bold text-orange-600">
+                {ticket.code}
+              </p>
+              <p className="text-xs text-gray-500 mt-2">
+                Fecha de emisión: {ticket.booking_date}
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-gray-600 mb-2 font-semibold">
+                CÓDIGO QR
+              </p>
+              <div className="p-3 bg-white border-2 border-gray-300 rounded-lg inline-block">
+                <QRCodeSVG
+                  value={JSON.stringify({
+                    code: ticket.code,
+                    passenger: ticket.passenger,
+                    seat: ticket.seat,
+                    trip: ticket.trip_route,
+                    price: ticket.price,
+                    document: ticket.document,
+                  })}
+                  size={100}
+                  level="H"
+                  includeMargin={false}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Escanear al abordar
+              </p>
             </div>
           </div>
 
-          {/* Fecha de reserva */}
-          <div className="text-center text-xs text-gray-500 pt-2 border-t">
-            <p>Reservado el: {ticket.booking_date}</p>
-            <p className="mt-1">¡Gracias por viajar con nosotros!</p>
+          {/* Términos y condiciones */}
+          <div className="bg-gray-50 p-4 rounded-lg text-xs text-gray-600 space-y-1">
+            <p className="font-semibold text-gray-800 mb-2">
+              Términos y Condiciones:
+            </p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>
+                El pasajero debe presentarse 15 minutos antes de la hora de
+                salida
+              </li>
+              <li>
+                Es obligatorio presentar documento de identidad al momento de
+                abordar
+              </li>
+              <li>
+                Las cancelaciones deben realizarse con 24 horas de anticipación
+              </li>
+              <li>El ticket es personal e intransferible</li>
+              <li>Conserve este documento como comprobante de pago</li>
+            </ul>
+          </div>
+
+          {/* Pie de página */}
+          <div className="text-center text-xs text-gray-500 pt-4 border-t border-gray-200">
+            <p className="font-semibold">
+              ¡Gracias por viajar con TRANSARKA!
+            </p>
+            <p className="mt-1">
+              Este documento es válido como comprobante de compra
+            </p>
+            <p className="mt-2 text-gray-400">
+              Generado electrónicamente - No requiere firma ni sello
+            </p>
           </div>
         </div>
 
-        {/* Botones de acción */}
-        <div className="flex flex-col sm:flex-row gap-2 pt-4">
+        {/* Botones de acción - No se imprimen */}
+        <div className="flex gap-2 p-4 bg-gray-50 border-t print:hidden">
           <Button
             onClick={handlePrint}
-            className="w-full sm:flex-1 bg-orange-500 hover:bg-orange-600"
+            className="flex-1 bg-orange-500 hover:bg-orange-600"
           >
             <Printer className="w-4 h-4 mr-2" />
-            Imprimir
+            Imprimir Factura
           </Button>
-          <Button 
-            onClick={onClose} 
-            variant="outline" 
-            className="w-full sm:flex-1"
-          >
+          <Button onClick={onClose} variant="outline" className="flex-1">
+            <X className="w-4 h-4 mr-2" />
             Cerrar
           </Button>
         </div>
-
-        {/* Instrucciones de impresión */}
-        <p className="text-xs text-center text-gray-500 mt-2 hidden sm:block">
-          💡 Tip: Usa Ctrl+P para imprimir directamente
-        </p>
       </DialogContent>
 
       {/* Estilos para impresión */}
@@ -170,29 +261,34 @@ export function TicketPreviewModal({ ticket, open, onClose }) {
           body * {
             visibility: hidden;
           }
-          #ticket-preview,
-          #ticket-preview * {
+          #invoice-preview,
+          #invoice-preview * {
             visibility: visible;
           }
-          #ticket-preview {
+          #invoice-preview {
             position: absolute;
             left: 0;
             top: 0;
             width: 100%;
             background: white !important;
+            padding: 20mm;
           }
           
-          /* Optimizar para impresión */
-          #ticket-preview {
-            padding: 20px;
-            border: 2px solid #000;
+          /* Ocultar elementos no necesarios */
+          .print\\:hidden {
+            display: none !important;
           }
-        }
-
-        /* Mejoras para scroll en móviles */
-        @media (max-width: 640px) {
-          .overflow-y-auto {
-            -webkit-overflow-scrolling: touch;
+          
+          /* Optimizar colores para impresión */
+          * {
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+          }
+          
+          /* Evitar saltos de página dentro de elementos */
+          table,
+          .border-2 {
+            page-break-inside: avoid;
           }
         }
       `}</style>

@@ -40,6 +40,7 @@ export default function ClientesPage() {
         lastName: client.lastName,
         documentNumber: client.documentNumber || "—",
         phone: client.phone || "—",
+        email: client.email || "—",
         address: client.address || "—",
         isActive: client.isActive,
         createdAt: new Date(client.createdAt).toLocaleDateString("es-ES"),
