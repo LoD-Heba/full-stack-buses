@@ -23,7 +23,6 @@ export class PermissionsGuard implements CanActivate {
     const user: User = request.user;
 
     console.log('Permisos necesarios:', requiredPermissions);
-    console.log('Usuario:', user?.email, 'Rol:', user?.roles?.name);
 
     // Verificar que el usuario y su rol existan
     if (!user || !user.roles) {

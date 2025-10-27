@@ -76,7 +76,7 @@ export class TripService {
     const hoursUntilDeparture =
       (departureDate.getTime() - new Date().getTime()) / (1000 * 60 * 60);
 
-    const MINIMUM_LEAD_TIME_HOURS = 2;
+    const MINIMUM_LEAD_TIME_HOURS = 2; 
     if (hoursUntilDeparture < MINIMUM_LEAD_TIME_HOURS) {
       throw new BadRequestException(
         `Los viajes deben crearse con al menos ${MINIMUM_LEAD_TIME_HOURS} horas de anticipación`,

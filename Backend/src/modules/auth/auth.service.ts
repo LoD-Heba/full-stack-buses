@@ -62,93 +62,97 @@ export class AuthService {
   /********************************************************************** */
   // Método para generar la respuesta de autenticación
   private generateAuthResponse(user: User): LoginResponse {
-    // Determinar el identificador principal y su tipo
-    const identifier = user.email || user.phone || '';
-    const identifierType: 'email' | 'phone' = user.email ? 'email' : 'phone';
+  // CAMBIAR para obtener email y phone del perfil:
+  const identifier = user.profile?.email || user.profile?.phone || '';
+  const identifierType: 'email' | 'phone' = user.profile?.email ? 'email' : 'phone';
 
-    const payload: JwtPayload = {
-      sub: user.id,
-      identifier,
-      identifierType,
-      role: user.roles.name,
-    };
+  const payload: JwtPayload = {
+    sub: user.id,
+    identifier,
+    identifierType,
+    role: user.roles.name,
+  };
 
-    // Generar el token de acceso
-    const accessToken = this.jwtService.sign(payload);
+  const accessToken = this.jwtService.sign(payload);
+  const expiresIn = this.getTokenExpirationInSeconds();
 
-    // Obtener el tiempo de expiración del token en segundos
-    const expiresIn = this.getTokenExpirationInSeconds();
+  const userProfile: UserProfile = {
+    id: user.id,
+    name: user.name,
+    email: user.profile?.email,
+    phone: user.profile?.phone,
+    // ELIMINAR isEmailVerified e isPhoneVerified si no los tienes en UserProfile entity
+    // O cambiarlos a profile.isEmailVerified si los agregas allí
+    isEmailVerified: false, // TODO: mover a profile entity
+    isPhoneVerified: false, // TODO: mover a profile entity
+    role: user.roles.name,
+  };
 
-    // Crear el perfil del usuario para la respuesta
-    const userProfile: UserProfile = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      isEmailVerified: user.isEmailVerified,
-      isPhoneVerified: user.isPhoneVerified,
-      role: user.roles.name,
-    };
-
-    return {
-      access_token: accessToken,
-      token_type: 'Bearer',
-      expires_in: expiresIn,
-      user: userProfile,
-    };
-  }
+  return {
+    access_token: accessToken,
+    token_type: 'Bearer',
+    expires_in: expiresIn,
+    user: userProfile,
+  };
+}
 
   /********************************************************************** */
   // Método para obtener el usuario actual desde el token JWT
   async getCurrentUser(userId: string): Promise<Partial<User>> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId, isActive: true },
-      relations: { roles: true, profile: true },
-      select: {
-        id: true,
-        name: true,
+  const user = await this.userRepository.findOne({
+    where: { id: userId, isActive: true },
+    relations: { roles: true, profile: true },
+    select: {
+      id: true,
+      name: true,
+      isActive: true,
+      createdAt: true,
+      profile: {
         email: true,
         phone: true,
-        isEmailVerified: true,
-        isPhoneVerified: true,
-        isActive: true,
-        createdAt: true,
-      },
-    });
+        firstName: true,
+        lastName: true,
+        documentNumber: true,
+        address: true,
+      }
+    },
+  });
 
-    if (!user) {
-      throw new UnauthorizedException('Usuario no encontrado');
-    }
-
-    return user;
+  if (!user) {
+    throw new UnauthorizedException('Usuario no encontrado');
   }
 
+  return user;
+}
   /********************************************************************** */
   // Método para refrescar el token
   async refreshToken(userId: string): Promise<LoginResponse> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId, isActive: true },
-      relations: { roles: true },
-      select: {
-        id: true,
-        name: true,
+  const user = await this.userRepository.findOne({
+    where: { id: userId, isActive: true },
+    relations: { roles: true, profile: true }, // AGREGAR profile
+    select: {
+      id: true,
+      name: true,
+      // ELIMINAR email y phone
+      password: true,
+      isActive: true,
+      profile: { // AGREGAR select del profile
         email: true,
         phone: true,
-        password: true,
-        isActive: true,
-        isEmailVerified: true,
-        isPhoneVerified: true,
-        roles: {
-          id: true,
-          name: true,
-        },
       },
-    });
-    if (!user) {
-      throw new UnauthorizedException('Usuario no encontrado');
-    }
-    return this.generateAuthResponse(user);
+      roles: {
+        id: true,
+        name: true,
+      },
+    },
+  });
+  
+  if (!user) {
+    throw new UnauthorizedException('Usuario no encontrado');
   }
+  
+  return this.generateAuthResponse(user);
+}
 
   /********************************************************************** */
   // Método para logout (opcional - depende de tu implementación)
@@ -196,31 +200,33 @@ export class AuthService {
 
   /********************************************************************** */
   // Método privado para encontrar un usuario por email o teléfono
-  private async findUserForAuth(identifier: string): Promise<User | null> {
-    // Detectar si el identificador es email o teléfono
-    const isEmail = identifier.includes('@');
+  // CAMBIAR completamente el método:
+private async findUserForAuth(identifier: string): Promise<User | null> {
+  // Detectar si el identificador es email o teléfono
+  const isEmail = identifier.includes('@');
 
-    const whereCondition = isEmail
-      ? { email: identifier, isActive: true }
-      : { phone: identifier, isActive: true };
-
-    return this.userRepository.findOne({
-      where: whereCondition,
-      relations: { roles: true },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        password: true,
-        isActive: true,
-        isEmailVerified: true,
-        isPhoneVerified: true,
-        roles: {
-          id: true,
-          name: true,
-        },
-      },
-    });
-  }
+  // Buscar usuario que tenga un perfil con ese email o phone
+  return this.userRepository
+    .createQueryBuilder('user')
+    .leftJoinAndSelect('user.roles', 'roles')
+    .leftJoinAndSelect('user.profile', 'profile')
+    .where('user.isActive = :isActive', { isActive: true })
+    .andWhere(
+      isEmail 
+        ? 'profile.email = :identifier' 
+        : 'profile.phone = :identifier',
+      { identifier }
+    )
+    .select([
+      'user.id',
+      'user.name',
+      'user.password',
+      'user.isActive',
+      'profile.email',
+      'profile.phone',
+      'roles.id',
+      'roles.name'
+    ])
+    .getOne();
+}
 }

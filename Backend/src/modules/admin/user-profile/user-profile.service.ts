@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like } from 'typeorm';
 import { UserProfile } from './entities/user-profile.entity';
@@ -14,30 +18,44 @@ export class UserProfileService {
     private readonly userProfileRepository: Repository<UserProfile>,
 
     @InjectRepository(Ticket)
-    private readonly ticketRepository: Repository<Ticket>
+    private readonly ticketRepository: Repository<Ticket>,
   ) {}
 
-  async create(createUserProfileDto: CreateUserProfileDto): Promise<UserProfile> {
+  async create(
+    createUserProfileDto: CreateUserProfileDto,
+  ): Promise<UserProfile> {
     // Validar documentNumber único si se proporciona
     if (createUserProfileDto.documentNumber) {
       const exists = await this.userProfileRepository.findOne({
-        where: { documentNumber: createUserProfileDto.documentNumber }
+        where: { documentNumber: createUserProfileDto.documentNumber },
       });
-      
+
       if (exists) {
         throw new ConflictException(
-          `Ya existe un cliente con el C.I. ${createUserProfileDto.documentNumber}`
+          `Ya existe un cliente con el C.I. ${createUserProfileDto.documentNumber}`,
         );
       }
     }
-    
+
+    if (createUserProfileDto.email) {
+      const exists = await this.userProfileRepository.findOne({
+        where: { email: createUserProfileDto.email },
+      });
+
+      if (exists) {
+        throw new ConflictException(
+          `Ya existe un cliente con el email ${createUserProfileDto.email}`,
+        );
+      }
+    }
+
     // Crear perfil como invitado (sin usuario asociado)
     const userProfile = this.userProfileRepository.create({
       ...createUserProfileDto,
       isGuest: true, // Marcar como invitado
       isActive: true,
     });
-    
+
     return this.userProfileRepository.save(userProfile);
   }
 
@@ -45,8 +63,8 @@ export class UserProfileService {
     const { page = 1, limit = 10 } = paginationDto;
     const offset = (page - 1) * limit;
 
-    const whereConditions: any = { 
-      isGuest: true // Solo clientes invitados (sin cuenta de usuario)
+    const whereConditions: any = {
+      isGuest: true, // Solo clientes invitados (sin cuenta de usuario)
     };
 
     // Búsqueda por nombre, apellido o documento
@@ -67,7 +85,7 @@ export class UserProfileService {
         limit,
         hasNextPage: page < Math.ceil(total / limit),
         hasPrevPage: page > 1,
-      }
+      },
     };
   }
 
@@ -75,11 +93,11 @@ export class UserProfileService {
     const userProfile = await this.userProfileRepository.findOne({
       where: { id },
     });
-    
+
     if (!userProfile) {
       throw new NotFoundException(`Cliente con id ${id} no encontrado`);
     }
-    
+
     return userProfile;
   }
 
@@ -87,7 +105,7 @@ export class UserProfileService {
     const userProfile = await this.userProfileRepository.findOne({
       where: { id },
     });
-    
+
     if (!userProfile) {
       throw new NotFoundException(`Cliente con id ${id} no encontrado`);
     }
@@ -95,7 +113,14 @@ export class UserProfileService {
     // Obtener tickets del cliente
     const tickets = await this.ticketRepository.find({
       where: { user: { id } },
-      relations: ['trip', 'trip.route', 'trip.route.originCity', 'trip.route.destinationCity', 'trip.bus', 'seat'],
+      relations: [
+        'trip',
+        'trip.route',
+        'trip.route.originCity',
+        'trip.route.destinationCity',
+        'trip.bus',
+        'seat',
+      ],
       order: { booking_date: 'DESC' },
     });
 
@@ -110,27 +135,45 @@ export class UserProfileService {
     updateUserProfileDto: UpdateUserProfileDto,
   ): Promise<UserProfile> {
     const userProfile = await this.findOne(id);
-    
+
     // Validar documentNumber único si se está actualizando
-    if (updateUserProfileDto.documentNumber && updateUserProfileDto.documentNumber !== userProfile.documentNumber) {
+    if (
+      updateUserProfileDto.documentNumber &&
+      updateUserProfileDto.documentNumber !== userProfile.documentNumber
+    ) {
       const exists = await this.userProfileRepository.findOne({
-        where: { documentNumber: updateUserProfileDto.documentNumber }
+        where: { documentNumber: updateUserProfileDto.documentNumber },
       });
-      
+
       if (exists) {
         throw new ConflictException(
-          `Ya existe un cliente con el C.I. ${updateUserProfileDto.documentNumber}`
+          `Ya existe un cliente con el C.I. ${updateUserProfileDto.documentNumber}`,
         );
       }
     }
-    
+
+    if (
+      updateUserProfileDto.email &&
+      updateUserProfileDto.email !== userProfile.email
+    ) {
+      const exists = await this.userProfileRepository.findOne({
+        where: { email: updateUserProfileDto.email },
+      });
+
+      if (exists) {
+        throw new ConflictException(
+          `Ya existe un cliente con el email ${updateUserProfileDto.email}`,
+        );
+      }
+    }
+
     Object.assign(userProfile, updateUserProfileDto);
     return this.userProfileRepository.save(userProfile);
   }
 
   async remove(id: string): Promise<void> {
     const userProfile = await this.findOne(id);
-    
+
     await this.userProfileRepository.remove(userProfile);
   }
 
@@ -143,7 +186,7 @@ export class UserProfileService {
   // Método para verificar si un cliente puede comprar tickets
   async canPurchaseTickets(id: string): Promise<boolean> {
     const userProfile = await this.findOne(id);
-    
+
     return !!(
       userProfile.firstName &&
       userProfile.lastName &&
@@ -151,4 +194,5 @@ export class UserProfileService {
       userProfile.isActive
     );
   }
+  
 }

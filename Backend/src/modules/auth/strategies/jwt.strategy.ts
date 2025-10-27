@@ -28,7 +28,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       where: { id, isActive: true },
       relations: { roles: true },
       select: {
-        email: true,
+        profile: {
+          email: true,
+          phone: true,
+        },
         roles: { name: true },
       },
     });

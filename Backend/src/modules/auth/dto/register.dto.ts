@@ -58,6 +58,11 @@ export class ProfileDataDto {
   })
   @Transform(({ value }) => value?.toString().trim())
   address?: string;
+
+  @IsOptional()
+  @IsEmail({}, { message: 'Debe ser un correo electrónico válido' })
+  @Transform(({ value }) => value?.toString().toLowerCase().trim())
+  email?: string;
 }
 
 export class RegisterDto {
@@ -67,23 +72,6 @@ export class RegisterDto {
   @Transform(({ value }) => value?.toString().trim())
   name: string;
 
-  // Email es opcional, pero requerido si no hay phone
-  @ValidateIf((o) => !o.phone)
-  @IsNotEmpty({ message: 'El email es obligatorio si no proporciona teléfono' })
-  @IsEmail({}, { message: 'Debe ser un correo electrónico válido' })
-  @Transform(({ value }) => value?.toString().toLowerCase().trim())
-  email?: string;
-
-  // Phone es opcional, pero requerido si no hay email
-  @ValidateIf((o) => !o.email)
-  @IsNotEmpty({ message: 'El teléfono es obligatorio si no proporciona email' })
-  @IsString({ message: 'El teléfono debe ser una cadena de texto' })
-  @Matches(/^[+]?[0-9\s\-\(\)]{7,15}$/, {
-    message: 'El teléfono debe tener un formato válido',
-  })
-  @Transform(({ value }) => value?.toString().trim())
-  phone?: string;
-
   @IsString({ message: 'La contraseña debe ser una cadena de texto' })
   @IsNotEmpty({ message: 'La contraseña es obligatoria' })
   @Transform(({ value }) => value?.toString().trim())
@@ -92,9 +80,9 @@ export class RegisterDto {
   })
   password: string;
 
-  // Datos del perfil opcionales
-  @IsOptional()
+  // AHORA profile es OBLIGATORIO (debe contener email o phone)
+  @IsNotEmpty({ message: 'Los datos del perfil son obligatorios' })
   @ValidateNested()
   @Type(() => ProfileDataDto)
-  profile?: ProfileDataDto;
+  profile: ProfileDataDto;
 }

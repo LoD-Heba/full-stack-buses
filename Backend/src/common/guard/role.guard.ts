@@ -25,7 +25,6 @@ export class RolesGuard implements CanActivate {
 
     // Log para debug
     console.log('Roles requeridos:', requiredRoles);
-    console.log('Usuario que hace la petición:', user?.email, 'Rol:', user?.roles?.name);
 
     // Preguntar si el usuario y su rol existen
     if (!user || !user.roles) {
@@ -35,7 +34,6 @@ export class RolesGuard implements CanActivate {
     // Verificar que el rol del usuario esté entre los roles permitidos
     const hasRole = requiredRoles.includes(user.roles.name);
     if (!hasRole) {
-      console.log(`Usuario ${user.email} no tiene permisos para esta ruta`);
       throw new ForbiddenException('No tienes acceso a esa ruta');
     } 
 

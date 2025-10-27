@@ -32,36 +32,16 @@ export class UserService {
 
   /********************************* Crear usuario (Admin) ************************************** */
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const { roleId, password, email, phone, ...userData } = createUserDto;
-
-    // Validar que se proporciona al menos email o phone
-    if (!email && !phone) {
-      throw new BadRequestException(
-        'Debe proporcionar al menos email o teléfono',
-      );
-    }
+    const { roleId, password, ...userData } = createUserDto;
 
     // Verificar que el rol existe
     const role = await this.findRoleOrThrow(roleId);
-
-    // Verificar que email sea único si se proporciona
-    if (email) {
-      await this.checkEmailUnique(email);
-    }
-
-    // Verificar que phone sea único si se proporciona
-    if (phone) {
-      await this.checkPhoneUnique(phone);
-    }
-
     // Hash de la contraseña
     const hashedPassword = await bcrypt.hash(password, 12);
 
     // Crear el usuario
     const user = this.userRepository.create({
       ...userData,
-      email,
-      phone,
       password: hashedPassword,
       roles: role,
     });
@@ -73,29 +53,12 @@ export class UserService {
 
   /********************************* Registro público ************************************** */
   async register(registerDto: RegisterDto): Promise<User> {
-    const {
-      password,
-      email,
-      phone,
-      profile: profileData,
-      ...userData
-    } = registerDto;
+    const { password, profile: profileData, ...userData } = registerDto;
 
-    // Validar que se proporciona al menos email o phone
-    if (!email && !phone) {
+    if (!profileData || (!profileData.email && !profileData.phone)) {
       throw new BadRequestException(
-        'Debe proporcionar al menos email o teléfono',
+        'Debe proporcionar al menos email o teléfono en el perfil',
       );
-    }
-
-    // Verificar que email sea único si se proporciona
-    if (email) {
-      await this.checkEmailUnique(email);
-    }
-
-    // Verificar que phone sea único si se proporciona
-    if (phone) {
-      await this.checkPhoneUnique(phone);
     }
 
     // Obtener rol por defecto (ej: "user" o "client")
@@ -115,6 +78,28 @@ export class UserService {
     // Crear perfil si se proporcionaron datos
     let createdProfile: UserProfile | null = null;
     if (profileData && Object.keys(profileData).length > 0) {
+      if (profileData.email) {
+        const existingProfile = await this.userProfileRepository.findOne({
+          where: { email: profileData.email },
+        });
+        if (existingProfile) {
+          throw new ConflictException(
+            `Ya existe un perfil con el email ${profileData.email}`,
+          );
+        }
+      }
+      // AGREGAR validación de phone único:
+      if (profileData.phone) {
+        const existingProfile = await this.userProfileRepository.findOne({
+          where: { phone: profileData.phone },
+        });
+        if (existingProfile) {
+          throw new ConflictException(
+            `Ya existe un perfil con el teléfono ${profileData.phone}`,
+          );
+        }
+      }
+
       // Validar que el documentNumber sea único si se proporciona
       if (profileData.documentNumber) {
         const existingProfile = await this.userProfileRepository.findOne({
@@ -139,8 +124,6 @@ export class UserService {
     // Crear el usuario con el perfil (si existe)
     const user = this.userRepository.create({
       ...userData,
-      email,
-      phone,
       password: hashedPassword,
       roles: defaultRole,
       profile: createdProfile,
@@ -210,7 +193,7 @@ export class UserService {
     // Filtro de búsqueda por término
     if (searchTerm) {
       queryBuilder.where(
-        '(user.name ILIKE :searchTerm OR user.email ILIKE :searchTerm OR user.phone ILIKE :searchTerm)',
+        '(user.name ILIKE :searchTerm OR profile.email ILIKE :searchTerm OR profile.phone ILIKE :searchTerm)',
         { searchTerm: `%${searchTerm}%` },
       );
     }
@@ -318,8 +301,6 @@ export class UserService {
     const {
       roleId,
       password,
-      email,
-      phone,
       profile: profileData,
       ...userData
     } = updateUserDto;
@@ -329,18 +310,6 @@ export class UserService {
 
     // Preparar los datos para actualizar
     const updateData: any = { ...userData };
-
-    // Verificar email único si se está cambiando
-    if (email && email !== existingUser.email) {
-      await this.checkEmailUnique(email);
-      updateData.email = email;
-    }
-
-    // Verificar phone único si se está cambiando
-    if (phone && phone !== existingUser.phone) {
-      await this.checkPhoneUnique(phone);
-      updateData.phone = phone;
-    }
 
     // Hash de nueva contraseña si se proporciona
     if (password) {
@@ -365,8 +334,35 @@ export class UserService {
     // Actualizar o crear perfil si se proporcionan datos
     if (profileData && Object.keys(profileData).length > 0) {
       if (existingUser.profile) {
-        // Actualizar perfil existente
-        // Validar documentNumber único si se está cambiando
+        if (
+          profileData.email &&
+          profileData.email !== existingUser.profile.email
+        ) {
+          const existingProfile = await this.userProfileRepository.findOne({
+            where: { email: profileData.email },
+          });
+          if (existingProfile) {
+            throw new ConflictException(
+              `Ya existe un perfil con el email ${profileData.email}`,
+            );
+          }
+        }
+
+        //validación de phone:
+        if (
+          profileData.phone &&
+          profileData.phone !== existingUser.profile.phone
+        ) {
+          const existingProfile = await this.userProfileRepository.findOne({
+            where: { phone: profileData.phone },
+          });
+          if (existingProfile) {
+            throw new ConflictException(
+              `Ya existe un perfil con el teléfono ${profileData.phone}`,
+            );
+          }
+        }
+
         if (
           profileData.documentNumber &&
           profileData.documentNumber !== existingUser.profile.documentNumber
@@ -441,27 +437,6 @@ export class UserService {
     return this.findOne(id);
   }
 
-  /*************************** Verificar email ************************************* */
-  async verifyEmail(id: string): Promise<User> {
-    await this.findOne(id);
-
-    await this.userRepository.update(id, {
-      isEmailVerified: true,
-    });
-
-    return this.findOne(id);
-  }
-
-  /*************************** Verificar teléfono ************************************* */
-  async verifyPhone(id: string): Promise<User> {
-    await this.findOne(id);
-
-    await this.userRepository.update(id, {
-      isPhoneVerified: true,
-    });
-
-    return this.findOne(id);
-  }
 
   /******************************* Crear perfil para un usuario *********************************** */
   async createProfile(
@@ -580,8 +555,6 @@ export class UserService {
         totalBuses: parseInt(stats.total_buses) || 0,
         totalSpent: parseFloat(stats.total_spent) || 0,
         hasProfile: !!user.profile,
-        isEmailVerified: user.isEmailVerified,
-        isPhoneVerified: user.isPhoneVerified,
       },
     };
   }
@@ -596,7 +569,11 @@ export class UserService {
 
     const activeBuses = user.buses?.filter((bus) => bus.is_active) || [];
     const activeNews = user.news?.filter((newId) => newId.id) || [];
-    if (activeTickets.length > 0 || activeBuses.length > 0 || activeNews.length > 0) {
+    if (
+      activeTickets.length > 0 ||
+      activeBuses.length > 0 ||
+      activeNews.length > 0
+    ) {
       throw new BadRequestException(
         'No se puede eliminar un usuario que tiene tickets confirmados o buses activos',
       );
@@ -623,25 +600,6 @@ export class UserService {
     return role;
   }
 
-  private async checkEmailUnique(email: string): Promise<void> {
-    const existingUser = await this.userRepository.findOne({
-      where: { email },
-    });
-
-    if (existingUser) {
-      throw new ConflictException('El email ya está en uso');
-    }
-  }
-
-  private async checkPhoneUnique(phone: string): Promise<void> {
-    const existingUser = await this.userRepository.findOne({
-      where: { phone },
-    });
-
-    if (existingUser) {
-      throw new ConflictException('El teléfono ya está en uso');
-    }
-  }
   private isUUID(value: string): boolean {
     const uuidRegex =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

@@ -17,9 +17,7 @@ import { Report } from 'src/modules/client/report/entities/report.entity';
 import { News } from 'src/modules/client/news/entities/news.entity';
 import { Ticket } from 'src/modules/client/tickets/entities/ticket.entity';
 
-// Índice único compuesto para email y phone (no pueden ser ambos nulos)
-@Index(['email'], { unique: true, where: '"email" IS NOT NULL' })
-@Index(['phone'], { unique: true, where: '"phone" IS NOT NULL' })
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
@@ -28,25 +26,11 @@ export class User {
   @Column({ length: 100 })
   name: string;
 
-  // Email opcional (puede ser null si se usa phone)
-  @Column({ length: 100, unique: true, nullable: true })
-  email?: string;
-
   @Column({ type: 'text', nullable: true })
   image_url?: string;
-  
-  // Phone opcional (puede ser null si se usa email)
-  @Column({ length: 20, unique: true, nullable: true })
-  phone?: string;
 
   @Column({ length: 100, select: false })
   password: string;
-
-  @Column({ default: false, name: 'is_email_verified' })
-  isEmailVerified: boolean;
-
-  @Column({ default: false, name: 'is_phone_verified' })
-  isPhoneVerified: boolean;
 
   @Column({ default: true, name: 'is_active' })
   isActive: boolean;

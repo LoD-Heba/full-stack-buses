@@ -11,11 +11,11 @@ import {
 } from 'class-validator';
 
 export class LoginDto {
-  // Acepta email o teléfono como identificador
+  // Acepta email o teléfono del PERFIL como identificador
   @IsNotEmpty({ message: 'El identificador (email o teléfono) es obligatorio' })
   @IsString({ message: 'El identificador debe ser una cadena de texto' })
   @Transform(({ value }) => value?.toString().trim())
-  identifier: string; // Puede ser email o teléfono
+  identifier: string; // Email o teléfono del perfil
 
   @IsString({ message: 'La contraseña debe ser una cadena de texto' })
   @IsNotEmpty({ message: 'La contraseña es obligatoria' })

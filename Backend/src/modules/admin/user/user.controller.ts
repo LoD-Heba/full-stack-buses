@@ -83,19 +83,6 @@ export class UserController {
   }
   //------------------------------CLOUDINARYA---------------------------------
 
-  //------------------------------------------------------------------
-  // Verificar email
-  @Patch(':id/verify-email')
-  verifyEmail(@Param('id', ParseUUIDPipe) id: string) {
-    return this.userService.verifyEmail(id);
-  }
-
-  // Verificar teléfono
-  @Patch(':id/verify-phone')
-  verifyPhone(@Param('id', ParseUUIDPipe) id: string) {
-    return this.userService.verifyPhone(id);
-  }
-
   // Cambiar contraseña
   @Patch(':id/change-password')
   changePassword(

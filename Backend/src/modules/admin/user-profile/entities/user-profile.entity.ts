@@ -30,8 +30,17 @@ export class UserProfile {
   @Column({ length: 20, nullable: true })
   phone?: string;
 
+  @Column({ length: 100, unique: true, nullable: true })
+  email?: string;
+
   @Column({ length: 150, nullable: true })
   address?: string;
+
+  @Column({ default: false, name: 'is_email_verified' })
+  isEmailVerified: boolean;
+
+  @Column({ default: false, name: 'is_phone_verified' })
+  isPhoneVerified: boolean;
 
   @Column({ default: true, name: 'is_active' })
   isActive: boolean;

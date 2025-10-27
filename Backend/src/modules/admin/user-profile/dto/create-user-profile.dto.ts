@@ -1,5 +1,12 @@
-import { Transform } from "class-transformer";
-import { IsNotEmpty, IsOptional, IsString, Length, Matches } from "class-validator";
+import { Transform } from 'class-transformer';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Length,
+  Matches,
+} from 'class-validator';
 
 export class CreateUserProfileDto {
   @IsString({ message: 'Los nombres deben ser una cadena de texto' })
@@ -17,7 +24,7 @@ export class CreateUserProfileDto {
   })
   @Transform(({ value }) => value?.toString().trim())
   lastName: string;
-  
+
   @IsString({ message: 'El C.I. debe ser válido' })
   @IsNotEmpty({ message: 'El C.I. es obligatorio' })
   @Matches(/^\d{7,10}(-[0-9A-Za-z]{1,3})?$/, {
@@ -39,6 +46,11 @@ export class CreateUserProfileDto {
       .trim(),
   )
   phone: string;
+
+  @IsOptional()
+  @IsEmail({}, { message: 'Debe ser un correo electrónico válido' })
+  @Transform(({ value }) => value?.toString().toLowerCase().trim())
+  email?: string;
 
   @IsOptional()
   @IsString({ message: 'La dirección debe ser una cadena de texto' })
