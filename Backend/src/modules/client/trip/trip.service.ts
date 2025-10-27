@@ -554,107 +554,135 @@ export class TripService {
     return this.findOne(id);
   }
 
-  async remove(id: string): Promise<Trip> {
-    const trip = await this.findOne(id);
+  // Línea 458 - Método remove()
+async remove(id: string): Promise<Trip> {
+  const trip = await this.findOne(id);
 
-    //No se puede eluminar viajes en progreso
-    if (trip.status === TripStatus.IN_PROGRESS) {
-      throw new BadRequestException(
-        'No se puede eliminar un viaje que está en progreso',
-      );
-    }
-    // No permitir eliminar viajes con tickets confirmados
-    const confirmedTicketsCount =
-      trip.tickets?.filter((ticket) => ticket.status === 'CONFIRMADO').length ||
-      0;
-
-    if (confirmedTicketsCount > 0) {
-      throw new BadRequestException(
-        'No se puede eliminar un viaje que tiene tickets confirmados',
-      );
-    }
-
-    // Soft delete
-    await this.tripRepository.update(id, { is_active: false });
-
-    return { ...trip, is_active: false };
+  if (trip.status === TripStatus.IN_PROGRESS) {
+    throw new BadRequestException(
+      'No se puede eliminar un viaje que está en progreso',
+    );
   }
+
+  const confirmedTicketsCount =
+    trip.tickets?.filter((ticket) => ticket.status === TicketStatus.CONFIRMED).length || 0;
+
+  if (confirmedTicketsCount > 0) {
+    throw new BadRequestException(
+      'No se puede eliminar un viaje que tiene tickets confirmados',
+    );
+  }
+
+  await this.tripRepository.update(id, { is_active: false });
+
+  // ✅ CAMBIO: Usar findTripById en lugar de modificar manualmente
+  return this.findTripById(id);
+}
 
   async permanentRemove(id: string): Promise<{ message: string }> {
-    // Buscar el viaje sin filtro is_active para poder eliminar desactivados
-    const trip = await this.tripRepository.findOne({
-      where: { id },
-      relations: {
-        tickets: true,
-      },
-    });
+  const trip = await this.tripRepository.findOne({
+    where: { id },
+    relations: { tickets: true },
+  });
 
-    if (!trip) {
-      throw new NotFoundException(`El viaje con ID ${id} no existe`);
-    }
-
-    // Solo permitir eliminación permanente de viajes inactivos
-    if (trip.is_active) {
-      throw new BadRequestException(
-        'Solo se pueden eliminar permanentemente viajes desactivados. Use el soft delete primero.',
-      );
-    }
-
-    // Verificar que no tenga tickets confirmados activos
-    const activeConfirmedTickets =
-      trip.tickets?.filter(
-        (ticket) =>
-          ticket.is_active && ticket.status === TicketStatus.CONFIRMED,
-      ).length || 0;
-
-    if (activeConfirmedTickets > 0) {
-      throw new BadRequestException(
-        `No se puede eliminar permanentemente un viaje con ${activeConfirmedTickets} tickets confirmados activos`,
-      );
-    }
-
-    // Hard delete
-    await this.tripRepository.remove(trip);
-
-    return {
-      message: `Viaje ${id} eliminado permanentemente`,
-    };
+  if (!trip) {
+    throw new NotFoundException(`El viaje con ID ${id} no existe`);
   }
+
+  if (trip.is_active) {
+    throw new BadRequestException(
+      'Solo se pueden eliminar permanentemente viajes desactivados. Use el soft delete primero.',
+    );
+  }
+
+  // ✅ AGREGAR: Verificar estado del viaje
+  if (trip.status === TripStatus.IN_PROGRESS) {
+    throw new BadRequestException(
+      'No se puede eliminar permanentemente un viaje en progreso',
+    );
+  }
+
+  const activeConfirmedTickets =
+    trip.tickets?.filter(
+      (ticket) => ticket.is_active && ticket.status === TicketStatus.CONFIRMED,
+    ).length || 0;
+
+  if (activeConfirmedTickets > 0) {
+    throw new BadRequestException(
+      `No se puede eliminar permanentemente un viaje con ${activeConfirmedTickets} tickets confirmados activos`,
+    );
+  }
+
+  // ✅ AGREGAR: Liberar asientos antes de eliminar
+  if (trip.tickets && trip.tickets.length > 0) {
+    const seatIds = trip.tickets
+      .filter(t => t.seat)
+      .map(t => t.seat.id);
+    
+    if (seatIds.length > 0) {
+      await this.seatRepository.update(
+        { id: In(seatIds) },
+        { status: SeatStatus.AVAILABLE }
+      );
+    }
+  }
+
+  await this.tripRepository.remove(trip);
+
+  return {
+    message: `Viaje ${id} eliminado permanentemente`,
+  };
+}
   ////////////////////
 
-  async cancelTrip(id: string): Promise<Trip> {
-    const trip = await this.findOne(id);
+  // Después de la línea 547 (método cancelTrip)
+async cancelTrip(id: string): Promise<Trip> {
+  const trip = await this.findOne(id);
 
-    if (trip.status === TripStatus.CANCELLED) {
-      throw new BadRequestException('El viaje ya está cancelado');
-    }
-
-    if (trip.status === TripStatus.COMPLETED) {
-      throw new BadRequestException('No se puede cancelar un viaje completado');
-    }
-
-    // Cancelar todos los tickets activos
-    if (trip.tickets && trip.tickets.length > 0) {
-      const activeTickets = trip.tickets.filter(
-        (t) =>
-          t.is_active &&
-          (t.status === TicketStatus.CONFIRMED ||
-            t.status === TicketStatus.PENDING),
-      );
-
-      for (const ticket of activeTickets) {
-        await this.ticketRepository.update(ticket.ticket_id, {
-          status: TicketStatus.CANCELLED,
-        });
-      }
-    }
-
-    await this.tripRepository.update(id, {
-      status: TripStatus.CANCELLED,
-    });
-
-    return this.findOne(id);
+  if (trip.status === TripStatus.CANCELLED) {
+    throw new BadRequestException('El viaje ya está cancelado');
   }
+
+  if (trip.status === TripStatus.COMPLETED) {
+    throw new BadRequestException('No se puede cancelar un viaje completado');
+  }
+
+  // Cancelar todos los tickets activos
+  if (trip.tickets && trip.tickets.length > 0) {
+    const activeTickets = trip.tickets.filter(
+      (t) =>
+        t.is_active &&
+        (t.status === TicketStatus.CONFIRMED || t.status === TicketStatus.PENDING),
+    );
+
+    for (const ticket of activeTickets) {
+      await this.ticketRepository.update(ticket.ticket_id, {
+        status: TicketStatus.CANCELLED,
+      });
+    }
+
+    // ✅ AGREGAR: Liberar asientos al cancelar
+    const seatIds = trip.tickets
+      .filter(t => t.seat)
+      .map(t => t.seat.id);
+    
+    if (seatIds.length > 0) {
+      await this.seatRepository.update(
+        { id: In(seatIds) },
+        { status: SeatStatus.AVAILABLE }
+      );
+    }
+  }
+
+  await this.tripRepository.update(id, {
+    status: TripStatus.CANCELLED,
+  });
+
+  // ✅ AGREGAR: Recalcular asientos disponibles
+  await this.updateAvailableSeats(id);
+
+  return this.findOne(id);
+}
 
   async startTrip(id: string): Promise<Trip> {
     const trip = await this.findOne(id);
