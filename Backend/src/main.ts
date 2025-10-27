@@ -9,29 +9,38 @@ import * as bodyParser from 'body-parser';
 import * as fs from 'fs';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // CAMBIO: Habilitar rawBody para webhooks
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
+
   const logger = new Logger(AppModule.name);
   const configService = app.get(ConfigService);
 
   // Crear carpeta uploads con ruta ABSOLUTA
   const uploadsPath = join(process.cwd(), 'uploads');
   const citiesPath = join(uploadsPath, 'cities');
-  
-  if (!fs.existsSync(uploadsPath)) {
-    fs.mkdirSync(uploadsPath, { recursive: true });
-    logger.log(`✅ Carpeta creada: ${uploadsPath}`);
-  }
-  
-  if (!fs.existsSync(citiesPath)) {
-    fs.mkdirSync(citiesPath, { recursive: true });
-    logger.log(`✅ Carpeta creada: ${citiesPath}`);
-  }
+  const busesPath = join(uploadsPath, 'buses');
+  const newsPath = join(uploadsPath, 'news');
+
+  [uploadsPath, citiesPath, busesPath, newsPath].forEach((path) => {
+    if (!fs.existsSync(path)) {
+      fs.mkdirSync(path, { recursive: true });
+      logger.log(`✅ Carpeta creada: ${path}`);
+    }
+  });
 
   logger.log(`📂 Ruta de uploads: ${uploadsPath}`);
 
   // Global prefix desde .env
   const apiPrefix = configService.get<string>('API_PREFIX', 'api/v1');
   app.setGlobalPrefix(apiPrefix);
+
+  // ✅ CAMBIO: Configurar webhook de Stripe ANTES de otros middlewares
+  app.use(
+    `/${apiPrefix}/stripe/webhook`,
+    bodyParser.raw({ type: 'application/json' })
+  );
 
   // Validación global
   app.useGlobalPipes(
@@ -45,12 +54,12 @@ async function bootstrap() {
   );
 
   // CORS mejorado
-  const clientUrl = configService.get<string>('CLIENT_URL', 'http://localhost:3000');
+  const frontendUrl = configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
   app.enableCors({
-    origin: clientUrl,
+    origin: frontendUrl,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature'],
   });
 
   // Servir archivos estáticos con ruta ABSOLUTA
@@ -59,14 +68,12 @@ async function bootstrap() {
     maxAge: '1d',
   });
 
-  // Body parser para webhooks
-  app.use('/payments/webhook', bodyParser.raw({ type: 'application/json' }));
-
   const port = +configService.get<string>('PORT', '3001');
   await app.listen(port);
 
   logger.log(`✅ Servidor iniciado en http://localhost:${port}/${apiPrefix}`);
   logger.log(`📂 Archivos estáticos: http://localhost:${port}/uploads`);
+  logger.log(`💳 Webhook Stripe: http://localhost:${port}/${apiPrefix}/stripe/webhook`);
   logger.log(`📁 CWD: ${process.cwd()}`);
 }
 bootstrap();

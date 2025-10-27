@@ -8,17 +8,15 @@ import {
   Get,
   Query,
   Param,
+  BadRequestException,
 } from '@nestjs/common';
 import { StripeService } from './stripe.service';
+import { Request } from 'express';
 
 @Controller('stripe')
 export class StripeController {
   constructor(private readonly stripeService: StripeService) {}
 
-  /**
-   * Crear sesión de checkout
-   * POST /stripe/create-checkout-session
-   */
   @Post('create-checkout-session')
   createCheckoutSession(
     @Body()
@@ -37,32 +35,26 @@ export class StripeController {
     return this.stripeService.createCheckoutSession(body);
   }
 
-  /**
-   * Verificar pago exitoso
-   * GET /stripe/verify-payment?session_id=xxx
-   */
   @Get('verify-payment')
   verifyPayment(@Query('session_id') sessionId: string) {
     return this.stripeService.handleSuccessfulPayment(sessionId);
   }
 
-  /**
-   * Webhook de Stripe
-   * POST /stripe/webhook
-   */
   @Post('webhook')
   async handleWebhook(
     @Headers('stripe-signature') signature: string,
     @Req() request: RawBodyRequest<Request>,
   ) {
+    // ✅ FIX: Validar que rawBody existe
     const rawBody = request.rawBody;
+    
+    if (!rawBody) {
+      throw new BadRequestException('Raw body no disponible');
+    }
+
     return this.stripeService.handleWebhook(signature, rawBody);
   }
 
-  /**
-   * Crear reembolso
-   * POST /stripe/refund/:paymentId
-   */
   @Post('refund/:paymentId')
   createRefund(
     @Param('paymentId') paymentId: string,

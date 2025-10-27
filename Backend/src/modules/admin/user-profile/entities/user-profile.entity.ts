@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
 import { Ticket } from 'src/modules/client/tickets/entities/ticket.entity';
+import { Payment } from 'src/modules/client/payment/entities/payment.entity';
 
 @Entity('user_profiles')
 export class UserProfile {
@@ -48,6 +49,8 @@ export class UserProfile {
   @OneToOne(() => User, (user) => user.profile, { nullable: true })
   user?: User;
 
+  @OneToMany(() => Payment, (payment) => payment.userProfile)
+  payments: Payment[];
   //-----------------------------------------------------------------
 
   @CreateDateColumn({ name: 'created_at' })

@@ -1,13 +1,15 @@
-// Backend/src/modules/client/payment/entities/payment.entity.ts
 import { 
   Column, 
   Entity, 
   PrimaryGeneratedColumn, 
   OneToMany, 
   CreateDateColumn,
-  UpdateDateColumn 
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn
 } from 'typeorm';
 import { Ticket } from '../../tickets/entities/ticket.entity';
+import { UserProfile } from 'src/modules/admin/user-profile/entities/user-profile.entity';
 
 @Entity('payments')
 export class Payment {
@@ -29,7 +31,7 @@ export class Payment {
     enum: ['EFECTIVO', 'TARJETA', 'QR', 'TRANSFERENCIA'],
     default: 'EFECTIVO',
   })
-  method: string; // ✅ Este es el campo correcto
+  method: string;
 
   @Column({
     type: 'enum',
@@ -40,6 +42,10 @@ export class Payment {
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   payment_date: Date;
+
+  // ✅ AGREGAR: Campo para ID de transacción de Stripe
+  @Column({ type: 'varchar', length: 255, nullable: true, unique: true })
+  transaction_id?: string;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   transaction_reference?: string;
@@ -55,6 +61,14 @@ export class Payment {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updated_at: Date;
+
+  // ✅ AGREGAR: Relación con UserProfile
+  @ManyToOne(() => UserProfile, (profile) => profile.payments, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'user_profile_id' })
+  userProfile?: UserProfile;
 
   @OneToMany(() => Ticket, (ticket) => ticket.payment)
   tickets: Ticket[];

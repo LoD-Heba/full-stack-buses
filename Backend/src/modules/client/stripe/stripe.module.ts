@@ -7,11 +7,12 @@ import { Payment } from '../payment/entities/payment.entity';
 import { Ticket } from '../tickets/entities/ticket.entity';
 import { Trip } from '../trip/entities/trip.entity';
 import { UserProfile } from 'src/modules/admin/user-profile/entities/user-profile.entity';
+import { Seat } from '../seat/entities/seat.entity'; 
 
 @Module({
   imports: [
     ConfigModule,
-    TypeOrmModule.forFeature([Payment, Ticket, Trip, UserProfile])
+    TypeOrmModule.forFeature([Payment, Ticket, Trip, UserProfile, Seat])
   ],
   controllers: [StripeController],
   providers: [StripeService],
