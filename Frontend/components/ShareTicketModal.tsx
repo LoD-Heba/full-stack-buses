@@ -24,8 +24,6 @@ interface ShareTicketModalProps {
       firstName: string;
       lastName: string;
       phone?: string;
-    };
-    user?: {
       email?: string;
     };
     price: number;
@@ -47,7 +45,7 @@ export function ShareTicketModal({
   qrCode,
 }: ShareTicketModalProps) {
   const [shareMethod, setShareMethod] = useState<'whatsapp' | 'email' | 'link'>('link');
-  const [email, setEmail] = useState(ticket.user?.email || '');
+  const [email, setEmail] = useState(ticket.userProfile?.email || '');
   const [phone, setPhone] = useState(ticket.userProfile?.phone || '');
   const [sending, setSending] = useState(false);
   const [success, setSuccess] = useState(false);

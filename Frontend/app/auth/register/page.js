@@ -1,61 +1,70 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { User, Mail, Phone, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+  User,
+  Mail,
+  Phone,
+  Lock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  CheckCircle,
+} from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: '',
-    confirmPassword: ''
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
-    setError('');
+    setError("");
   };
 
   const validateForm = () => {
     if (!formData.name.trim()) {
-      setError('El nombre es obligatorio');
+      setError("El nombre es obligatorio");
       return false;
     }
 
     if (!formData.email && !formData.phone) {
-      setError('Debes proporcionar al menos un email o teléfono');
+      setError("Debes proporcionar al menos un email o teléfono");
       return false;
     }
 
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      setError('Email inválido');
+      setError("Email inválido");
       return false;
     }
 
     if (formData.phone && !/^[+]?[0-9\s\-\(\)]{7,15}$/.test(formData.phone)) {
-      setError('Teléfono inválido');
+      setError("Teléfono inválido");
       return false;
     }
 
     if (formData.password.length < 5) {
-      setError('La contraseña debe tener al menos 5 caracteres');
+      setError("La contraseña debe tener al menos 5 caracteres");
       return false;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError('Las contraseñas no coinciden');
+      setError("Las contraseñas no coinciden");
       return false;
     }
 
@@ -64,7 +73,7 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (!validateForm()) {
       return;
@@ -76,41 +85,47 @@ export default function RegisterPage() {
       const registerData = {
         name: formData.name.trim(),
         password: formData.password,
+        profile: {
+          email: formData.email ? formData.email.trim() : undefined,
+          phone: formData.phone ? formData.phone.trim() : undefined,
+        },
       };
 
       if (formData.email) registerData.email = formData.email.trim();
       if (formData.phone) registerData.phone = formData.phone.trim();
 
-      const response = await fetch('http://localhost:3001/api/v1/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(registerData),
-      });
+      const response = await fetch(
+        "http://localhost:3001/api/v1/auth/register",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(registerData),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Error al registrarse');
+        throw new Error(data.message || "Error al registrarse");
       }
 
       // Guardar el token y datos del usuario
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+      if (typeof window !== "undefined") {
+        localStorage.setItem("access_token", data.access_token);
+        localStorage.setItem("user", JSON.stringify(data.user));
       }
 
       setSuccess(true);
-      
+
       setTimeout(() => {
-        router.push('/comprar');
+        router.push("/comprar");
         router.refresh();
       }, 2000);
       router.refresh();
-
     } catch (err) {
-      setError(err.message || 'Error al registrarse');
+      setError(err.message || "Error al registrarse");
     } finally {
       setLoading(false);
     }
@@ -125,8 +140,12 @@ export default function RegisterPage() {
               <CheckCircle className="w-12 h-12 text-green-600" />
             </div>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">¡Registro Exitoso!</h2>
-          <p className="text-gray-600 mb-4">Tu cuenta ha sido creada correctamente</p>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">
+            ¡Registro Exitoso!
+          </h2>
+          <p className="text-gray-600 mb-4">
+            Tu cuenta ha sido creada correctamente
+          </p>
           <p className="text-sm text-gray-500">Redirigiendo...</p>
         </div>
       </div>
@@ -208,7 +227,9 @@ export default function RegisterPage() {
                     className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Proporciona al menos email o teléfono</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Proporciona al menos email o teléfono
+                </p>
               </div>
 
               <div>
@@ -231,7 +252,11 @@ export default function RegisterPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -256,7 +281,11 @@ export default function RegisterPage() {
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -266,14 +295,17 @@ export default function RegisterPage() {
                 disabled={loading}
                 className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Registrando...' : 'Crear Cuenta'}
+                {loading ? "Registrando..." : "Crear Cuenta"}
               </button>
             </form>
 
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
-                ¿Ya tienes una cuenta?{' '}
-                <Link href="/auth/login" className="text-purple-600 hover:text-purple-700 font-semibold hover:underline">
+                ¿Ya tienes una cuenta?{" "}
+                <Link
+                  href="/auth/login"
+                  className="text-purple-600 hover:text-purple-700 font-semibold hover:underline"
+                >
                   Inicia sesión aquí
                 </Link>
               </p>

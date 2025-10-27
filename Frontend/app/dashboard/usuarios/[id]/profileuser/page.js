@@ -112,16 +112,16 @@ export default function UserProfilePage() {
               <div>
                 <h1 className="text-3xl font-bold mb-2">{user.name}</h1>
                 <div className="flex items-center gap-4 text-sm text-gray-600 mb-3">
-                  {user.email && (
+                  {user.profile?.email && (
                     <div className="flex items-center gap-1">
                       <Mail className="h-4 w-4" />
-                      {user.email}
+                      {user.profile?.email}
                     </div>
                   )}
-                  {user.phone && (
+                  {user.profile?.phone && (
                     <div className="flex items-center gap-1">
                       <Phone className="h-4 w-4" />
-                      {user.phone}
+                      {user.profile?.phone}
                     </div>
                   )}
                 </div>

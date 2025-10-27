@@ -81,8 +81,8 @@ export function UserForm({ user }) {
     if (user && !loadingRoles) {
       reset({
         name: user.name || "",
-        email: user.email || "",
-        phone: user.phone || "",
+        email: user.profile?.email || "",
+        phone: user.profile?.phone || "",
         password: "",
         roleId: userRoleId,
       });

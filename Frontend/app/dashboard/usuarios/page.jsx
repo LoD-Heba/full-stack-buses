@@ -36,10 +36,8 @@ export default function UsuariosPage({ user }) {
       const usersData = usersArray.map((user) => ({
         id: user.id,
         nombre: user.name,
-        email: user.email,
-        phone: user.phone || "—",
-        isEmailVerified: user.isEmailVerified,
-        isPhoneVerified: user.isPhoneVerified,
+        email: user.profile?.email,
+        phone: user.profile?.phone || "—",
         isActive: user.isActive,
         rol: user.roles?.name || "—",
       }));
