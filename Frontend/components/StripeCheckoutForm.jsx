@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader, CreditCard, AlertCircle, Lock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 export default function StripeCheckoutForm({ amount, onSuccess, onError }) {
   const stripe = useStripe();
   const elements = useElements();
-  
+
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
 
@@ -30,7 +31,7 @@ export default function StripeCheckoutForm({ amount, onSuccess, onError }) {
 
     try {
       const { error: submitError } = await elements.submit();
-      
+
       if (submitError) {
         throw new Error(submitError.message);
       }
@@ -103,7 +104,8 @@ export default function StripeCheckoutForm({ amount, onSuccess, onError }) {
           <Alert className="bg-blue-50 border-blue-200">
             <Lock className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800 text-sm">
-              Tu pago está protegido por Stripe. No guardamos información de tu tarjeta.
+              Tu pago está protegido por Stripe. No guardamos información de tu
+              tarjeta.
             </AlertDescription>
           </Alert>
 
@@ -128,13 +130,17 @@ export default function StripeCheckoutForm({ amount, onSuccess, onError }) {
           </Button>
 
           {/* Tarjetas de prueba */}
-          <div className="text-xs text-gray-500 space-y-1 pt-2 border-t">
-            <p className="font-semibold">Tarjetas de prueba:</p>
-            <p>✅ Éxito: 4242 4242 4242 4242</p>
-            <p>❌ Falla: 4000 0000 0000 0002</p>
-            <p>🔐 3D Secure: 4000 0027 6000 3184</p>
-            <p className="text-gray-400">CVV: cualquier 3 dígitos | Fecha: cualquier futura</p>
-          </div>
+          <ProtectedRoute>
+            <div className="text-xs text-gray-500 space-y-1 pt-2 border-t">
+              <p className="font-semibold">Tarjetas de prueba:</p>
+              <p>Éxito: 4242 4242 4242 4242</p>
+              <p>Falla: 4000 0000 0000 0002</p>
+              <p>3D Secure: 4000 0027 6000 3184</p>
+              <p className="text-gray-400">
+                CVV: cualquier 3 dígitos | Fecha: cualquier futura
+              </p>
+            </div>
+          </ProtectedRoute>
         </CardContent>
       </Card>
     </form>
