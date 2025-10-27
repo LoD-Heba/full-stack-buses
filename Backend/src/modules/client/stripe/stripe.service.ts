@@ -143,6 +143,182 @@ export class StripeService {
   }
 
   /**
+ * Crear Payment Intent para formulario embebido
+ */
+async createPaymentIntent(data: {
+  tickets: Array<{
+    tripId: string;
+    seatId: string;
+    price: number;
+    category: string;
+  }>;
+  userProfileId: string;
+}) {
+  const { tickets, userProfileId } = data;
+
+  // Validar usuario
+  const userProfile = await this.userProfileRepository.findOne({
+    where: { id: userProfileId, isActive: true },
+    relations: ['user'],
+  });
+
+  if (!userProfile) {
+    throw new NotFoundException('Usuario no encontrado');
+  }
+
+  // Calcular monto total
+  const totalAmount = tickets.reduce((sum, ticket) => sum + ticket.price, 0);
+
+  // Crear Payment Intent
+  const paymentIntent = await this.stripe.paymentIntents.create({
+    amount: Math.round(totalAmount * 100), // Convertir a centavos
+    currency: 'usd',
+    automatic_payment_methods: {
+      enabled: true,
+    },
+    metadata: {
+      userProfileId,
+      ticketData: JSON.stringify(tickets),
+    },
+    description: `Compra de ${tickets.length} ticket(s) de bus`,
+  });
+
+  return {
+    clientSecret: paymentIntent.client_secret,
+    paymentIntentId: paymentIntent.id,
+    amount: totalAmount,
+  };
+}
+
+/**
+ * Confirmar pago y crear tickets después de Payment Intent exitoso
+ */
+async confirmPaymentIntent(paymentIntentId: string) {
+  // Obtener Payment Intent de Stripe
+  const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId);
+
+  if (paymentIntent.status !== 'succeeded') {
+    throw new BadRequestException('El pago no ha sido completado');
+  }
+
+  // Verificar que no se haya procesado antes
+  const existingPayment = await this.paymentRepository.findOne({
+    where: { transaction_id: paymentIntentId },
+    relations: ['tickets'],
+  });
+
+  if (existingPayment) {
+    return {
+      payment: existingPayment,
+      tickets: existingPayment.tickets || [],
+      message: 'Este pago ya fue procesado anteriormente',
+    };
+  }
+
+  // Obtener metadata
+  const metadata = paymentIntent.metadata;
+  const userProfileId = metadata.userProfileId;
+  const ticketData = JSON.parse(metadata.ticketData);
+
+  const userProfile = await this.userProfileRepository.findOne({
+    where: { id: userProfileId },
+    relations: ['user'],
+  });
+
+  if (!userProfile) {
+    throw new NotFoundException(`Usuario ${userProfileId} no encontrado`);
+  }
+
+  // Transacción para garantizar atomicidad
+  const queryRunner =
+    this.paymentRepository.manager.connection.createQueryRunner();
+  await queryRunner.connect();
+  await queryRunner.startTransaction();
+
+  try {
+    // Crear registro de pago
+    const payment = queryRunner.manager.create(Payment, {
+      amount: paymentIntent.amount / 100, // Convertir de centavos
+      method: PaymentMethod.CARD,
+      status: PaymentStatus.COMPLETED,
+      transaction_id: paymentIntentId,
+      payment_date: new Date(),
+      userProfile,
+    });
+
+    const savedPayment = await queryRunner.manager.save(Payment, payment);
+
+    // Crear tickets
+    const createdTickets: Ticket[] = [];
+
+    for (const ticketInfo of ticketData) {
+      const trip = await queryRunner.manager.findOne(Trip, {
+        where: { id: ticketInfo.tripId },
+        relations: ['bus', 'route'],
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!trip) {
+        throw new NotFoundException(
+          `Viaje ${ticketInfo.tripId} no encontrado`,
+        );
+      }
+
+      if (trip.available_seats <= 0) {
+        throw new BadRequestException(
+          `El viaje no tiene asientos disponibles`,
+        );
+      }
+
+      // Generar código único de ticket
+      const ticketCode = await this.generateTicketCode(queryRunner.manager);
+
+      const ticket = queryRunner.manager.create(Ticket, {
+        code: ticketCode,
+        price: ticketInfo.price,
+        status: TicketStatus.CONFIRMED,
+        trip: trip,
+        seat: { id: ticketInfo.seatId } as any,
+        userProfile: userProfile,
+        payment: savedPayment,
+        booking_date: new Date(),
+        is_active: true,
+      });
+
+      const savedTicket = await queryRunner.manager.save(Ticket, ticket);
+      createdTickets.push(savedTicket);
+
+      // Actualizar estado del asiento
+      await queryRunner.manager.update(
+        Seat,
+        { id: ticketInfo.seatId },
+        { status: SeatStatus.OCCUPIED },
+      );
+
+      // Actualizar asientos disponibles del viaje
+      await queryRunner.manager.decrement(
+        Trip,
+        { id: ticketInfo.tripId },
+        'available_seats',
+        1,
+      );
+    }
+
+    await queryRunner.commitTransaction();
+
+    return {
+      payment: savedPayment,
+      tickets: createdTickets,
+    };
+  } catch (error) {
+    await queryRunner.rollbackTransaction();
+    throw error;
+  } finally {
+    await queryRunner.release();
+  }
+}
+
+  /**
    * Verificar pago completado y crear tickets
    */
   async handleSuccessfulPayment(sessionId: string) {
@@ -284,58 +460,81 @@ export class StripeService {
   /**
    * Webhook para procesar eventos de Stripe
    */
-  async handleWebhook(signature: string, rawBody: Buffer) {
-    // ✅ FIX: Validar que el webhook secret existe
-    const webhookSecret = this.configService.get<string>(
-      'STRIPE_WEBHOOK_SECRET',
+ async handleWebhook(signature: string, rawBody: Buffer) {
+  // ✅ FIX: Validar que el webhook secret existe
+  const webhookSecret = this.configService.get<string>(
+    'STRIPE_WEBHOOK_SECRET',
+  );
+
+  if (!webhookSecret) {
+    console.warn(
+      '⚠️ STRIPE_WEBHOOK_SECRET no configurado. En desarrollo, procesando sin validación.',
     );
-
-    if (!webhookSecret) {
-      console.warn(
-        '⚠️ STRIPE_WEBHOOK_SECRET no configurado, saltando validación de webhook',
-      );
-      // En desarrollo, puedes continuar sin validar
-      // En producción, deberías lanzar un error
-      return { received: true, warning: 'Webhook secret no configurado' };
-    }
-
-    let event: Stripe.Event;
-
+    
+    // ✅ En desarrollo, parsear el body directamente
+    // NOTA: Esto NO es seguro para producción
     try {
-      event = this.stripe.webhooks.constructEvent(
-        rawBody,
-        signature,
-        webhookSecret,
-      );
+      const event = JSON.parse(rawBody.toString());
+      
+      // Procesar el evento sin validar firma
+      switch (event.type) {
+        case 'checkout.session.completed':
+          const session = event.data.object;
+          await this.handleSuccessfulPayment(session.id);
+          break;
+          
+        case 'checkout.session.expired':
+          console.log(`❌ Sesión expirada: ${event.data.object.id}`);
+          break;
+          
+        default:
+          console.log(`⚠️ Evento no manejado: ${event.type}`);
+      }
+      
+      return { received: true, warning: 'Webhook sin validación (desarrollo)' };
     } catch (err) {
-      throw new BadRequestException(
-        `Webhook signature verification failed: ${err.message}`,
-      );
+      throw new BadRequestException(`Error al procesar webhook: ${err.message}`);
     }
-
-    // Manejar diferentes eventos
-    switch (event.type) {
-      case 'checkout.session.completed':
-        const session = event.data.object as Stripe.Checkout.Session;
-        await this.handleSuccessfulPayment(session.id);
-        break;
-
-      case 'checkout.session.expired':
-        const expiredSession = event.data.object as Stripe.Checkout.Session;
-        console.log(`❌ Sesión expirada: ${expiredSession.id}`);
-        break;
-
-      case 'payment_intent.payment_failed':
-        const failedPayment = event.data.object as Stripe.PaymentIntent;
-        console.log(`❌ Pago fallido: ${failedPayment.id}`);
-        break;
-
-      default:
-        console.log(`⚠️ Evento no manejado: ${event.type}`);
-    }
-
-    return { received: true };
   }
+
+  // Flujo normal con validación (para producción)
+  let event: Stripe.Event;
+
+  try {
+    event = this.stripe.webhooks.constructEvent(
+      rawBody,
+      signature,
+      webhookSecret,
+    );
+  } catch (err) {
+    throw new BadRequestException(
+      `Webhook signature verification failed: ${err.message}`,
+    );
+  }
+
+  // Manejar diferentes eventos
+  switch (event.type) {
+    case 'checkout.session.completed':
+      const session = event.data.object as Stripe.Checkout.Session;
+      await this.handleSuccessfulPayment(session.id);
+      break;
+
+    case 'checkout.session.expired':
+      const expiredSession = event.data.object as Stripe.Checkout.Session;
+      console.log(`❌ Sesión expirada: ${expiredSession.id}`);
+      break;
+
+    case 'payment_intent.payment_failed':
+      const failedPayment = event.data.object as Stripe.PaymentIntent;
+      console.log(`❌ Pago fallido: ${failedPayment.id}`);
+      break;
+
+    default:
+      console.log(`⚠️ Evento no manejado: ${event.type}`);
+  }
+
+  return { received: true };
+}
 
   /**
    * Crear reembolso

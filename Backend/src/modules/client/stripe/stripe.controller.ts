@@ -34,6 +34,27 @@ export class StripeController {
   ) {
     return this.stripeService.createCheckoutSession(body);
   }
+  
+  @Post('create-payment-intent')
+  createPaymentIntent(
+    @Body()
+    body: {
+      tickets: Array<{
+        tripId: string;
+        seatId: string;
+        price: number;
+        category: string;
+      }>;
+      userProfileId: string;
+    },
+  ) {
+    return this.stripeService.createPaymentIntent(body);
+  }
+
+  @Post('confirm-payment-intent')
+  confirmPaymentIntent(@Body('paymentIntentId') paymentIntentId: string) {
+    return this.stripeService.confirmPaymentIntent(paymentIntentId);
+  }
 
   @Get('verify-payment')
   verifyPayment(@Query('session_id') sessionId: string) {
@@ -47,7 +68,7 @@ export class StripeController {
   ) {
     // ✅ FIX: Validar que rawBody existe
     const rawBody = request.rawBody;
-    
+
     if (!rawBody) {
       throw new BadRequestException('Raw body no disponible');
     }
