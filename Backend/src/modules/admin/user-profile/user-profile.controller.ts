@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Query,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { UserProfileService } from './user-profile.service';
 import { CreateUserProfileDto } from './dto/create-user-profile.dto';
@@ -38,6 +39,26 @@ export class UserProfileController {
     return this.userProfileService.findOne(id);
   }
 
+    @Get('search')
+  searchProfile(@Query('identifier') identifier: string) {
+    if (!identifier || identifier.trim().length === 0) {
+      throw new BadRequestException(
+        'Debe proporcionar un documento o teléfono',
+      );
+    }
+
+    return this.userProfileService.searchProfile(identifier.trim());
+  }
+
+  /**
+   * Crear o actualizar perfil (reutilizar si existe)
+   * POST /clients/create-or-update
+   */
+  @Post('create-or-update')
+  createOrUpdate(@Body() createUserProfileDto: CreateUserProfileDto) {
+    return this.userProfileService.createOrUpdate(createUserProfileDto);
+  }
+
   @Get(':id/with-tickets')
   findOneWithTickets(@Param('id', ParseUUIDPipe) id: string) {
     return this.userProfileService.findOneWithTickets(id);
@@ -65,4 +86,10 @@ export class UserProfileController {
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.userProfileService.remove(id);
   }
+
+  /**
+   * Buscar perfil por documento o teléfono
+   * GET /clients/search?identifier=12345678
+   */
+
 }

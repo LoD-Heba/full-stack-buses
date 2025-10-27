@@ -194,5 +194,105 @@ export class UserProfileService {
       userProfile.isActive
     );
   }
+
+  /**
+ * Busca un perfil por documento o teléfono
+ * Útil para verificar si un cliente ya está registrado
+ */
+async findByDocumentOrPhone(
+  documentNumber?: string,
+  phone?: string,
+): Promise<UserProfile | null> {
+  if (!documentNumber && !phone) {
+    return null;
+  }
+
+  const whereConditions: any[] = [];
+
+  if (documentNumber) {
+    whereConditions.push({ documentNumber: documentNumber.trim().toUpperCase() });
+  }
+
+  if (phone) {
+    // Limpiar teléfono de espacios y guiones
+    const cleanPhone = phone.replace(/[\s\-]/g, '').trim();
+    whereConditions.push({ phone: cleanPhone });
+  }
+
+  if (whereConditions.length === 0) {
+    return null;
+  }
+
+  const profile = await this.userProfileRepository.findOne({
+    where: whereConditions,
+    relations: ['user'], // Incluir relación con usuario si existe
+  });
+
+  return profile || null;
+}
+
+/**
+ * Busca perfil y devuelve información relevante
+ * Sin exponer datos sensibles innecesarios
+ */
+async searchProfile(identifier: string): Promise<{
+  exists: boolean;
+  profile?: Partial<UserProfile>;
+}> {
+  // Detectar si es documento o teléfono
+  const isPhone = /^(\+\d{1,4})?[\s\-]?\d{6,15}$/.test(identifier);
+  const isDocument = /^\d{7,10}(-[0-9A-Za-z]{1,3})?$/.test(identifier);
+
+  let profile: UserProfile | null = null;
+
+  if (isDocument) {
+    profile = await this.findByDocumentOrPhone(identifier, undefined);
+  } else if (isPhone) {
+    const cleanPhone = identifier.replace(/[\s\-]/g, '').trim();
+    profile = await this.findByDocumentOrPhone(undefined, cleanPhone);
+  } else {
+    return { exists: false };
+  }
+
+  if (!profile) {
+    return { exists: false };
+  }
+
+  // Devolver solo datos necesarios (sin exponer todo)
+  return {
+    exists: true,
+    profile: {
+      id: profile.id,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      documentNumber: profile.documentNumber,
+      phone: profile.phone,
+      email: profile.email,
+      address: profile.address,
+      isGuest: profile.isGuest,
+    },
+  };
+}
+
+/**
+ * Crear o actualizar perfil según existencia
+ */
+async createOrUpdate(
+  createUserProfileDto: CreateUserProfileDto,
+): Promise<UserProfile> {
+  // Buscar perfil existente
+  const existingProfile = await this.findByDocumentOrPhone(
+    createUserProfileDto.documentNumber,
+    createUserProfileDto.phone,
+  );
+
+  if (existingProfile) {
+    // Actualizar perfil existente con nuevos datos
+    return this.update(existingProfile.id, createUserProfileDto);
+  }
+
+  // Si no existe, crear nuevo
+  return this.create(createUserProfileDto);
+}
   
 }
