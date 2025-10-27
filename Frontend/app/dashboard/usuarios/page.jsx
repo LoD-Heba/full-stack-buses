@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import DataTable from "@/src/components/DataTable";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import  DataTable  from "../../../components/common/DataTable";
 import { 
   getUsers, 
   deleteUser, 

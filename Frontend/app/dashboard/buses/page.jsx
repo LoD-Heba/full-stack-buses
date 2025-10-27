@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import DataTable from "@/src/components/DataTable";
+import DataTable from "@/components/common/DataTable";
 import { Pagination } from "@/app/dashboard/buses/components/Pagination";
 import { BusFilters } from "@/app/dashboard/buses/components/bus-filters";
 import {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import DataTable from '../../../src/components/DataTable';
+import DataTable from '../../../components/common/DataTable';
 import RouteForm from './components/RouteForm';
 import RouteDetails from './components/RouteDetails';
 import { Badge } from '@/components/ui/badge';

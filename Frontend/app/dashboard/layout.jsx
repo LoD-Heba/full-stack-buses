@@ -1,10 +1,7 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import DashboardSidebar from '@/src/components/DashboardSidebar';
-
+import DashboardSidebar from '@/components/common/DashboardSidebar';
 export default function DashboardLayout({ children }) {
   // const { data: session, status } = useSession();
   const router = useRouter();
@@ -39,7 +36,7 @@ export default function DashboardLayout({ children }) {
 
   return (
     <div className="flex bg-green-50">
-      <DashboardSidebar />
+      <DashboardSidebar/>
       <main className="flex-1">
         <div className="p-8">
           {children}
