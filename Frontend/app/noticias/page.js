@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Calendar, User } from 'lucide-react';
-
+import { Calendar, User, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 
 export default function NoticiasSection() {
   const [noticias, setNoticias] = useState([]);
@@ -41,12 +41,10 @@ export default function NoticiasSection() {
   if (loading) {
     return (
       <section className="py-16 bg-gray-50" style={{
-          backgroundImage: `
-      url('/img/img7.jpg')
-    `,
+          backgroundImage: `url('/img/img7.jpg')`,
           backgroundPosition: "center, top right, bottom left",
           backgroundRepeat: "repeat",
-        }} >
+        }}>
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-12">
             Noticias Recientes
@@ -122,11 +120,17 @@ export default function NoticiasSection() {
                     )}
                   </div>
                   
-                  <p className="text-gray-600 text-sm leading-relaxed line-clamp-3 min-h-[72px]">
+                  <p className="text-gray-600 text-sm leading-relaxed line-clamp-3 min-h-[72px] mb-4">
                     {truncateText(noticia.content, 120)}
                   </p>
                   
-                  
+                  <Link 
+                    href={`/noticias/${noticia.id}`}
+                    className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-semibold text-sm transition-colors duration-200 group"
+                  >
+                    Leer más
+                    <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform duration-200" />
+                  </Link>
                 </div>
               </div>
             ))}

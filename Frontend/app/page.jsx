@@ -5,7 +5,7 @@ import { Bus, MapPin, Clock, Shield, Star, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import NoticiasSection from "../components/NoticieSection";
+import NoticiasSection from "./noticias/page";
 
 export default function Home() {
   const [ciudades, setCiudades] = useState([]);
