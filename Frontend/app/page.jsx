@@ -182,7 +182,7 @@ export default function Home() {
                       <Clock className="w-4 h-4" />
                       Horarios
                     </button>
-                    <Link href="/comprar" className="flex-1">
+                    <Link href="/salidas" className="flex-1">
                       <button className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 px-3 rounded-lg transition-colors font-semibold flex items-center justify-center gap-2 text-sm">
                         <ArrowRight className="w-4 h-4" />
                         Comprar
