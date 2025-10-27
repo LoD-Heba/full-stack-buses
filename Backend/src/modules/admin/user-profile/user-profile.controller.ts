@@ -15,10 +15,6 @@ import { UserProfileService } from './user-profile.service';
 import { CreateUserProfileDto } from './dto/create-user-profile.dto';
 import { UpdateUserProfileDto } from './dto/update-user-profile.dto';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
-import { JwtAuthGuard } from 'src/common/guard/auth.guard';
-import { PermissionsGuard } from 'src/common/guard/permission.guard';
-import { RolesGuard } from 'src/common/guard/role.guard';
-import { Permissions } from 'src/common/decorators/permission.decorator';
 
 @Controller('clients')
 export class UserProfileController {
@@ -34,12 +30,14 @@ export class UserProfileController {
     return this.userProfileService.findAll(paginationDto);
   }
 
-  @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.userProfileService.findOne(id);
-  }
-
-    @Get('search')
+  /**
+   * ⚠️ IMPORTANTE: Este endpoint debe estar ANTES de @Get(':id')
+   * para evitar conflictos de rutas
+   * 
+   * Buscar perfil por documento o teléfono
+   * GET /clients/search?identifier=12345678
+   */
+  @Get('search')
   searchProfile(@Query('identifier') identifier: string) {
     if (!identifier || identifier.trim().length === 0) {
       throw new BadRequestException(
@@ -57,6 +55,12 @@ export class UserProfileController {
   @Post('create-or-update')
   createOrUpdate(@Body() createUserProfileDto: CreateUserProfileDto) {
     return this.userProfileService.createOrUpdate(createUserProfileDto);
+  }
+
+  // ⚠️ Endpoints con :id van DESPUÉS de los endpoints específicos
+  @Get(':id')
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.userProfileService.findOne(id);
   }
 
   @Get(':id/with-tickets')
@@ -86,10 +90,4 @@ export class UserProfileController {
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.userProfileService.remove(id);
   }
-
-  /**
-   * Buscar perfil por documento o teléfono
-   * GET /clients/search?identifier=12345678
-   */
-
 }
