@@ -43,17 +43,29 @@ export const tripsAPI = {
     return response.json();
   },
 
-  // Eliminar viaje
-  delete: async (id) => {
-    const response = await fetch(`${API_URL}/trips/${id}`, {
-      method: 'DELETE',
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Error al eliminar viaje');
-    }
-    return response.json();
-  },
+  // Eliminar viaje (soft delete)
+delete: async (id) => {
+  const response = await fetch(`${API_URL}/trips/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al eliminar viaje');
+  }
+  return response.json();
+},
+
+// ✅ AGREGAR: Eliminar permanentemente (hard delete)
+deletePermanent: async (id) => {
+  const response = await fetch(`${API_URL}/trips/${id}/permanent`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Error al eliminar permanentemente');
+  }
+  return response.json();
+},
 
   // Buscar viajes
   search: async (filters, page = 1, limit = 10) => {

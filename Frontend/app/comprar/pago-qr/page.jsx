@@ -21,13 +21,14 @@ import {
   MessageCircle,
   CreditCard,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 
 const API_BASE = "http://localhost:3001/api/v1";
 
 const generateSimulatedQR = (paymentId, amount) => {
   const text = `PAGO|${paymentId}|${amount}|${new Date().toISOString()}`;
-  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(text)}`;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+    text
+  )}`;
 };
 
 export default function PagoQRPage() {
@@ -88,7 +89,9 @@ export default function PagoQRPage() {
       const tripData = await tripRes.json();
       setTrip(tripData);
 
-      const layoutRes = await fetch(`${API_BASE}/buses/${tripData.bus.id}/layout`);
+      const layoutRes = await fetch(
+        `${API_BASE}/buses/${tripData.bus.id}/layout`
+      );
       if (!layoutRes.ok) throw new Error("Error al cargar layout del bus");
       const layoutData = await layoutRes.json();
 
@@ -195,7 +198,10 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
     `.trim();
 
     try {
-      const whatsappUrl = `https://wa.me/${client.phone.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`;
+      const whatsappUrl = `https://wa.me/${client.phone.replace(
+        /\D/g,
+        ""
+      )}?text=${encodeURIComponent(message)}`;
       window.open(whatsappUrl, "_blank");
       toast.info("Se abrirá WhatsApp en una nueva ventana");
     } catch (err) {
@@ -214,21 +220,34 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
   const handleConfirmPayment = async () => {
     try {
       setConfirmingPayment(true);
-      setCountdown(3);
+      setError(null);
 
-      // SIMULACIÓN: Esperar 3 segundos
+      // Si es pago con tarjeta, usar Stripe
+      if (paymentMethod === "TARJETA") {
+        console.log("💳 Redirigiendo a formulario de tarjeta...");
+        router.push(
+          `/comprar/pago-tarjeta?tripId=${tripId}&clientId=${clientId}`
+        );
+        return;
+      }
+
+      // Para QR y otros métodos, mantener el flujo existente
+      setCountdown(3);
       console.log("⏳ Simulando procesamiento de pago...");
       await new Promise((resolve) => setTimeout(resolve, 3000));
 
       // 1. Confirmar el pago
       console.log("✔️ Confirmando pago...");
-      const confirmResponse = await fetch(`${API_BASE}/payments/${payment.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: "COMPLETO",
-        }),
-      });
+      const confirmResponse = await fetch(
+        `${API_BASE}/payments/${payment.id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: "COMPLETO",
+          }),
+        }
+      );
 
       if (!confirmResponse.ok) {
         const errorData = await confirmResponse.json();
@@ -282,7 +301,9 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
 
       if (ticketErrors.length > 0) {
         console.warn("Algunos tickets tuvieron errores:", ticketErrors);
-        toast.warning(`${ticketErrors.length} asiento(s) no se pudieron procesar`);
+        toast.warning(
+          `${ticketErrors.length} asiento(s) no se pudieron procesar`
+        );
       }
 
       setCreatedTickets(ticketsCreated);
@@ -461,8 +482,8 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
               Proceso de Pago
             </h1>
             <p className="text-gray-600 mt-1">
-              {step === "qr" 
-                ? "Escanea el código QR o confirma tu pago" 
+              {step === "qr"
+                ? "Escanea el código QR o confirma tu pago"
                 : "Preparando información de pago"}
             </p>
           </div>
@@ -486,7 +507,9 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
               </div>
               <div>
                 <p className="text-gray-600">Teléfono</p>
-                <p className="font-medium">{client.phone || "No especificado"}</p>
+                <p className="font-medium">
+                  {client.phone || "No especificado"}
+                </p>
               </div>
               <div>
                 <p className="text-gray-600">Documento</p>
@@ -543,7 +566,9 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
         {step === "qr" && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Selecciona Método de Pago</CardTitle>
+              <CardTitle className="text-lg">
+                Selecciona Método de Pago
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-3">

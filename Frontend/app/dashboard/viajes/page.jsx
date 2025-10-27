@@ -240,17 +240,42 @@ export default function TripsManagement() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm("¿Estás seguro de eliminar este viaje?")) return;
+  const handleDelete = async (id, isPermanent = false) => {
+  // Buscar el viaje en el estado actual
+  const trip = trips.find(t => t.id === id);
+  
+  if (!trip) {
+    showAlert("Viaje no encontrado", "error");
+    return;
+  }
 
+  // ✅ Si el viaje está desactivado, preguntar si quiere eliminarlo permanentemente
+  if (!trip.is_active) {
+    if (!confirm(
+      "⚠️ Este viaje ya está desactivado. ¿Desea eliminarlo PERMANENTEMENTE? Esta acción no se puede deshacer."
+    )) return;
+    
     try {
-      await tripsAPI.delete(id);
-      showAlert("Viaje eliminado exitosamente");
+      await tripsAPI.deletePermanent(id);
+      showAlert("Viaje eliminado permanentemente", "success");
       fetchTrips();
     } catch (error) {
       showAlert(error.message, "error");
     }
-  };
+    return;
+  }
+
+  // ✅ Si el viaje está activo, hacer soft delete
+  if (!confirm("¿Estás seguro de desactivar este viaje?")) return;
+
+  try {
+    await tripsAPI.delete(id);
+    showAlert("Viaje desactivado exitosamente");
+    fetchTrips();
+  } catch (error) {
+    showAlert(error.message, "error");
+  }
+};
 
   const handleStatusChange = async (id, action) => {
     try {
@@ -942,6 +967,7 @@ export default function TripsManagement() {
                             </div>
                           </div>
                         </td>
+                        
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-1 font-semibold text-green-600">
                             <DollarSign className="w-4 h-4" />
@@ -1043,6 +1069,13 @@ export default function TripsManagement() {
                             </Button>
                           </div>
                         </td>
+                        <td className="py-3 px-4">
+  {trip.is_active ? (
+    <span className="text-green-600 text-xs">Activo</span>
+  ) : (
+    <span className="text-red-600 text-xs">Desactivado</span>
+  )}
+</td>
                       </tr>
                     ))}
                   </tbody>
