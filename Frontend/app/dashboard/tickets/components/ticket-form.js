@@ -23,6 +23,8 @@ import {
   Calendar,
   AlertCircle,
   Loader,
+  QrCode,
+  CreditCard,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -42,9 +44,8 @@ export function NewTicketForm() {
   const [availableSeats, setAvailableSeats] = useState([]);
   const [backendError, setBackendError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [step, setStep] = useState("review"); // "review" o "payment"
+  const [step, setStep] = useState("review"); // "review" o "payment-selection"
   const [createdTickets, setCreatedTickets] = useState([]);
-  const [processingPayment, setProcessingPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("QR");
 
   const {
@@ -307,7 +308,7 @@ export function NewTicketForm() {
           ticketsCreated.length > 1 ? "s" : ""
         } creado${ticketsCreated.length > 1 ? "s" : ""}`
       );
-      setStep("payment");
+      setStep("payment-selection");
     } catch (error) {
       console.error("Error en createTicketsOnly:", error);
       const errorMessage =
@@ -319,111 +320,34 @@ export function NewTicketForm() {
     }
   };
 
-  // Procesar pago
-  const handlePayment = async () => {
-    try {
-      setProcessingPayment(true);
-      setBackendError(null);
+  // Procesar selección de método de pago
+  const handlePaymentMethodSelection = () => {
+    // Guardar datos en sessionStorage para mantenerlos entre páginas
+    sessionStorage.setItem("dashboardPurchaseClient", JSON.stringify({
+      id: clientInfo.id,
+      firstName: clientInfo.firstName,
+      lastName: clientInfo.lastName,
+      documentNumber: clientInfo.documentNumber,
+      phone: clientInfo.phone,
+    }));
+    
+    sessionStorage.setItem("dashboardSelectedSeats", JSON.stringify(
+      selectedSeats.map(s => s.seat_code)
+    ));
 
-      if (createdTickets.length === 0) {
-        throw new Error("No hay tickets para pagar");
-      }
+    sessionStorage.setItem("dashboardCreatedTickets", JSON.stringify(
+      createdTickets.map(t => t.ticket_id)
+    ));
 
-      const totalAmount = createdTickets.reduce(
-        (sum, ticket) => sum + parseFloat(ticket.price),
-        0
+    // Redirigir según el método de pago
+    if (paymentMethod === "TARJETA") {
+      router.push(
+        `/comprar/pago-tarjeta?tripId=${tripId}&clientId=${clientId}&source=dashboard`
       );
-
-      // 1. Crear el pago
-      console.log("💳 Creando pago...");
-      const paymentResponse = await fetch(
-        "http://localhost:3001/api/v1/payments",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: totalAmount,
-            method: paymentMethod,
-            category: "adulto",
-            notes: `Pago para ${
-              createdTickets.length
-            } ticket(s): ${createdTickets.map((t) => t.code).join(", ")}`,
-          }),
-        }
+    } else {
+      router.push(
+        `/comprar/pago-qr?tripId=${tripId}&clientId=${clientId}&source=dashboard`
       );
-
-      if (!paymentResponse.ok) {
-        const errorData = await paymentResponse.json();
-        throw new Error(errorData.message || "Error al crear el pago");
-      }
-
-      const payment = await paymentResponse.json();
-      console.log("✅ Pago creado:", payment.id);
-
-      // 2. Simular procesamiento
-      console.log("⏳ Procesando pago...");
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      // 3. Confirmar el pago
-      console.log("✔️ Confirmando pago...");
-      const confirmResponse = await fetch(
-        `http://localhost:3001/api/v1/payments/${payment.id}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            status: "COMPLETO",
-          }),
-        }
-      );
-
-      if (!confirmResponse.ok) {
-        throw new Error("Error al confirmar el pago");
-      }
-
-      console.log("✅ Pago confirmado");
-
-      // 4. Actualizar tickets con payment_id y cambiar a CONFIRMADO
-      console.log("🔗 Vinculando tickets con pago...");
-      const updateTicketPromises = createdTickets.map((ticket) =>
-        fetch(`http://localhost:3001/api/v1/tickets/${ticket.ticket_id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            paymentId: payment.id,
-            status: "CONFIRMADO",
-          }),
-        })
-      );
-
-      const updateResults = await Promise.all(updateTicketPromises);
-      const allUpdatesOk = updateResults.every((res) => res.ok);
-
-      if (!allUpdatesOk) {
-        throw new Error("Error al actualizar tickets");
-      }
-
-      console.log("✅ Tickets confirmados");
-
-      toast.success("¡Pago procesado exitosamente!");
-
-      // 5. Redirigir a página de confirmación con QR
-      const firstTicketId = createdTickets[0].ticket_id;
-      const firstTicketCode = createdTickets[0].code;
-
-      setTimeout(() => {
-        router.push(
-          `/tickets/${firstTicketId}?payment=success&code=${firstTicketCode}`
-        );
-      }, 1500);
-    } catch (error) {
-      console.error("Error en handlePayment:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Error al procesar el pago";
-      setBackendError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setProcessingPayment(false);
     }
   };
 
@@ -477,18 +401,18 @@ export function NewTicketForm() {
           <h1 className="text-3xl font-bold text-gray-900">
             {step === "review"
               ? "Confirmar Compra de Tickets"
-              : "Procesamiento de Pago"}
+              : "Seleccionar Método de Pago"}
           </h1>
           <p className="text-gray-600 mt-1">
             {step === "review"
               ? "Revisa los detalles antes de proceder al pago"
-              : "Completa el pago para confirmar tu compra"}
+              : "Elige cómo deseas pagar tus tickets"}
           </p>
         </div>
       </div>
 
       {/* Pasos */}
-      {step === "payment" && (
+      {step === "payment-selection" && (
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center font-bold">
@@ -501,7 +425,7 @@ export function NewTicketForm() {
             <div className="w-8 h-8 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold">
               2
             </div>
-            <span className="text-orange-600 font-medium">Pago</span>
+            <span className="text-orange-600 font-medium">Método de Pago</span>
           </div>
         </div>
       )}
@@ -692,13 +616,13 @@ export function NewTicketForm() {
             <AlertDescription className="text-blue-800 text-sm">
               Al confirmar, se crearán {selectedSeats.length} ticket
               {selectedSeats.length > 1 ? "s" : ""} con estado "Pendiente". A
-              continuación podrás proceder con el pago para confirmarlos.
+              continuación podrás seleccionar tu método de pago.
             </AlertDescription>
           </Alert>
         </form>
       )}
 
-      {step === "payment" && (
+      {step === "payment-selection" && (
         <div className="space-y-6">
           {/* Resumen de Tickets Creados */}
           <Card className="bg-green-50 border-green-200">
@@ -731,24 +655,46 @@ export function NewTicketForm() {
           {/* Método de Pago */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Método de Pago</CardTitle>
+              <CardTitle className="text-lg">Selecciona Método de Pago</CardTitle>
+              <CardDescription>
+                Elige cómo deseas completar tu compra
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-3 gap-2">
-                {["QR", "EFECTIVO", "TARJETA"].map((method) => (
-                  <button
-                    key={method}
-                    onClick={() => setPaymentMethod(method)}
-                    disabled={processingPayment}
-                    className={`p-3 rounded-lg border-2 transition ${
-                      paymentMethod === method
-                        ? "border-blue-600 bg-blue-50"
-                        : "border-gray-200 hover:border-gray-300"
-                    } disabled:opacity-50`}
-                  >
-                    <div className="text-sm font-medium">{method}</div>
-                  </button>
-                ))}
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={() => setPaymentMethod("QR")}
+                  className={`p-6 rounded-lg border-2 transition flex flex-col items-center gap-3 ${
+                    paymentMethod === "QR"
+                      ? "border-blue-600 bg-blue-50 shadow-md"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <QrCode className="h-12 w-12 text-blue-600" />
+                  <div className="text-center">
+                    <div className="font-semibold text-lg">Pago QR</div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Escanea el código QR con tu billetera móvil
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setPaymentMethod("TARJETA")}
+                  className={`p-6 rounded-lg border-2 transition flex flex-col items-center gap-3 ${
+                    paymentMethod === "TARJETA"
+                      ? "border-green-600 bg-green-50 shadow-md"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <CreditCard className="h-12 w-12 text-green-600" />
+                  <div className="text-center">
+                    <div className="font-semibold text-lg">Tarjeta</div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Paga con tarjeta de crédito o débito
+                    </p>
+                  </div>
+                </button>
               </div>
             </CardContent>
           </Card>
@@ -788,15 +734,6 @@ export function NewTicketForm() {
             </Alert>
           )}
 
-          {/* Nota */}
-          <Alert className="bg-blue-50 border-blue-200">
-            <AlertCircle className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800 text-sm">
-              Esto es una simulación de pago. Al confirmar, se procesará el pago
-              y se generará tu código QR.
-            </AlertDescription>
-          </Alert>
-
           {/* Botones */}
           <div className="flex gap-3">
             <Button
@@ -807,24 +744,16 @@ export function NewTicketForm() {
                 setCreatedTickets([]);
                 setBackendError(null);
               }}
-              disabled={processingPayment}
             >
               ← Volver
             </Button>
             <Button
-              onClick={handlePayment}
-              disabled={processingPayment || createdTickets.length === 0}
+              onClick={handlePaymentMethodSelection}
+              disabled={createdTickets.length === 0}
               className="flex-1 bg-green-600 hover:bg-green-700"
               size="lg"
             >
-              {processingPayment ? (
-                <>
-                  <Loader className="animate-spin h-4 w-4 mr-2" />
-                  Procesando pago...
-                </>
-              ) : (
-                `Confirmar Pago`
-              )}
+              Continuar con {paymentMethod}
             </Button>
           </div>
         </div>
