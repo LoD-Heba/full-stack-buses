@@ -535,8 +535,7 @@ Asientos: ${selectedSeats.map((s) => s.seat_code).join(", ")}
                   Ruta
                 </p>
                 <p className="font-medium mt-1">
-                  {trip.route?.originCity?.name} →{" "}
-                  {trip.route?.destinationCity?.name}
+                  {trip.route?.name}
                 </p>
               </div>
               <div>

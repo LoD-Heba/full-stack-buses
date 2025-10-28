@@ -45,7 +45,7 @@ export const generateInvoicePDF = async (
           <div>
             <p style="margin: 0; color: #666; font-size: 12px;">RUTA</p>
             <p style="margin: 5px 0; font-weight: bold;">
-              ${trip.route?.originCity?.name || "?"} → ${trip.route?.destinationCity?.name || "?"}
+              ${trip.route?.name || "?"}
             </p>
           </div>
           <div>

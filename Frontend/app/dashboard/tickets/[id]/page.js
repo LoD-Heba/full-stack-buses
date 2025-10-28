@@ -280,8 +280,7 @@ export default function PublicTicketPage() {
               <div>
                 <p className="text-sm text-gray-600">Ruta</p>
                 <p className="font-medium text-lg">
-                  {ticket.trip?.route?.originCity?.name || '?'} →{' '}
-                  {ticket.trip?.route?.destinationCity?.name || '?'}
+                  {ticket.trip?.route?.name || '???'}
                 </p>
               </div>
               <div>

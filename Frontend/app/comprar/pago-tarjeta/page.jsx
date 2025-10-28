@@ -19,8 +19,11 @@ import {
 } from "lucide-react";
 import StripeCheckoutForm from "@/components/StripeCheckoutForm";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api/v1";
+const stripePromise = loadStripe(
+  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+);
 
 export default function PagoTarjetaPage() {
   const router = useRouter();
@@ -71,7 +74,9 @@ export default function PagoTarjetaPage() {
       setTrip(tripData);
 
       // Obtener layout del bus para mapear asientos
-      const layoutRes = await fetch(`${API_BASE}/buses/${tripData.bus.id}/layout`);
+      const layoutRes = await fetch(
+        `${API_BASE}/buses/${tripData.bus.id}/layout`
+      );
       if (!layoutRes.ok) throw new Error("Error al cargar layout del bus");
       const layoutData = await layoutRes.json();
 
@@ -125,14 +130,17 @@ export default function PagoTarjetaPage() {
 
   const createPaymentIntent = async (seats, tripData) => {
     try {
-      console.log("💳 Creando Payment Intent...");
-
       const ticketsData = seats.map((seat) => ({
         tripId: tripId,
         seatId: seat.id,
         price: parseFloat(tripData.price),
         category: "adulto",
       }));
+
+      console.log("📤 Enviando datos al backend:", {
+        tickets: ticketsData,
+        userProfileId: clientId,
+      });
 
       const response = await fetch(`${API_BASE}/stripe/create-payment-intent`, {
         method: "POST",
@@ -143,13 +151,8 @@ export default function PagoTarjetaPage() {
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Error al crear Payment Intent");
-      }
-
       const data = await response.json();
-      console.log("✅ Payment Intent creado:", data.paymentIntentId);
+      console.log("✅ Payment Intent creado:", data);
 
       setClientSecret(data.clientSecret);
       setPaymentIntentId(data.paymentIntentId);
@@ -164,13 +167,16 @@ export default function PagoTarjetaPage() {
       console.log("✅ Pago exitoso, confirmando...");
 
       // Confirmar el pago en el backend y crear tickets
-      const response = await fetch(`${API_BASE}/stripe/confirm-payment-intent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          paymentIntentId: paymentIntentId,
-        }),
-      });
+      const response = await fetch(
+        `${API_BASE}/stripe/confirm-payment-intent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            paymentIntentId: paymentIntentId,
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error("Error al confirmar el pago");
@@ -247,7 +253,9 @@ export default function PagoTarjetaPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Pago con Tarjeta</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Pago con Tarjeta
+            </h1>
             <p className="text-gray-600 mt-1">
               Completa tu información de pago de forma segura
             </p>
@@ -276,7 +284,9 @@ export default function PagoTarjetaPage() {
               </div>
               <div>
                 <p className="text-gray-600">Teléfono</p>
-                <p className="font-medium">{client.phone || "No especificado"}</p>
+                <p className="font-medium">
+                  {client.phone || "No especificado"}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -297,9 +307,7 @@ export default function PagoTarjetaPage() {
                   <MapPin className="h-4 w-4" />
                   Ruta
                 </p>
-                <p className="font-medium mt-1">
-                  {trip.route?.name}{" "}
-                </p>
+                <p className="font-medium mt-1">{trip.route?.name} </p>
               </div>
               <div>
                 <p className="text-gray-600 flex items-center gap-1">

@@ -43,11 +43,6 @@ export default function RegisterPage() {
       return false;
     }
 
-    if (!formData.email && !formData.phone) {
-      setError("Debes proporcionar al menos un email o teléfono");
-      return false;
-    }
-
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       setError("Email inválido");
       return false;
@@ -85,14 +80,14 @@ export default function RegisterPage() {
       const registerData = {
         name: formData.name.trim(),
         password: formData.password,
-        profile: {
-          email: formData.email ? formData.email.trim() : undefined,
-          phone: formData.phone ? formData.phone.trim() : undefined,
-        },
       };
 
-      if (formData.email) registerData.email = formData.email.trim();
-      if (formData.phone) registerData.phone = formData.phone.trim();
+      // Solo agregar profile si hay email o phone
+      if (formData.email || formData.phone) {
+        registerData.profile = {};
+        if (formData.email) registerData.profile.email = formData.email.trim();
+        if (formData.phone) registerData.profile.phone = formData.phone.trim();
+      }
 
       const response = await fetch(
         "http://localhost:3001/api/v1/auth/register",
@@ -120,7 +115,7 @@ export default function RegisterPage() {
       setSuccess(true);
 
       setTimeout(() => {
-        router.push("/comprar");
+        router.push("/");
         router.refresh();
       }, 2000);
       router.refresh();
@@ -179,7 +174,7 @@ export default function RegisterPage() {
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre Completo <span className="text-red-500">*</span>
+                  Nombre Completo
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -228,13 +223,13 @@ export default function RegisterPage() {
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Proporciona al menos email o teléfono
+                  Email y teléfono son opcionales
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Contraseña <span className="text-red-500">*</span>
+                  Contraseña 
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -263,7 +258,7 @@ export default function RegisterPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Confirmar Contraseña <span className="text-red-500">*</span>
+                  Confirmar Contraseña
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />

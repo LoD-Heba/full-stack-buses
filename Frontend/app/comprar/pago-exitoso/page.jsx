@@ -12,97 +12,82 @@ const API_BASE = "http://localhost:3001/api/v1";
 export default function PagoExitosoPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const sessionId = searchParams.get("session_id");
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [paymentData, setPaymentData] = useState(null);
 
   useEffect(() => {
-    if (!sessionId) {
-      setError("Sesión de pago inválida");
+    // ✅ Obtener AMBOS parámetros posibles
+    const sessionId = searchParams.get("session_id");
+    const paymentIntent = searchParams.get("payment_intent");
+
+    console.log("🔍 URL params:", { sessionId, paymentIntent });
+
+    // ✅ Validar que al menos uno exista
+    if (!sessionId && !paymentIntent) {
+      setError("No se encontró información de pago en la URL");
       setLoading(false);
       return;
     }
 
     verifyPayment();
-  }, [sessionId]);
+  }, []);
 
   const verifyPayment = async () => {
     try {
-      console.log("🔍 Verificando pago...");
-
-      // Extraer payment_intent de la URL
+      const sessionId = searchParams.get("session_id");
       const paymentIntent = searchParams.get("payment_intent");
 
+      console.log("🔍 Verificando pago...");
+      console.log("SessionId:", sessionId);
+      console.log("PaymentIntent:", paymentIntent);
+
+      let response;
+
       if (paymentIntent) {
-        // Es un Payment Intent (formulario embebido)
-        const response = await fetch(
-          `${API_BASE}/stripe/confirm-payment-intent`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ paymentIntentId: paymentIntent }),
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Error al verificar el pago");
-        }
-
-        const data = await response.json();
-        console.log("✅ Pago verificado:", data);
-
-        setPaymentData(data);
-        toast.success("¡Pago confirmado exitosamente!");
-
-        // Limpiar sessionStorage
-        sessionStorage.removeItem("purchaseClient");
-        sessionStorage.removeItem("selectedSeats");
-
-        // Redirigir al primer ticket después de 3 segundos
-        setTimeout(() => {
-          if (data.tickets && data.tickets.length > 0) {
-            router.push(
-              `/tickets/${data.tickets[0].ticket_id}?payment=success`
-            );
-          }
-        }, 3000);
+        // ✅ Es un Payment Intent (formulario embebido de tarjeta)
+        console.log("💳 Procesando Payment Intent...");
+        
+        response = await fetch(`${API_BASE}/stripe/confirm-payment-intent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paymentIntentId: paymentIntent }),
+        });
       } else if (sessionId) {
-        // Es una sesión de Checkout (redirección a Stripe)
-        const response = await fetch(
+        // ✅ Es una sesión de Checkout (redirección a Stripe)
+        console.log("🛒 Procesando Checkout Session...");
+        
+        response = await fetch(
           `${API_BASE}/stripe/verify-payment?session_id=${sessionId}`
         );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Error al verificar el pago");
-        }
-
-        const data = await response.json();
-        console.log("✅ Pago verificado:", data);
-
-        setPaymentData(data);
-        toast.success("¡Pago confirmado exitosamente!");
-
-        // Limpiar sessionStorage
-        sessionStorage.removeItem("purchaseClient");
-        sessionStorage.removeItem("selectedSeats");
-
-        // Redirigir al primer ticket después de 3 segundos
-        setTimeout(() => {
-          if (data.tickets && data.tickets.length > 0) {
-            router.push(
-              `/tickets/${data.tickets[0].ticket_id}?payment=success`
-            );
-          }
-        }, 3000);
       } else {
         throw new Error("No se encontró información de pago");
       }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Error al verificar el pago");
+      }
+
+      const data = await response.json();
+      console.log("✅ Pago verificado:", data);
+
+      setPaymentData(data);
+      toast.success("¡Pago confirmado exitosamente!");
+
+      // Limpiar sessionStorage
+      sessionStorage.removeItem("purchaseClient");
+      sessionStorage.removeItem("selectedSeats");
+
+      // Redirigir al primer ticket después de 3 segundos
+      setTimeout(() => {
+        if (data.tickets && data.tickets.length > 0) {
+          router.push(`/tickets/${data.tickets[0].ticket_id}?payment=success`);
+        }
+      }, 3000);
     } catch (err) {
-      console.error("Error:", err);
+      console.error("❌ Error al verificar pago:", err);
       setError(err.message || "Error al verificar el pago");
       toast.error(err.message);
     } finally {
@@ -116,6 +101,7 @@ export default function PagoExitosoPage() {
         <div className="text-center">
           <Loader className="animate-spin h-16 w-16 text-orange-600 mx-auto" />
           <p className="mt-4 text-gray-600">Verificando tu pago...</p>
+          <p className="mt-2 text-sm text-gray-500">Por favor espera...</p>
         </div>
       </div>
     );
@@ -129,12 +115,21 @@ export default function PagoExitosoPage() {
             <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-red-900 mb-2">Error</h2>
             <p className="text-red-800 mb-6">{error}</p>
-            <Button
-              onClick={() => router.push("/salidas")}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Volver a Salidas
-            </Button>
+            <div className="space-y-2">
+              <Button
+                onClick={() => router.push("/salidas")}
+                className="w-full bg-red-600 hover:bg-red-700"
+              >
+                Volver a Salidas
+              </Button>
+              <Button
+                onClick={() => window.location.reload()}
+                variant="outline"
+                className="w-full"
+              >
+                Reintentar Verificación
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -169,13 +164,16 @@ export default function PagoExitosoPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total pagado:</span>
                   <span className="font-bold text-green-600 text-xl">
-                    Bs.{" "}
-                    {parseFloat(paymentData.payment?.amount || 0).toFixed(2)}
+                    Bs. {parseFloat(paymentData.payment?.amount || 0).toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Método:</span>
                   <span className="font-medium">Tarjeta de Crédito</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Estado:</span>
+                  <span className="font-bold text-green-600">COMPLETADO</span>
                 </div>
               </CardContent>
             </Card>

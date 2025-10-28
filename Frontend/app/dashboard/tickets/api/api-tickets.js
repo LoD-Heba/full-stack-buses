@@ -214,8 +214,7 @@ export async function getAvailableSeatsForTrip(tripId) {
     console.log("✅ Viaje obtenido:", {
       id: trip.id,
       busId: trip.bus?.id,
-      route: `${trip.route?.originCity?.name || "?"} → ${
-        trip.route?.destinationCity?.name || "?"
+      route: `${trip.route?.name || "?"}
       }`,
     });
 
