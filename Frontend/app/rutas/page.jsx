@@ -47,7 +47,7 @@ export default function RutasPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-indigo-100 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-green-200 py-12 px-4">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-12 text-center">
@@ -147,7 +147,6 @@ export default function RutasPage() {
                     {ruta.base_price && (
                       <div className="flex items-center justify-between pb-3 border-b border-gray-100">
                         <div className="flex items-center gap-2 text-gray-600">
-                          <DollarSign className="w-4 h-4" />
                           <span className="text-sm">Precio Base</span>
                         </div>
                         <span className="text-2xl font-bold text-orange-600">
@@ -173,7 +172,7 @@ export default function RutasPage() {
                   </div>
 
                   {/* Botón de Compra */}
-                  <Link href={`/comprar?routeId=${ruta.id}`} className="block w-full pt-2">
+                  <Link href={`/salidas`} className="block w-full pt-2">
                     <Button className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-lg transition-colors">
                       Comprar Pasaje
                     </Button>

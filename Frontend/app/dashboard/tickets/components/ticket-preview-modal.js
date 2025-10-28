@@ -323,12 +323,12 @@ export function TicketPreviewModal({ ticket, open, onClose }) {
           {/* Encabezado */}
           <div className="header">
             <div className="company-info">
-              <h1>TRANSARKA</h1>
+              <h1>TRANS SACABA</h1>
               <p>Empresa de Transporte</p>
               <p>NIT: 123456789</p>
               <p>Av. Principal #123, Cochabamba</p>
               <p>Tel: +591 4-1234567</p>
-              <p>Email: info@transarka.com</p>
+              <p>Email: info@transsacaba.com</p>
             </div>
             <div>
               <div className="invoice-badge">
@@ -453,7 +453,7 @@ export function TicketPreviewModal({ ticket, open, onClose }) {
 
           {/* Pie de página */}
           <div className="footer">
-            <p className="thank-you">¡Gracias por viajar con TRANSARKA!</p>
+            <p className="thank-you">¡Gracias por viajar con TRANS SACABA!</p>
             <p>Este documento es válido como comprobante de compra</p>
             <p className="disclaimer">Generado electrónicamente - No requiere firma ni sello</p>
           </div>

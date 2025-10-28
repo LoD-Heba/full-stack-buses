@@ -41,7 +41,7 @@ export function exportSingleTicketToPDF(ticket) {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(28);
   doc.setFont(undefined, "bold");
-  doc.text("TRANSARKA", 15, 15);
+  doc.text("TRANS SACABA", 15, 15);
 
   doc.setFontSize(10);
   doc.setFont(undefined, "normal");
@@ -266,7 +266,7 @@ export function exportSingleTicketToPDF(ticket) {
   doc.setFontSize(9);
   doc.setTextColor(234, 88, 12);
   doc.setFont(undefined, "bold");
-  doc.text("Gracias por viajar con TRANSARKA!", pageWidth / 2, yPos, { align: "center" });
+  doc.text("Gracias por viajar con TRANS SACABA!", pageWidth / 2, yPos, { align: "center" });
 
   yPos += 5;
   doc.setFontSize(8);
