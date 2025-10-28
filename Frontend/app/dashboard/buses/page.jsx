@@ -322,7 +322,7 @@ export default function BusesPage() {
     {
       key: "user",
       label: "Usuario",
-      render: (value) => value?.email || value?.username || "-",
+      render: (value) => value?.name || value?.username || "-",
     },
   ];
 

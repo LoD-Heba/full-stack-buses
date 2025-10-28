@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import SeatToolbox from './SeatToolbox';
-import SeatGrid from './SeatGrid';
-import SeatProperties from './SeatProperties';
-import { FaSave, FaUndo, FaRedo, FaExpand, FaCompress } from 'react-icons/fa';
+import React, { useState, useEffect } from "react";
+import SeatToolbox from "./SeatToolbox";
+import SeatGrid from "./SeatGrid";
+import SeatProperties from "./SeatProperties";
+import { FaSave, FaUndo, FaRedo, FaExpand, FaCompress } from "react-icons/fa";
 
 interface SeatEditorProps {
   busId: string;
@@ -10,37 +10,50 @@ interface SeatEditorProps {
   onSave: (layoutData: any) => void;
 }
 
-export default function SeatEditor({ busId, initialLayout, onSave }: SeatEditorProps) {
+export default function SeatEditor({
+  busId,
+  initialLayout,
+  onSave,
+}: SeatEditorProps) {
   // Estado del grid
   const [gridSize, setGridSize] = useState({ rows: 10, cols: 5 });
   const [cells, setCells] = useState<any[]>([]);
-  
+
   // Estado de herramientas
   const [selectedTool, setSelectedTool] = useState<any>(null);
   const [selectedCell, setSelectedCell] = useState<any>(null);
-  
+
   // Estado de configuración
   const [deckNumber, setDeckNumber] = useState(1);
-  const [stackName, setStackName] = useState('Piso 1');
-  
+  const [stackName, setStackName] = useState("Piso 1");
+  const [decks, setDecks] = useState<any[]>([
+    { floor: 1, name: "Piso 1", cells: [] },
+  ]);
+  const [currentDeckIndex, setCurrentDeckIndex] = useState(0);
   // Historial para deshacer/rehacer
   const [history, setHistory] = useState<any[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  
+
   // Contador de asientos
   const [seatCounter, setSeatCounter] = useState(1);
 
   // Cargar layout inicial si existe
   useEffect(() => {
-    if (initialLayout && initialLayout.layout) {
-      setCells(initialLayout.layout);
-      const maxSeatNumber = Math.max(
-        ...initialLayout.layout
-          .filter((c: any) => c.seat_number)
-          .map((c: any) => c.seat_number),
-        0
-      );
-      setSeatCounter(maxSeatNumber + 1);
+    if (initialLayout && initialLayout.decks) {
+      // Cargar todos los pisos
+      const loadedDecks = initialLayout.decks.map((deck: any) => ({
+        floor: deck.floor_number,
+        name: deck.stack_name,
+        cells: deck.layout || [],
+      }));
+      setDecks(loadedDecks);
+
+      // Cargar primer piso
+      if (loadedDecks.length > 0) {
+        setCells(loadedDecks[0].cells);
+        setDeckNumber(loadedDecks[0].floor);
+        setStackName(loadedDecks[0].name);
+      }
     }
   }, [initialLayout]);
 
@@ -72,12 +85,16 @@ export default function SeatEditor({ busId, initialLayout, onSave }: SeatEditorP
   const handleCellClick = (x: number, y: number) => {
     if (!selectedTool) return;
 
-    const existingCell = cells.find(c => c.position_x === x && c.position_y === y);
+    const existingCell = cells.find(
+      (c) => c.position_x === x && c.position_y === y
+    );
 
-    if (selectedTool.type === 'eraser') {
+    if (selectedTool.type === "eraser") {
       // Eliminar celda
       if (existingCell) {
-        const newCells = cells.filter(c => !(c.position_x === x && c.position_y === y));
+        const newCells = cells.filter(
+          (c) => !(c.position_x === x && c.position_y === y)
+        );
         setCells(newCells);
         addToHistory(newCells);
       }
@@ -91,14 +108,14 @@ export default function SeatEditor({ busId, initialLayout, onSave }: SeatEditorP
           rotation: 0,
         };
 
-        if (selectedTool.type === 'seat') {
+        if (selectedTool.type === "seat") {
           newCell = {
             ...newCell,
             seat_code: `${seatCounter}A`,
             seat_number: seatCounter,
             type: selectedTool.seatType,
           };
-          setSeatCounter(prev => prev + 1);
+          setSeatCounter((prev) => prev + 1);
         }
 
         const newCells = [...cells, newCell];
@@ -110,7 +127,7 @@ export default function SeatEditor({ busId, initialLayout, onSave }: SeatEditorP
 
   // Actualizar celda seleccionada
   const handleUpdateCell = (updates: any) => {
-    const newCells = cells.map(cell =>
+    const newCells = cells.map((cell) =>
       cell.position_x === selectedCell.position_x &&
       cell.position_y === selectedCell.position_y
         ? { ...cell, ...updates }
@@ -124,9 +141,13 @@ export default function SeatEditor({ busId, initialLayout, onSave }: SeatEditorP
   // Eliminar celda seleccionada
   const handleDeleteCell = () => {
     if (!selectedCell) return;
-    
+
     const newCells = cells.filter(
-      c => !(c.position_x === selectedCell.position_x && c.position_y === selectedCell.position_y)
+      (c) =>
+        !(
+          c.position_x === selectedCell.position_x &&
+          c.position_y === selectedCell.position_y
+        )
     );
     setCells(newCells);
     addToHistory(newCells);
@@ -134,59 +155,68 @@ export default function SeatEditor({ busId, initialLayout, onSave }: SeatEditorP
   };
 
   // Ajustar tamaño del grid
-  const adjustGridSize = (dimension: 'rows' | 'cols', increment: boolean) => {
-    setGridSize(prev => ({
+  const adjustGridSize = (dimension: "rows" | "cols", increment: boolean) => {
+    setGridSize((prev) => ({
       ...prev,
-      [dimension]: Math.max(1, Math.min(20, prev[dimension] + (increment ? 1 : -1)))
+      [dimension]: Math.max(
+        3,
+        Math.min(25, prev[dimension] + (increment ? 1 : -1))
+      ),
     }));
   };
 
   // Guardar configuración
- const handleSave = () => {
-  const seats = cells.filter(c => c.visual_type === 'seat');
-  
-  if (seats.length === 0) {
-    alert('Debes agregar al menos un asiento antes de guardar');
-    return;
-  }
+  const handleSave = () => {
+    // Guardar piso actual antes de enviar
+    const updatedDecks = [...decks];
+    updatedDecks[currentDeckIndex] = {
+      floor: deckNumber,
+      name: stackName,
+      cells: cells,
+    };
 
-  const layoutData = {
-    decks: [
-      {
-        floor_number: deckNumber,
-        stack_name: stackName,
-        description: `Configuración del piso ${deckNumber}`,
-        seats: cells.map(cell => {
-          const seatData: any = {
-            seat_code: cell.seat_code || `ELEM-${cell.position_x}-${cell.position_y}`,
-            position_x: cell.position_x,
-            position_y: cell.position_y,
-            visual_type: cell.visual_type,
-            rotation: cell.rotation || 0,
-            type: cell.type || 'normal',
-            meta: {},
-          };
-          if (cell.visual_type === 'seat' && cell.seat_number) {
-            seatData.seat_number = cell.seat_number;
-          }
+    // Validar que al menos un piso tenga asientos
+    const hasSeats = updatedDecks.some((deck) =>
+      deck.cells.some((c: any) => c.visual_type === "seat")
+    );
 
-          return seatData;
-        }),
-      },
-    ],
+    if (!hasSeats) {
+      alert("Debes agregar al menos un asiento en algún piso");
+      return;
+    }
+
+    const layoutData = {
+      decks: updatedDecks.map((deck) => ({
+        floor_number: deck.floor,
+        stack_name: deck.name,
+        description: `Configuración del ${deck.name}`,
+        seats: deck.cells.map((cell: any) => ({
+          seat_code:
+            cell.seat_code || `ELEM-${cell.position_x}-${cell.position_y}`,
+          seat_number:
+            cell.visual_type === "seat" ? cell.seat_number : undefined,
+          position_x: cell.position_x,
+          position_y: cell.position_y,
+          visual_type: cell.visual_type,
+          rotation: cell.rotation || 0,
+          type: cell.type || "normal",
+          deck: deck.floor,
+          meta: {},
+        })),
+      })),
+    };
+
+    onSave(layoutData);
   };
-
-  onSave(layoutData);
-};
 
   // Obtener códigos y números existentes
   const existingCodes = cells
-    .filter(c => c.seat_code)
-    .map(c => c.seat_code);
-  
+    .filter((c) => c.seat_code)
+    .map((c) => c.seat_code);
+
   const existingNumbers = cells
-    .filter(c => c.seat_number)
-    .map(c => c.seat_number);
+    .filter((c) => c.seat_number)
+    .map((c) => c.seat_number);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -199,7 +229,8 @@ export default function SeatEditor({ busId, initialLayout, onSave }: SeatEditorP
                 Configurador de Asientos
               </h1>
               <p className="text-sm text-gray-600 mt-1">
-                Bus ID: {busId} | {cells.filter(c => c.visual_type === 'seat').length} asientos
+                Bus ID: {busId} |{" "}
+                {cells.filter((c) => c.visual_type === "seat").length} asientos
               </p>
             </div>
 
@@ -232,24 +263,109 @@ export default function SeatEditor({ busId, initialLayout, onSave }: SeatEditorP
         </div>
 
         {/* Configuración de piso */}
+        {/* Gestión de pisos */}
         <div className="bg-white rounded-lg shadow-md p-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-800">
+              Configuración de Pisos
+            </h3>
+            <button
+              onClick={() => {
+                // Guardar piso actual
+                const updatedDecks = [...decks];
+                updatedDecks[currentDeckIndex] = {
+                  floor: deckNumber,
+                  name: stackName,
+                  cells: cells,
+                };
+
+                // Crear nuevo piso
+                const newFloor = updatedDecks.length + 1;
+                updatedDecks.push({
+                  floor: newFloor,
+                  name: `Piso ${newFloor}`,
+                  cells: [],
+                });
+
+                setDecks(updatedDecks);
+                setCurrentDeckIndex(updatedDecks.length - 1);
+                setDeckNumber(newFloor);
+                setStackName(`Piso ${newFloor}`);
+                setCells([]);
+                setSeatCounter(1);
+              }}
+              className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+            >
+              + Agregar Piso
+            </button>
+          </div>
+
+          {/* Tabs de pisos */}
+          <div className="flex gap-2 mb-4 overflow-x-auto">
+            {decks.map((deck, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  // Guardar piso actual antes de cambiar
+                  const updatedDecks = [...decks];
+                  updatedDecks[currentDeckIndex] = {
+                    floor: deckNumber,
+                    name: stackName,
+                    cells: cells,
+                  };
+                  setDecks(updatedDecks);
+
+                  // Cargar nuevo piso
+                  setCurrentDeckIndex(index);
+                  setDeckNumber(deck.floor);
+                  setStackName(deck.name);
+                  setCells(deck.cells);
+
+                  // Actualizar contador de asientos
+                  const maxSeat = Math.max(
+                    ...deck.cells
+                      .filter((c: any) => c.seat_number)
+                      .map((c: any) => c.seat_number),
+                    0
+                  );
+                  setSeatCounter(maxSeat + 1);
+                }}
+                className={`px-4 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${
+                  currentDeckIndex === index
+                    ? "bg-blue-600 text-white shadow-lg"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              >
+                {deck.name}
+                <span className="ml-2 text-xs opacity-75">
+                  (
+                  {
+                    deck.cells.filter((c: any) => c.visual_type === "seat")
+                      .length
+                  }{" "}
+                  asientos)
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Número de Piso
               </label>
-              <select
+              <input
+                type="number"
                 value={deckNumber}
                 onChange={(e) => setDeckNumber(Number(e.target.value))}
+                min={1}
+                max={2}
                 className="w-full px-3 py-2 border rounded-lg"
-              >
-                <option value={1}>Piso 1</option>
-                <option value={2}>Piso 2</option>
-              </select>
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nombre del Stack
+                Nombre del Piso
               </label>
               <input
                 type="text"
@@ -259,29 +375,30 @@ export default function SeatEditor({ busId, initialLayout, onSave }: SeatEditorP
                 placeholder="Ej: Piso 1"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tamaño del Grid
-              </label>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => adjustGridSize('cols', false)}
-                  className="px-3 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-                >
-                  <FaCompress />
-                </button>
-                <span className="px-3 py-2 border rounded-lg text-center min-w-[80px]">
-                  {gridSize.cols} × {gridSize.rows}
-                </span>
-                <button
-                  onClick={() => adjustGridSize('cols', true)}
-                  className="px-3 py-2 bg-gray-200 rounded-lg hover:bg-gray-300"
-                >
-                  <FaExpand />
-                </button>
-              </div>
-            </div>
           </div>
+
+          {/* Botón eliminar piso */}
+          {decks.length > 1 && (
+            <button
+              onClick={() => {
+                if (confirm(`¿Eliminar ${stackName}?`)) {
+                  const updatedDecks = decks.filter(
+                    (_, i) => i !== currentDeckIndex
+                  );
+                  setDecks(updatedDecks);
+
+                  // Ir al primer piso
+                  setCurrentDeckIndex(0);
+                  setDeckNumber(updatedDecks[0].floor);
+                  setStackName(updatedDecks[0].name);
+                  setCells(updatedDecks[0].cells);
+                }
+              }}
+              className="mt-3 w-full px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 text-sm"
+            >
+              Eliminar Piso Actual
+            </button>
+          )}
         </div>
 
         {/* Layout principal */}
