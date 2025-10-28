@@ -55,12 +55,6 @@ export class UserService {
   async register(registerDto: RegisterDto): Promise<User> {
     const { password, profile: profileData, ...userData } = registerDto;
 
-    if (!profileData || (!profileData.email && !profileData.phone)) {
-      throw new BadRequestException(
-        'Debe proporcionar al menos email o teléfono en el perfil',
-      );
-    }
-
     // Obtener rol por defecto (ej: "user" o "client")
     const defaultRole = await this.roleRepository.findOne({
       where: { name: 'user', isActive: true },
@@ -87,16 +81,16 @@ export class UserService {
             `Ya existe un perfil con el email ${profileData.email}`,
           );
         }
-      }
-      // AGREGAR validación de phone único:
-      if (profileData.phone) {
-        const existingProfile = await this.userProfileRepository.findOne({
-          where: { phone: profileData.phone },
-        });
-        if (existingProfile) {
-          throw new ConflictException(
-            `Ya existe un perfil con el teléfono ${profileData.phone}`,
-          );
+        // AGREGAR validación de phone único:
+        if (profileData.phone) {
+          const existingProfile = await this.userProfileRepository.findOne({
+            where: { phone: profileData.phone },
+          });
+          if (existingProfile) {
+            throw new ConflictException(
+              `Ya existe un perfil con el teléfono ${profileData.phone}`,
+            );
+          }
         }
       }
 
@@ -436,7 +430,6 @@ export class UserService {
 
     return this.findOne(id);
   }
-
 
   /******************************* Crear perfil para un usuario *********************************** */
   async createProfile(

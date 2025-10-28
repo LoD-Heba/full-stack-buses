@@ -80,9 +80,8 @@ export class RegisterDto {
   })
   password: string;
 
-  // AHORA profile es OBLIGATORIO (debe contener email o phone)
-  @IsNotEmpty({ message: 'Los datos del perfil son obligatorios' })
+  @IsOptional() // Ahora el perfil es opcional
   @ValidateNested()
   @Type(() => ProfileDataDto)
-  profile: ProfileDataDto;
+  profile?: ProfileDataDto; // Agregar el signo ?
 }

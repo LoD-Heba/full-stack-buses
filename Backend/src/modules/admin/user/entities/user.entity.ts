@@ -17,13 +17,12 @@ import { Report } from 'src/modules/client/report/entities/report.entity';
 import { News } from 'src/modules/client/news/entities/news.entity';
 import { Ticket } from 'src/modules/client/tickets/entities/ticket.entity';
 
-
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ length: 100 })
+  @Column({ length: 100, unique: true })
   name: string;
 
   @Column({ type: 'text', nullable: true })
@@ -40,7 +39,7 @@ export class User {
   // Muchos usuarios pueden tener un rol (N:1)
   @ManyToOne(() => Role, (role) => role.user, {
     nullable: false,
-    onDelete: 'SET NULL'
+    onDelete: 'SET NULL',
   })
   @JoinColumn({ name: 'role_id' })
   roles: Role;

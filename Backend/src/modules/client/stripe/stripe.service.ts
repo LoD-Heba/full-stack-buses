@@ -36,7 +36,6 @@ export class StripeService {
     @InjectRepository(Seat)
     private readonly seatRepository: Repository<Seat>,
   ) {
-    // ✅ FIX: Validar que la clave existe
     const stripeKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     if (!stripeKey) {
       throw new Error('STRIPE_SECRET_KEY no está configurada en .env');
@@ -52,104 +51,108 @@ export class StripeService {
    */
   // REEMPLAZAR desde la línea 52 hasta la 88:
 
-async createCheckoutSession(data: {
-  tickets: Array<{
-    tripId: string;
-    seatId: string;
-    price: number;
-    category: string;
-  }>;
-  userProfileId: string;
-  successUrl: string;
-  cancelUrl: string;
-}) {
-  const { tickets, userProfileId, successUrl, cancelUrl } = data;
+  async createCheckoutSession(data: {
+    tickets: Array<{
+      tripId: string;
+      seatId: string;
+      price: number;
+      category: string;
+    }>;
+    userProfileId: string;
+    successUrl: string;
+    cancelUrl: string;
+  }) {
+    const { tickets, userProfileId, successUrl, cancelUrl } = data;
 
-  // ✅ CORRECCIÓN: Validar usuario CON relación User
-  const userProfile = await this.userProfileRepository.findOne({
-    where: { id: userProfileId, isActive: true },
-    // NO necesitas relación 'user' aquí, solo accedes a campos del profile
-  });
-
-  if (!userProfile) {
-    throw new NotFoundException('Usuario no encontrado');
-  }
-
-  // ✅ CORRECCIÓN: Validar que tenga al menos UN dato de contacto
-  if (!userProfile.email && !userProfile.phone && !userProfile.documentNumber) {
-    throw new BadRequestException(
-      'El perfil debe tener al menos email, teléfono o documento para procesar el pago',
-    );
-  }
-
-  // Validar que los viajes y asientos existan
-  for (const ticket of tickets) {
-    const trip = await this.tripRepository.findOne({
-      where: { id: ticket.tripId, is_active: true },
-      relations: ['route', 'bus'],
+    // ✅ CORRECCIÓN: Validar usuario CON relación User
+    const userProfile = await this.userProfileRepository.findOne({
+      where: { id: userProfileId, isActive: true },
+      // NO necesitas relación 'user' aquí, solo accedes a campos del profile
     });
 
-    if (!trip) {
-      throw new NotFoundException(`Viaje ${ticket.tripId} no encontrado`);
+    if (!userProfile) {
+      throw new NotFoundException('Usuario no encontrado');
     }
 
-    if (trip.available_seats <= 0) {
-      throw new BadRequestException(`El viaje no tiene asientos disponibles`);
+    // ✅ CORRECCIÓN: Validar que tenga al menos UN dato de contacto
+    if (
+      !userProfile.email &&
+      !userProfile.phone &&
+      !userProfile.documentNumber
+    ) {
+      throw new BadRequestException(
+        'El perfil debe tener al menos email, teléfono o documento para procesar el pago',
+      );
     }
-  }
 
-  // Crear line items para Stripe
-  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] =
-    tickets.map((ticket) => ({
-      price_data: {
-        currency: 'usd',
-        product_data: {
-          name: `Boleto de Bus`,
-          description: `Pasajero: ${userProfile.firstName || 'Invitado'} ${userProfile.lastName || ''} - Categoría: ${ticket.category}`,
+    // Validar que los viajes y asientos existan
+    for (const ticket of tickets) {
+      const trip = await this.tripRepository.findOne({
+        where: { id: ticket.tripId, is_active: true },
+        relations: ['route', 'bus'],
+      });
+
+      if (!trip) {
+        throw new NotFoundException(`Viaje ${ticket.tripId} no encontrado`);
+      }
+
+      if (trip.available_seats <= 0) {
+        throw new BadRequestException(`El viaje no tiene asientos disponibles`);
+      }
+    }
+
+    // Crear line items para Stripe
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] =
+      tickets.map((ticket) => ({
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: `Boleto de Bus`,
+            description: `Pasajero: ${userProfile.firstName || 'Invitado'} ${userProfile.lastName || ''} - Categoría: ${ticket.category}`,
+          },
+          unit_amount: Math.round(ticket.price * 100),
         },
-        unit_amount: Math.round(ticket.price * 100),
-      },
-      quantity: 1,
-    }));
+        quantity: 1,
+      }));
 
-  // Crear metadata para recuperar info después
-  const metadata = {
-    userProfileId,
-    ticketData: JSON.stringify(tickets),
-  };
+    // Crear metadata para recuperar info después
+    const metadata = {
+      userProfileId,
+      ticketData: JSON.stringify(tickets),
+    };
 
-  // ✅ CORRECCIÓN: Generar email para Stripe
-  let customerEmail: string | undefined = undefined;
+    // ✅ CORRECCIÓN: Generar email para Stripe
+    let customerEmail: string | undefined = undefined;
 
-  if (userProfile.email) {
-    // Usar email del perfil directamente
-    customerEmail = userProfile.email;
-  } else if (userProfile.phone) {
-    // Si solo tiene teléfono, generar email temporal
-    customerEmail = `guest.${userProfile.phone.replace(/[^0-9]/g, '')}@transarka.local`;
-  } else if (userProfile.documentNumber) {
-    // Si solo tiene documento, usar eso
-    customerEmail = `guest.${userProfile.documentNumber.replace(/[^0-9A-Za-z]/g, '')}@transarka.local`;
+    if (userProfile.email) {
+      // Usar email del perfil directamente
+      customerEmail = userProfile.email;
+    } else if (userProfile.phone) {
+      // Si solo tiene teléfono, generar email temporal
+      customerEmail = `guest.${userProfile.phone.replace(/[^0-9]/g, '')}@transarka.local`;
+    } else if (userProfile.documentNumber) {
+      // Si solo tiene documento, usar eso
+      customerEmail = `guest.${userProfile.documentNumber.replace(/[^0-9A-Za-z]/g, '')}@transarka.local`;
+    }
+
+    // Crear sesión de Stripe
+    const session = await this.stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: lineItems,
+      mode: 'payment',
+      success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: cancelUrl,
+      metadata,
+      customer_email: customerEmail, // Puede ser undefined si no hay datos
+      expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
+    });
+
+    return {
+      sessionId: session.id,
+      url: session.url,
+      expiresAt: new Date(session.expires_at * 1000),
+    };
   }
-
-  // Crear sesión de Stripe
-  const session = await this.stripe.checkout.sessions.create({
-    payment_method_types: ['card'],
-    line_items: lineItems,
-    mode: 'payment',
-    success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: cancelUrl,
-    metadata,
-    customer_email: customerEmail, // Puede ser undefined si no hay datos
-    expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
-  });
-
-  return {
-    sessionId: session.id,
-    url: session.url,
-    expiresAt: new Date(session.expires_at * 1000),
-  };
-}
 
   /**
    * Crear Payment Intent para formulario embebido
@@ -199,130 +202,202 @@ async createCheckoutSession(data: {
   }
 
   /**
-   * Confirmar pago y crear tickets después de Payment Intent exitoso
+   * ✅ CORREGIDO: Confirmar pago y crear tickets después de Payment Intent exitoso
    */
   async confirmPaymentIntent(paymentIntentId: string) {
-    // Obtener Payment Intent de Stripe
-    const paymentIntent =
-      await this.stripe.paymentIntents.retrieve(paymentIntentId);
-
-    if (paymentIntent.status !== 'succeeded') {
-      throw new BadRequestException('El pago no ha sido completado');
-    }
-
-    // Verificar que no se haya procesado antes
-    const existingPayment = await this.paymentRepository.findOne({
-      where: { transaction_id: paymentIntentId },
-      relations: ['tickets'],
-    });
-
-    if (existingPayment) {
-      return {
-        payment: existingPayment,
-        tickets: existingPayment.tickets || [],
-        message: 'Este pago ya fue procesado anteriormente',
-      };
-    }
-
-    // Obtener metadata
-    const metadata = paymentIntent.metadata;
-    const userProfileId = metadata.userProfileId;
-    const ticketData = JSON.parse(metadata.ticketData);
-
-    const userProfile = await this.userProfileRepository.findOne({
-      where: { id: userProfileId },
-    });
-
-    if (!userProfile) {
-      throw new NotFoundException(`Usuario ${userProfileId} no encontrado`);
-    }
-
-    // Transacción para garantizar atomicidad
-    const queryRunner =
-      this.paymentRepository.manager.connection.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
     try {
-      // Crear registro de pago
-      const payment = queryRunner.manager.create(Payment, {
-        amount: paymentIntent.amount / 100, // Convertir de centavos
-        method: PaymentMethod.CARD,
-        status: PaymentStatus.COMPLETED,
-        transaction_id: paymentIntentId,
-        payment_date: new Date(),
-        userProfile,
-      });
+      console.log('🔍 Confirmando Payment Intent:', paymentIntentId);
 
-      const savedPayment = await queryRunner.manager.save(Payment, payment);
+      // 1. Obtener Payment Intent de Stripe
+      const paymentIntent = await this.stripe.paymentIntents.retrieve(
+        paymentIntentId,
+      );
 
-      // Crear tickets
-      const createdTickets: Ticket[] = [];
+      console.log('📄 Payment Intent status:', paymentIntent.status);
 
-      for (const ticketInfo of ticketData) {
-        const trip = await queryRunner.manager.findOne(Trip, {
-          where: { id: ticketInfo.tripId },
-          relations: ['bus', 'route'],
-          lock: { mode: 'pessimistic_write' },
-        });
-
-        if (!trip) {
-          throw new NotFoundException(
-            `Viaje ${ticketInfo.tripId} no encontrado`,
-          );
-        }
-
-        if (trip.available_seats <= 0) {
-          throw new BadRequestException(
-            `El viaje no tiene asientos disponibles`,
-          );
-        }
-
-        // Generar código único de ticket
-        const ticketCode = await this.generateTicketCode(queryRunner.manager);
-
-        const ticket = queryRunner.manager.create(Ticket, {
-          code: ticketCode,
-          price: ticketInfo.price,
-          status: TicketStatus.CONFIRMED,
-          trip: trip,
-          seat: { id: ticketInfo.seatId } as any,
-          userProfile: userProfile,
-          payment: savedPayment,
-          booking_date: new Date(),
-          is_active: true,
-        });
-
-        const savedTicket = await queryRunner.manager.save(Ticket, ticket);
-        createdTickets.push(savedTicket);
-
-        // Actualizar estado del asiento
-        await queryRunner.manager.update(
-          Seat,
-          { id: ticketInfo.seatId },
-          { status: SeatStatus.OCCUPIED },
-        );
-
-        // Actualizar asientos disponibles del viaje
-        await queryRunner.manager.decrement(
-          Trip,
-          { id: ticketInfo.tripId },
-          'available_seats',
-          1,
+      if (paymentIntent.status !== 'succeeded') {
+        throw new BadRequestException(
+          `El pago no ha sido completado. Estado: ${paymentIntent.status}`,
         );
       }
 
-      await queryRunner.commitTransaction();
+      // 2. Verificar que no se haya procesado antes
+      const existingPayment = await this.paymentRepository.findOne({
+        where: { transaction_id: paymentIntentId },
+        relations: ['tickets'],
+      });
 
-      return {
-        payment: savedPayment,
-        tickets: createdTickets,
-      };
+      if (existingPayment) {
+        console.log('⚠️ Pago ya procesado anteriormente');
+        return {
+          payment: existingPayment,
+          tickets: existingPayment.tickets || [],
+          message: 'Este pago ya fue procesado anteriormente',
+        };
+      }
+
+      // 3. Validar metadata
+      const metadata = paymentIntent.metadata;
+      
+      if (!metadata || !metadata.userProfileId || !metadata.ticketData) {
+        console.error('❌ Metadata inválida:', metadata);
+        throw new BadRequestException(
+          'Información de pago incompleta. Por favor contacta soporte.',
+        );
+      }
+
+      const userProfileId = metadata.userProfileId;
+      let ticketData;
+
+      try {
+        ticketData = JSON.parse(metadata.ticketData);
+      } catch (err) {
+        console.error('❌ Error al parsear ticketData:', err);
+        throw new BadRequestException('Datos de tickets inválidos');
+      }
+
+      console.log('👤 User Profile ID:', userProfileId);
+      console.log('🎫 Tickets a crear:', ticketData.length);
+
+      // 4. Obtener usuario
+      const userProfile = await this.userProfileRepository.findOne({
+        where: { id: userProfileId, isActive: true },
+      });
+
+      if (!userProfile) {
+        throw new NotFoundException(`Usuario ${userProfileId} no encontrado`);
+      }
+
+      // 5. Transacción para garantizar atomicidad
+      const queryRunner =
+        this.paymentRepository.manager.connection.createQueryRunner();
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+
+      try {
+        // 6. Crear registro de pago
+        const payment = queryRunner.manager.create(Payment, {
+          amount: paymentIntent.amount / 100, // Convertir de centavos
+          method: PaymentMethod.CARD,
+          status: PaymentStatus.COMPLETED,
+          transaction_id: paymentIntentId,
+          payment_date: new Date(),
+          userProfile,
+          category: 'adulto',
+        });
+
+        const savedPayment = await queryRunner.manager.save(Payment, payment);
+        console.log('✅ Pago guardado:', savedPayment.id);
+
+        // 7. Crear tickets
+        const createdTickets: Ticket[] = [];
+
+        for (const ticketInfo of ticketData) {
+          console.log('🎫 Procesando ticket para asiento:', ticketInfo.seatId);
+
+          // ✅ SOLUCIÓN: Primero hacer el lock SIN relaciones
+          const trip = await queryRunner.manager.findOne(Trip, {
+            where: { id: ticketInfo.tripId, is_active: true },
+            lock: { mode: 'pessimistic_write' },
+          });
+
+          if (!trip) {
+            throw new NotFoundException(
+              `Viaje ${ticketInfo.tripId} no encontrado`,
+            );
+          }
+
+          // ✅ DESPUÉS cargar las relaciones (sin lock)
+          const tripWithRelations = await queryRunner.manager.findOne(Trip, {
+            where: { id: ticketInfo.tripId },
+            relations: ['bus', 'route'],
+          });
+
+          if (trip.available_seats <= 0) {
+            throw new BadRequestException(
+              `El viaje no tiene asientos disponibles`,
+            );
+          }
+
+          // Verificar que el asiento existe y está disponible
+          const seat = await queryRunner.manager.findOne(Seat, {
+            where: { id: ticketInfo.seatId },
+          });
+
+          if (!seat) {
+            throw new NotFoundException(
+              `Asiento ${ticketInfo.seatId} no encontrado`,
+            );
+          }
+
+          if (seat.status !== SeatStatus.AVAILABLE) {
+            throw new BadRequestException(
+              `El asiento ${seat.seat_code} ya no está disponible`,
+            );
+          }
+
+          // Generar código único de ticket
+          const ticketCode = await this.generateTicketCode(queryRunner.manager);
+
+          // Crear ticket
+          const ticket = queryRunner.manager.create(Ticket, {
+            code: ticketCode,
+            price: ticketInfo.price,
+            status: TicketStatus.CONFIRMED,
+            trip: trip,
+            seat: seat,
+            userProfile: userProfile,
+            payment: savedPayment,
+            booking_date: new Date(),
+            is_active: true,
+          });
+
+          const savedTicket = await queryRunner.manager.save(Ticket, ticket);
+          console.log('✅ Ticket creado:', savedTicket.code);
+          createdTickets.push(savedTicket);
+
+          // Actualizar estado del asiento
+          await queryRunner.manager.update(
+            Seat,
+            { id: ticketInfo.seatId },
+            { status: SeatStatus.OCCUPIED },
+          );
+
+          // Actualizar asientos disponibles del viaje
+          await queryRunner.manager.decrement(
+            Trip,
+            { id: ticketInfo.tripId },
+            'available_seats',
+            1,
+          );
+        }
+
+        await queryRunner.commitTransaction();
+        console.log('✅ Transacción completada. Tickets creados:', createdTickets.length);
+
+        return {
+          payment: savedPayment,
+          tickets: createdTickets,
+          message: 'Pago confirmado exitosamente',
+        };
+      } catch (error) {
+        await queryRunner.rollbackTransaction();
+        console.error('❌ Error en transacción:', error);
+        throw error;
+      } finally {
+        await queryRunner.release();
+      }
     } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw error;
-    } finally {
-      await queryRunner.release();
+      console.error('❌ Error en confirmPaymentIntent:', error);
+      
+      // Proporcionar mensajes de error más específicos
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      
+      throw new BadRequestException(
+        `Error al confirmar el pago: ${error.message || 'Error desconocido'}`,
+      );
     }
   }
 
@@ -613,11 +688,13 @@ async createCheckoutSession(data: {
     const nextNumber = count + 1;
     const code = `TCK-${year}-${nextNumber.toString().padStart(6, '0')}`;
 
+    // Verificar que no exista
     const existing = await manager.findOne(Ticket, {
       where: { code },
     });
 
     if (existing) {
+      // Si existe, obtener el último y sumar 1
       const lastTicket = await manager
         .createQueryBuilder(Ticket, 'ticket')
         .where('EXTRACT(YEAR FROM ticket.created_at) = :year', { year })
