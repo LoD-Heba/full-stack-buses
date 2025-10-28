@@ -35,11 +35,18 @@ export class UserController {
     return this.userService.register(registerDto);
   }
 
-  // Obtener todos los usuarios
-  @Get()
-  findAll(@Query() paginationDto: PaginationDto) {
-    return this.userService.findAll(paginationDto);
-  }
+ @Get()
+findAll(
+  @Query() paginationDto: PaginationDto,
+  @Query('isActive') isActive?: string, // ✅ Nuevo query param
+) {
+  // Convertir string a boolean si viene definido
+  const isActiveBoolean = isActive !== undefined 
+    ? isActive === 'true' 
+    : undefined;
+    
+  return this.userService.findAll(paginationDto, isActiveBoolean);
+}
 
   // Búsqueda avanzada
   @Get('search')

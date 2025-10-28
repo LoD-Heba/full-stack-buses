@@ -131,14 +131,20 @@ export class UserService {
   /**************************** Buscar todos los usuarios ************************************* */
   async findAll(
     paginationDto: PaginationDto,
+    isActive?: boolean,
   ): Promise<PaginatedResponse<User>> {
     const { page = 1, limit = 10 } = paginationDto;
 
     const take = Math.min(Math.max(limit, 1), 100);
     const skip = (page - 1) * take;
 
+    const where: any = {};
+    if (typeof isActive === 'boolean') {
+      where.isActive = isActive;
+    }
+
     const total = await this.userRepository.count({
-      where: { isActive: true },
+      where,
     });
 
     const lastPage = Math.ceil(total / take);
@@ -146,6 +152,7 @@ export class UserService {
     const hasPrevPage = page > 1;
 
     const data = await this.userRepository.find({
+      where,
       relations: {
         roles: true,
         profile: true,
@@ -169,7 +176,6 @@ export class UserService {
       },
     };
   }
-
   /***************************** Buscar usuarios con filtros ************************************ */
   async search(searchDto: SearchUserDto, paginationDto: PaginationDto) {
     const { page = 1, limit = 10 } = paginationDto;
@@ -431,42 +437,114 @@ export class UserService {
     return this.findOne(id);
   }
 
-  /******************************* Crear perfil para un usuario *********************************** */
-  async createProfile(
-    userId: string,
-    profileData: Partial<UserProfile>,
-  ): Promise<User> {
-    const user = await this.findOne(userId);
+ async createProfile(
+  userId: string,
+  profileData: Partial<UserProfile>,
+): Promise<User> {
+  const user = await this.findOne(userId);
 
-    if (user.profile) {
-      throw new BadRequestException('El usuario ya tiene un perfil asociado');
-    }
+  if (user.profile) {
+    throw new BadRequestException('El usuario ya tiene un perfil asociado');
+  }
 
-    const profile = this.userProfileRepository.create(profileData);
-    const savedProfile = await this.userProfileRepository.save(profile);
-
-    await this.userRepository.update(userId, {
-      profile: savedProfile,
+  // Validar datos únicos
+  if (profileData.documentNumber) {
+    const existingProfile = await this.userProfileRepository.findOne({
+      where: { documentNumber: profileData.documentNumber },
     });
-
-    return this.findOne(userId);
-  }
-
-  /*********************  Actualizar perfil de un usuario ************************************ */
-  async updateProfile(
-    userId: string,
-    profileData: Partial<UserProfile>,
-  ): Promise<User> {
-    const user = await this.findOne(userId);
-
-    if (!user.profile) {
-      throw new NotFoundException('El usuario no tiene un perfil asignado');
+    if (existingProfile) {
+      throw new ConflictException(
+        `Ya existe un perfil con el C.I. ${profileData.documentNumber}`,
+      );
     }
-
-    await this.userProfileRepository.update(user.profile.id, profileData);
-
-    return this.findOne(userId);
   }
+
+  if (profileData.email) {
+    const existingProfile = await this.userProfileRepository.findOne({
+      where: { email: profileData.email },
+    });
+    if (existingProfile) {
+      throw new ConflictException(
+        `Ya existe un perfil con el email ${profileData.email}`,
+      );
+    }
+  }
+
+  if (profileData.phone) {
+    const existingProfile = await this.userProfileRepository.findOne({
+      where: { phone: profileData.phone },
+    });
+    if (existingProfile) {
+      throw new ConflictException(
+        `Ya existe un perfil con el teléfono ${profileData.phone}`,
+      );
+    }
+  }
+
+  const profile = this.userProfileRepository.create({
+    ...profileData,
+    isGuest: false,
+  });
+  const savedProfile = await this.userProfileRepository.save(profile);
+
+  await this.userRepository.update(userId, {
+    profile: savedProfile,
+  });
+
+  return this.findOne(userId);
+}
+
+async updateProfile(
+  userId: string,
+  profileData: Partial<UserProfile>,
+): Promise<User> {
+  const user = await this.findOne(userId);
+
+  if (!user.profile) {
+    throw new NotFoundException('El usuario no tiene un perfil asignado');
+  }
+
+  // Validar datos únicos si han cambiado
+  if (
+    profileData.documentNumber &&
+    profileData.documentNumber !== user.profile.documentNumber
+  ) {
+    const existingProfile = await this.userProfileRepository.findOne({
+      where: { documentNumber: profileData.documentNumber },
+    });
+    if (existingProfile) {
+      throw new ConflictException(
+        `Ya existe un perfil con el C.I. ${profileData.documentNumber}`,
+      );
+    }
+  }
+
+  if (profileData.email && profileData.email !== user.profile.email) {
+    const existingProfile = await this.userProfileRepository.findOne({
+      where: { email: profileData.email },
+    });
+    if (existingProfile) {
+      throw new ConflictException(
+        `Ya existe un perfil con el email ${profileData.email}`,
+      );
+    }
+  }
+
+  if (profileData.phone && profileData.phone !== user.profile.phone) {
+    const existingProfile = await this.userProfileRepository.findOne({
+      where: { phone: profileData.phone },
+    });
+    if (existingProfile) {
+      throw new ConflictException(
+        `Ya existe un perfil con el teléfono ${profileData.phone}`,
+      );
+    }
+  }
+
+  await this.userProfileRepository.update(user.profile.id, profileData);
+
+  return this.findOne(userId);
+}
 
   /****************************** Eliminar perfil de un usuario ************************************ */
   async removeProfile(userId: string): Promise<{ message: string }> {
@@ -554,30 +632,47 @@ export class UserService {
 
   /************************ DELETE ***************************/
   async remove(id: string): Promise<User> {
-    const user = await this.findOne(id);
+  const user = await this.userRepository.findOne({
+    where: { id },
+    relations: {
+      tickets: true,
+      buses: true,
+      news: true,
+    },
+  });
 
-    // Verificar si tiene tickets confirmados o buses activos
-    const activeTickets =
-      user.tickets?.filter((ticket) => ticket.status === 'CONFIRMADO') || [];
-
-    const activeBuses = user.buses?.filter((bus) => bus.is_active) || [];
-    const activeNews = user.news?.filter((newId) => newId.id) || [];
-    if (
-      activeTickets.length > 0 ||
-      activeBuses.length > 0 ||
-      activeNews.length > 0
-    ) {
-      throw new BadRequestException(
-        'No se puede eliminar un usuario que tiene tickets confirmados o buses activos',
-      );
-    }
-
-    await this.userRepository.delete(id);
-
-    return { ...user, isActive: false };
-
-    ///////////////////////////////////////////////////////////////
+  if (!user) {
+    throw new NotFoundException(`Usuario con ID ${id} no encontrado`);
   }
+
+  // Verificar si tiene tickets confirmados o buses activos
+  const activeTickets =
+    user.tickets?.filter((ticket) => ticket.status === 'CONFIRMADO') || [];
+
+  const activeBuses = user.buses?.filter((bus) => bus.is_active) || [];
+  
+  const activeNews = user.news?.filter((news) => news.id) || [];
+
+  if (
+    activeTickets.length > 0 ||
+    activeBuses.length > 0 ||
+    activeNews.length > 0
+  ) {
+    throw new BadRequestException(
+      'No se puede eliminar un usuario que tiene tickets confirmados, buses activos o noticias publicadas',
+    );
+  }
+
+  // Si tiene perfil, desvincularlo primero
+  if (user.profile) {
+    await this.userRepository.update(id, { profile: null });
+  }
+
+  await this.userRepository.delete(id);
+
+  return { ...user, isActive: false };
+}
+
   // Métodos privados auxiliares
   private async findRoleOrThrow(roleId: string): Promise<Role> {
     const role = await this.roleRepository.findOne({
