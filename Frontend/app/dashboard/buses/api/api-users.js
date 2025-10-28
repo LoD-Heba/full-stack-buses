@@ -5,50 +5,54 @@ const BASE_URL = "http://localhost:3001/api/v1";
  */
 export async function getUsersWithProfile() {
   try {
-    const res = await fetch(`${BASE_URL}/users?limit=100`, {
+    const res = await fetch(`http://localhost:3001/api/v1/users?page=1&limit=100`, {
       cache: "no-store",
-      headers: {
-        "Content-Type": "application/json",
-      },
     });
 
-    const data = await res.json();
-
     if (!res.ok) {
-      throw new Error(data.message || "Error al cargar usuarios");
+      throw new Error("Error al cargar usuarios");
     }
 
-    // Filtrar solo usuarios activos con perfil completo
-    const usersWithProfile = (data.data || []).filter(
-      (user) => user.isActive && user.profile !== null
-    );
+    const response = await res.json();
+    const users = response.data || [];
 
-    // Obtener conteo de buses para cada usuario
+    // Enriquecer cada usuario con su conteo de buses
     const usersWithBusCount = await Promise.all(
-      usersWithProfile.map(async (user) => {
-        try {
-          const busRes = await fetch(`${BASE_URL}/buses/user/${user.id}`, {
-            cache: "no-store",
-          });
-          const busData = await busRes.json();
-          
-          return {
-            ...user,
-            busCount: Array.isArray(busData) ? busData.length : 0,
-          };
-        } catch (error) {
-          console.error(`Error al obtener buses del usuario ${user.id}:`, error);
-          return {
-            ...user,
-            busCount: 0,
-          };
-        }
-      })
+      users
+        .filter((user) => user.profile && user.is_active) // Solo usuarios con perfil completo y activos
+        .map(async (user) => {
+          try {
+            // Obtener buses del usuario
+            const busRes = await fetch(
+              `http://localhost:3001/api/v1/buses?userId=${user.id}`,
+              { cache: "no-store" }
+            );
+
+            if (busRes.ok) {
+              const busData = await busRes.json();
+              return {
+                ...user,
+                busCount: busData.data?.length || 0,
+              };
+            }
+
+            return {
+              ...user,
+              busCount: 0,
+            };
+          } catch (error) {
+            console.error(`Error al cargar buses del usuario ${user.id}:`, error);
+            return {
+              ...user,
+              busCount: 0,
+            };
+          }
+        })
     );
 
     return usersWithBusCount;
   } catch (error) {
-    console.error("Error al cargar usuarios:", error);
+    console.error("Error en getUsersWithProfile:", error);
     throw error;
   }
 }

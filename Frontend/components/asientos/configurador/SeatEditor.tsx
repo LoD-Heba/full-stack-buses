@@ -40,12 +40,17 @@ export default function SeatEditor({
   // Cargar layout inicial si existe
   useEffect(() => {
     if (initialLayout && initialLayout.decks) {
+      console.log("🔄 Cargando layout inicial:", initialLayout);
+
       // Cargar todos los pisos
       const loadedDecks = initialLayout.decks.map((deck: any) => ({
         floor: deck.floor_number,
         name: deck.stack_name,
         cells: deck.layout || [],
       }));
+
+      console.log("📊 Decks procesados:", loadedDecks);
+
       setDecks(loadedDecks);
 
       // Cargar primer piso
@@ -53,7 +58,24 @@ export default function SeatEditor({
         setCells(loadedDecks[0].cells);
         setDeckNumber(loadedDecks[0].floor);
         setStackName(loadedDecks[0].name);
+
+        // Actualizar contador de asientos
+        const maxSeat = Math.max(
+          ...loadedDecks[0].cells
+            .filter((c: any) => c.seat_number)
+            .map((c: any) => c.seat_number),
+          0
+        );
+        setSeatCounter(maxSeat + 1);
+
+        console.log("✅ Primer piso cargado:", {
+          cells: loadedDecks[0].cells.length,
+          maxSeat,
+          nextSeatCounter: maxSeat + 1,
+        });
       }
+    } else {
+      console.warn("⚠️ No hay initialLayout o no tiene decks");
     }
   }, [initialLayout]);
 
@@ -190,22 +212,31 @@ export default function SeatEditor({
         floor_number: deck.floor,
         stack_name: deck.name,
         description: `Configuración del ${deck.name}`,
-        seats: deck.cells.map((cell: any) => ({
-          seat_code:
-            cell.seat_code || `ELEM-${cell.position_x}-${cell.position_y}`,
-          seat_number:
-            cell.visual_type === "seat" ? cell.seat_number : undefined,
-          position_x: cell.position_x,
-          position_y: cell.position_y,
-          visual_type: cell.visual_type,
-          rotation: cell.rotation || 0,
-          type: cell.type || "normal",
-          deck: deck.floor,
-          meta: {},
-        })),
+        seats: deck.cells.map((cell: any) => {
+          // ✅ Crear objeto base sin deck
+          const seatData: any = {
+            seat_code:
+              cell.seat_code || `ELEM-${cell.position_x}-${cell.position_y}`,
+            position_x: cell.position_x,
+            position_y: cell.position_y,
+            visual_type: cell.visual_type,
+            rotation: cell.rotation || 0,
+            type: cell.type || "normal",
+            meta: {},
+          };
+
+          // ✅ Solo agregar seat_number si es un asiento real
+          if (cell.visual_type === "seat" && cell.seat_number) {
+            seatData.seat_number = cell.seat_number;
+          }
+
+          // ✅ NO incluir deck - se toma del floor_number del stack
+          return seatData;
+        }),
       })),
     };
 
+    console.log("📦 Datos a enviar:", JSON.stringify(layoutData, null, 2));
     onSave(layoutData);
   };
 

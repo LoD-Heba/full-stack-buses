@@ -216,6 +216,13 @@ export default function AsientoMapa({
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [selectedDeck, setSelectedDeck] = useState(1);
   const [error, setError] = useState(null);
+  
+  useEffect(() => {
+    if (onSeatSelect) {
+      console.log("🎯 Asientos seleccionados:", selectedSeats);
+      onSeatSelect(selectedSeats);
+    }
+  }, [selectedSeats]);
 
   useEffect(() => {
     if (!busLayout) {
@@ -286,49 +293,44 @@ export default function AsientoMapa({
         newSelection = [...prev, normalizedCode];
       }
 
-      if (onSeatSelect) {
-        console.log("🎯 Asientos seleccionados:", newSelection);
-        onSeatSelect(newSelection);
-      }
-
-      return newSelection;
+      return newSelection; // ✅ Solo retornar, no llamar a onSeatSelect aquí
     });
   };
 
   const clearSelection = () => {
-    setSelectedSeats([]);
-    if (onSeatSelect) {
-      onSeatSelect([]);
-    }
+    setSelectedSeats([]); // ✅ Solo actualizar estado
+    // El useEffect se encargará de notificar al padre
   };
 
   const renderDeckLayout = (deckData) => {
     let layout = deckData.layout || [];
 
-    console.log("📊 renderDeckLayout - Estado actual:");
+    console.log("📊 renderDeckLayout - Piso:", deckData.deck);
+    console.log("  - Layout original:", layout);
     console.log("  - occupiedSeats:", occupiedSeats);
-    console.log("  - layout original:", layout);
 
-    // ✅ Actualizar layout con estados reales
+    // ✅ Actualizar layout con estados reales del backend
     if (
       Array.isArray(occupiedSeats) &&
       occupiedSeats.length > 0 &&
       typeof occupiedSeats[0] === "object"
     ) {
-      console.log("✅ Aplicando estados del backend...");
       layout = layout.map((seat) => {
         const seatWithStatus = occupiedSeats.find(
-          (os) => os.seat_code?.toUpperCase() === seat.seat_code?.toUpperCase()
+          (os) =>
+            os.seat_code?.toUpperCase() === seat.seat_code?.toUpperCase() &&
+            os.deck === deckData.deck // ✅ Filtrar por piso
         );
 
         if (seatWithStatus) {
-          console.log(`  - ${seat.seat_code}: ${seatWithStatus.status}`);
+          console.log(
+            `  ✓ ${seat.seat_code} en piso ${deckData.deck}: ${seatWithStatus.status}`
+          );
+          return seatWithStatus;
         }
 
-        return seatWithStatus || seat;
+        return seat;
       });
-    } else {
-      console.warn("⚠️ occupiedSeats no está disponible o está vacío");
     }
 
     if (layout.length === 0) {
@@ -356,8 +358,6 @@ export default function AsientoMapa({
         >
           {layout.map((seat, index) => {
             const seatCode = seat.seat_code?.toUpperCase();
-
-            // ✅ El seat ya viene con su status actualizado desde el backend
             const isDisabled =
               seat.status === "ocupado" ||
               seat.status === "reservado" ||
@@ -426,8 +426,8 @@ export default function AsientoMapa({
           </div>
         )}
 
-        {/* Selector de pisos */}
-        {busLayout.floors > 1 && busLayout.decks.length > 1 && (
+        {/* ✅ Selector de pisos - MEJORADO */}
+        {busLayout.decks && busLayout.decks.length > 1 && (
           <div className="bg-white p-4 rounded-lg shadow-md">
             <p className="text-sm font-semibold text-gray-700 mb-3">
               Seleccionar Piso:
@@ -437,8 +437,10 @@ export default function AsientoMapa({
                 <button
                   key={deck.deck}
                   onClick={() => {
+                    console.log("🔄 Cambiando a piso:", deck.deck);
                     setSelectedDeck(deck.deck);
-                    setSelectedSeats([]);
+                    // ✅ NO limpiar la selección al cambiar de piso
+                    // Los asientos seleccionados persisten entre pisos
                   }}
                   className={`px-4 py-2 rounded-lg font-semibold transition-all ${
                     selectedDeck === deck.deck
@@ -446,7 +448,15 @@ export default function AsientoMapa({
                       : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                   }`}
                 >
-                  Piso {deck.deck}
+                  <div className="flex flex-col items-center">
+                    <span>Piso {deck.deck}</span>
+                    <span className="text-xs opacity-75 mt-1">
+                      {deck.stack_name}
+                    </span>
+                    <span className="text-xs opacity-75">
+                      ({deck.layout?.length || 0} elementos)
+                    </span>
+                  </div>
                 </button>
               ))}
             </div>
@@ -457,18 +467,27 @@ export default function AsientoMapa({
         <div className="bg-white rounded-lg shadow-md p-6">
           {/* Frente del bus */}
           <div className="bg-gray-800 text-white py-2 px-4 rounded-t-lg mb-6 text-center">
-            <p className="font-semibold">🚌 Frente del Bus - Conductor</p>
+            <p className="font-semibold">
+              🚌 Frente del Bus - Conductor
+              {busLayout.decks && busLayout.decks.length > 1 && (
+                <span className="ml-3 text-sm text-gray-300">
+                  (Piso {selectedDeck})
+                </span>
+              )}
+            </p>
           </div>
 
-          {/* Grid de asientos */}
+          {/* ✅ Grid de asientos - CORREGIDO */}
           <div className="flex justify-center">
-            {busLayout.floors > 1
-              ? busLayout.decks.map((deckData) => (
-                  <React.Fragment key={deckData.deck}>
-                    {renderDeckLayout(deckData)}
-                  </React.Fragment>
-                ))
-              : renderDeckLayout(currentDeckData)}
+            {currentDeckData ? (
+              renderDeckLayout(currentDeckData)
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500">
+                  No se encontró el piso seleccionado
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Parte trasera */}

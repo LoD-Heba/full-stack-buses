@@ -29,19 +29,23 @@ export async function configureBusLayout(busId, layoutConfig) {
  */
 export async function getBusLayout(busId) {
   try {
-    const res = await fetch(`${BASE_URL}/buses/${busId}/layout`, {
-      cache: "no-store",
-    });
-
-    const data = await res.json();
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/buses/${busId}/layout`,
+      {
+        cache: 'no-store',
+      }
+    );
 
     if (!res.ok) {
-      throw new Error(data.message || "Error al obtener el layout");
+      const errorData = await res.json();
+      throw new Error(errorData.message || 'Error al obtener el layout');
     }
 
+    const data = await res.json();
+    console.log("✅ Layout obtenido:", data);
     return data;
   } catch (error) {
-    console.error("Error al obtener layout:", error);
+    console.error("❌ Error en getBusLayout:", error);
     throw error;
   }
 }

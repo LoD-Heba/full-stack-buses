@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import SeatEditor from "@/components/asientos/configurador/SeatEditor";
-import { configureBusLayout, getBusLayout } from "@/app/dashboard/buses/api/api-bus-layout";
+import {
+  configureBusLayout,
+  getBusLayout,
+} from "@/app/dashboard/buses/api/api-bus-layout";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -29,7 +32,7 @@ export default function ConfiguradorPage() {
   const loadBusData = async () => {
     try {
       setLoading(true);
-      
+
       // Cargar información del bus
       const busResponse = await fetch(
         `http://localhost:3001/api/v1/buses/${busId}`
@@ -40,11 +43,23 @@ export default function ConfiguradorPage() {
       // Intentar cargar layout existente
       try {
         const layout = await getBusLayout(busId);
+        console.log("📦 Layout cargado del backend:", layout);
+
         if (layout && layout.decks && layout.decks.length > 0) {
-          setInitialLayout(layout.decks[0]);
+          // ✅ Pasar el objeto completo, no solo el primer deck
+          setInitialLayout({
+            decks: layout.decks.map((deck) => ({
+              floor_number: deck.deck,
+              stack_name: deck.stack_name,
+              layout: deck.layout || [],
+            })),
+          });
+        } else {
+          console.warn("⚠️ Layout sin decks válidos");
         }
       } catch (err) {
-        console.log("No hay layout previo, iniciando desde cero");
+        console.error("❌ Error al cargar layout:", err);
+        console.log("Iniciando desde cero");
       }
     } catch (error) {
       toast.error("Error al cargar información del bus");
