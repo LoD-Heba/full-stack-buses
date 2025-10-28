@@ -1,5 +1,3 @@
-//export const BACKEND_URL = process.env.BACKEND_URL
-
 export async function createUser(datosDeUsuario) {
   const res = await fetch(`http://localhost:3001/api/v1/users`, {
     method: "POST",
@@ -16,15 +14,21 @@ export async function createUser(datosDeUsuario) {
   return data;
 }
 
-export async function getUsers(page = 1, limit = 10) {
-  const data = await fetch(
-    `http://localhost:3001/api/v1/users?page=${page}&limit=${limit}`,
-    {
-      cache: "no-store",
-    }
-  );
+// ✅ Agregamos parámetro isActive para filtrar
+export async function getUsers(page = 1, limit = 10, isActive = null) {
+  let url = `http://localhost:3001/api/v1/users?page=${page}&limit=${limit}`;
+  
+  // ✅ Si se especifica isActive, agregamos el filtro
+  if (isActive !== null) {
+    url += `&isActive=${isActive}`;
+  }
+  
+  const data = await fetch(url, {
+    cache: "no-store",
+  });
   return await data.json();
 }
+
 
 export async function getUser(id) {
   const data = await fetch(`http://localhost:3001/api/v1/users/${id}`, {
@@ -33,23 +37,46 @@ export async function getUser(id) {
   return await data.json();
 }
 
+export async function getUserWithStats(id) {
+  try {
+    const res = await fetch(`http://localhost:3001/api/v1/users/${id}/stats`, {
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      throw new Error("Error al obtener estadísticas del usuario");
+    }
+
+    return await res.json();
+  } catch (error) {
+    console.error("Error al obtener estadísticas:", error);
+    throw error;
+  }
+}
+
 export async function deleteUser(id) {
-  console.log("Deleting user with ID:", id); // ✅ Debug
+  console.log("Deleting user with ID:", id);
 
   const res = await fetch(`http://localhost:3001/api/v1/users/${id}`, {
     method: "DELETE",
   });
 
-  const data = await res.json();
-
-  // ✅ Manejar errores del backend
   if (!res.ok) {
-    throw new Error(data.message || "Error al eliminar el usuario");
+    let errorMessage = "Error al eliminar el usuario";
+    
+    try {
+      const data = await res.json();
+      errorMessage = data.message || errorMessage;
+    } catch (e) {
+      errorMessage = `Error ${res.status}: ${res.statusText}`;
+    }
+    
+    throw new Error(errorMessage);
   }
 
+  const data = await res.json();
   return data;
 }
-// ... tus funciones existentes ...
 
 export async function toggleActiveUser(id) {
   console.log("Activating user with ID:", id);
@@ -82,11 +109,8 @@ export async function toggleDeactiveUser(id) {
 
   return data;
 }
-// ✅ CORREGIDO: Ahora acepta (id, newUser) como parámetros separados
-export async function updateUser(id, newUser) {
-  // console.log("Updating user with ID:", id); // ✅ Debug
-  // console.log("Data to send:", newUser); // ✅ Debug
 
+export async function updateUser(id, newUser) {
   const res = await fetch(`http://localhost:3001/api/v1/users/${id}`, {
     method: "PATCH",
     headers: {
@@ -98,13 +122,13 @@ export async function updateUser(id, newUser) {
 
   const data = await res.json();
 
-  // ✅ Manejar errores del backend
   if (!res.ok) {
     throw new Error(data.message || "Error al actualizar el usuario");
   }
 
   return data;
 }
+
 export async function getUserProfile(id) {
   try {
     const res = await fetch(`http://localhost:3001/api/v1/users/${id}`, {

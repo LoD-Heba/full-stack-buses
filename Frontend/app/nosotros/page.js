@@ -19,9 +19,9 @@ export default function NosotrosPage() {
 
   // EDITABLE: Información de la empresa
   const infoEmpresa = {
-    añoFundacion: "1995",
-    experiencia: "30 años",
-    flotas: "45+",
+    añoFundacion: "2010",
+    experiencia: "15 años",
+    flotas: "25+",
     destinos: "9 departamentos",
     pasajerosAnuales: "500,000+"
   };
@@ -29,7 +29,7 @@ export default function NosotrosPage() {
   // EDITABLE: Historia de la empresa
   const historia = {
     titulo: "Nuestra Historia",
-    parrafo1: "Trans Sacaba nace en 1995 con la visión de conectar los 9 departamentos de Bolivia, ofreciendo un servicio de transporte terrestre de calidad, seguro y accesible para todos los bolivianos.",
+    parrafo1: "Trans Sacaba nace en 2010 con la visión de conectar los 9 departamentos de Bolivia, ofreciendo un servicio de transporte terrestre de calidad, seguro y accesible para todos los bolivianos.",
     parrafo2: "Desde nuestros inicios en Sacaba, Cochabamba, hemos crecido constantemente, expandiendo nuestras rutas y modernizando nuestra flota. Hoy somos una de las empresas de transporte más confiables del país.",
     parrafo3: "Nuestro compromiso con la excelencia nos ha permitido ganar la confianza de miles de familias bolivianas que nos eligen para sus viajes."
   };

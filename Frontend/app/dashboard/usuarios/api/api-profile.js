@@ -1,5 +1,3 @@
-// app/dashboard/usuarios/api/api-profile.js
-
 export async function updateUserProfile(userId, profileData) {
   console.log("Updating profile for user:", userId);
   console.log("Profile data:", profileData);
@@ -13,12 +11,25 @@ export async function updateUserProfile(userId, profileData) {
     cache: "no-store",
   });
   
-  const data = await res.json();
-  
   if (!res.ok) {
-    throw new Error(data.message || "Error al actualizar el perfil");
+    let errorMessage = "Error al actualizar el perfil";
+    
+    try {
+      const data = await res.json();
+      errorMessage = data.message || errorMessage;
+      
+      // Si el mensaje es un array, tomar el primer elemento
+      if (Array.isArray(errorMessage)) {
+        errorMessage = errorMessage[0];
+      }
+    } catch (e) {
+      errorMessage = `Error ${res.status}: ${res.statusText}`;
+    }
+    
+    throw new Error(errorMessage);
   }
   
+  const data = await res.json();
   return data;
 }
 
@@ -34,11 +45,24 @@ export async function createUserProfile(userId, profileData) {
     body: JSON.stringify(profileData),
   });
   
-  const data = await res.json();
-  
   if (!res.ok) {
-    throw new Error(data.message || "Error al crear el perfil");
+    let errorMessage = "Error al crear el perfil";
+    
+    try {
+      const data = await res.json();
+      errorMessage = data.message || errorMessage;
+      
+      // Si el mensaje es un array, tomar el primer elemento
+      if (Array.isArray(errorMessage)) {
+        errorMessage = errorMessage[0];
+      }
+    } catch (e) {
+      errorMessage = `Error ${res.status}: ${res.statusText}`;
+    }
+    
+    throw new Error(errorMessage);
   }
   
+  const data = await res.json();
   return data;
 }

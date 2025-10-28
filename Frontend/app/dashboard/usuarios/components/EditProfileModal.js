@@ -1,4 +1,3 @@
-// components/EditProfileModal.jsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -21,9 +20,7 @@ import {
 } from "@/app/dashboard/usuarios/api/api-profile";
 
 export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
-  const [backendError, setBackendError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
   const hasProfile = !!user?.profile;
 
   const {
@@ -67,22 +64,27 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
   const onSubmit = handleSubmit(async (data) => {
     try {
       setIsSubmitting(true);
-      setBackendError(null);
 
-      const profileData = {
-        firstName: data.firstName || undefined,
-        lastName: data.lastName || undefined,
-        documentNumber: data.documentNumber || undefined,
-        phone: data.phone || undefined,
-        email: data.email || undefined, // AGREGAR
-        address: data.address || undefined,
-      };
+      // Filtrar campos vacíos y preparar datos
+      const profileData = {};
+      
+      if (data.firstName?.trim()) profileData.firstName = data.firstName.trim();
+      if (data.lastName?.trim()) profileData.lastName = data.lastName.trim();
+      if (data.documentNumber?.trim()) profileData.documentNumber = data.documentNumber.trim().toUpperCase();
+      if (data.phone?.trim()) profileData.phone = data.phone.trim().replace(/[\s\-]/g, '');
+      if (data.email?.trim()) profileData.email = data.email.trim().toLowerCase();
+      if (data.address?.trim()) profileData.address = data.address.trim();
 
       let result;
       if (hasProfile) {
         result = await updateUserProfile(user.id, profileData);
         toast.success("Perfil actualizado correctamente");
       } else {
+        // Al crear, firstName y lastName son requeridos
+        if (!profileData.firstName || !profileData.lastName) {
+          toast.error("Nombres y apellidos son obligatorios");
+          return;
+        }
         result = await createUserProfile(user.id, profileData);
         toast.success("Perfil creado correctamente");
       }
@@ -91,7 +93,6 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
       onClose();
     } catch (err) {
       console.error("Error al guardar perfil:", err);
-      setBackendError(err.message || "Error al guardar el perfil");
       toast.error(err.message || "Error al guardar el perfil");
     } finally {
       setIsSubmitting(false);
@@ -106,7 +107,10 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
             {hasProfile ? "Editar Perfil" : "Crear Perfil"}
           </DialogTitle>
           <DialogDescription>
-            Actualiza la información personal del usuario
+            {hasProfile 
+              ? "Actualiza la información personal del usuario"
+              : "Completa los datos para crear el perfil del usuario"
+            }
           </DialogDescription>
         </DialogHeader>
 
@@ -114,9 +118,12 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
           {/* Nombres y Apellidos */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Nombre(s)</Label>
+              <Label>
+                Nombre(s) {!hasProfile && <span className="text-red-500">*</span>}
+              </Label>
               <Input
                 {...register("firstName", {
+                  required: !hasProfile ? "El nombre es obligatorio" : false,
                   maxLength: { value: 50, message: "Máximo 50 caracteres" },
                 })}
                 placeholder="Ej: Juan Carlos"
@@ -129,9 +136,12 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
             </div>
 
             <div>
-              <Label>Apellido(s)</Label>
+              <Label>
+                Apellido(s) {!hasProfile && <span className="text-red-500">*</span>}
+              </Label>
               <Input
                 {...register("lastName", {
+                  required: !hasProfile ? "El apellido es obligatorio" : false,
                   maxLength: { value: 50, message: "Máximo 50 caracteres" },
                 })}
                 placeholder="Ej: Pérez García"
@@ -147,7 +157,7 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
           {/* Documento y Teléfono */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Número de Documento</Label>
+              <Label>Número de Documento (opcional)</Label>
               <Input
                 {...register("documentNumber", {
                   maxLength: { value: 20, message: "Máximo 20 caracteres" },
@@ -166,7 +176,7 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
             </div>
 
             <div>
-              <Label>Teléfono</Label>
+              <Label>Teléfono (opcional)</Label>
               <Input
                 type="tel"
                 {...register("phone", {
@@ -204,9 +214,6 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
                 {errors.email.message}
               </p>
             )}
-            <p className="text-xs text-gray-500 mt-1">
-              El email es opcional y puede agregarse más tarde
-            </p>
           </div>
 
           {/* Dirección */}
@@ -225,13 +232,6 @@ export function EditProfileModal({ isOpen, onClose, user, onSuccess }) {
               </p>
             )}
           </div>
-
-          {/* Mensaje de error del backend */}
-          {backendError && (
-            <p className="text-red-600 text-center font-medium">
-              {backendError}
-            </p>
-          )}
 
           {/* Botones */}
           <div className="flex justify-end gap-3 pt-4">
